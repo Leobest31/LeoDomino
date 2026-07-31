@@ -1,0 +1,47 @@
+/* Shared motion tokens & reduced-motion gates */
+
+:root {
+  --duration-flight: 480ms;
+  --duration-draw: 440ms;
+  --duration-flip: 280ms;
+  --ease-flight: cubic-bezier(0.22, 0.9, 0.2, 1);
+  --ease-snap: cubic-bezier(0.18, 0.9, 0.22, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 1ms;
+    --duration-med: 1ms;
+    --duration-slow: 1ms;
+    --duration-flight: 1ms;
+    --duration-draw: 1ms;
+    --duration-flip: 1ms;
+  }
+
+  .domino--interactive:hover,
+  .domino--interactive:active,
+  .domino--selected,
+  .player-panel__tile,
+  .player-panel__tile--enter,
+  .player-panel__status--turn,
+  .player-panel--turn .player-panel__meta,
+  .game-table__slot,
+  .game-table__slot--enter,
+  .flying-domino,
+  .flying-domino__inner,
+  .game-banner,
+  .game-banner--match::after,
+  .game-page--celebrate .game-table__felt,
+  .opponent-panel__status--thinking,
+  .opponent-panel__status--turn,
+  .opponent-panel__tile--enter,
+  .opponent-panel--thinking .opponent-panel__meta,
+  .opponent-panel--turn .opponent-panel__meta,
+  .scoreboard__points,
+  .scoreboard__points--bump,
+  .scoreboard__fill,
+  .avatar--active .avatar__ring {
+    animation: none !important;
+    transition: none !important;
+  }
+}

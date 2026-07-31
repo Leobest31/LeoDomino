@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 88" fill="none" role="img" aria-label="LeoDomino 3-6">
+  <defs>
+    <linearGradient id="tileFace" x1="8" y1="4" x2="48" y2="84" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFCF6"/>
+      <stop offset="0.45" stop-color="#F3EEE4"/>
+      <stop offset="1" stop-color="#D8CFBF"/>
+    </linearGradient>
+    <filter id="tileShadow" x="-20%" y="-10%" width="140%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <g filter="url(#tileShadow)">
+    <rect x="4" y="4" width="48" height="80" rx="7" fill="url(#tileFace)" stroke="#2A2318" stroke-width="2.25"/>
+  </g>
+  <line x1="12" y1="44" x2="44" y2="44" stroke="#2A2318" stroke-width="2" stroke-linecap="round"/>
+  <!-- 3 pips (top) -->
+  <circle cx="16" cy="16" r="3.6" fill="#1A1814"/>
+  <circle cx="28" cy="24" r="3.6" fill="#1A1814"/>
+  <circle cx="40" cy="32" r="3.6" fill="#1A1814"/>
+  <!-- 6 pips (bottom) -->
+  <circle cx="16" cy="54" r="3.6" fill="#1A1814"/>
+  <circle cx="16" cy="64" r="3.6" fill="#1A1814"/>
+  <circle cx="16" cy="74" r="3.6" fill="#1A1814"/>
+  <circle cx="40" cy="54" r="3.6" fill="#1A1814"/>
+  <circle cx="40" cy="64" r="3.6" fill="#1A1814"/>
+  <circle cx="40" cy="74" r="3.6" fill="#1A1814"/>
+</svg>

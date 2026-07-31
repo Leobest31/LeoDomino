@@ -1,0 +1,309 @@
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: #05070c;
+  opacity: 1;
+  transform: translateZ(0);
+  transition: opacity 640ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: auto;
+  will-change: opacity;
+}
+
+.splash--exit {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash--exit .splash__crest-wrap {
+  animation: none;
+  opacity: 0;
+  transform: scale(0.985);
+  transition:
+    opacity 560ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.splash__frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.splash__atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.splash__wood {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 65% 50% at 50% 40%, rgba(20, 36, 72, 0.42), transparent 62%),
+    radial-gradient(ellipse 70% 55% at 50% 48%, rgba(74, 46, 24, 0.18), transparent 65%),
+    linear-gradient(165deg, #0c1018 0%, #07090e 48%, #040508 100%);
+}
+
+.splash__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 42%, transparent 18%, rgba(0, 0, 0, 0.68) 100%);
+}
+
+.splash__rays {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: min(48rem, 140vw);
+  height: min(48rem, 140vw);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(64, 196, 255, 0.06) 10deg,
+    transparent 22deg,
+    transparent 55deg,
+    rgba(201, 162, 39, 0.05) 66deg,
+    transparent 78deg,
+    transparent 140deg,
+    rgba(64, 196, 255, 0.05) 152deg,
+    transparent 168deg,
+    transparent 250deg,
+    rgba(232, 197, 71, 0.04) 262deg,
+    transparent 278deg,
+    transparent 320deg,
+    rgba(64, 196, 255, 0.05) 330deg,
+    transparent 342deg
+  );
+  mask-image: radial-gradient(circle, #000 0%, transparent 68%);
+  animation: splash-rays 2.4s var(--ease-out) 0.2s both;
+  will-change: transform, opacity;
+}
+
+.splash__particles {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.splash__particle {
+  position: absolute;
+  bottom: 8%;
+  border-radius: 50%;
+  background: rgba(120, 210, 255, 0.75);
+  box-shadow: 0 0 6px rgba(64, 196, 255, 0.45);
+  opacity: 0;
+  animation-name: splash-particle;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+.splash__particle:nth-child(odd) {
+  background: rgba(246, 231, 168, 0.75);
+  box-shadow: 0 0 6px rgba(201, 162, 39, 0.4);
+}
+
+.splash__stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: min(92vw, 30rem);
+  padding: var(--space-md);
+}
+
+.splash__lion-glow {
+  position: absolute;
+  left: 50%;
+  top: 36%;
+  width: min(15rem, 55vw);
+  height: min(13rem, 46vw);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(232, 197, 71, 0.4) 0%, rgba(201, 162, 39, 0.16) 42%, transparent 72%);
+  filter: blur(3px);
+  opacity: 0;
+  animation:
+    splash-glow-in 900ms var(--ease-out) 120ms both,
+    splash-glow-pulse 2.6s ease-in-out 1.05s infinite;
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+
+.splash__crest-wrap {
+  position: relative;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  animation:
+    splash-crest-in 980ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    splash-breathe 3.2s ease-in-out 1.2s infinite;
+  will-change: transform, opacity;
+}
+
+.splash__crest {
+  width: 100%;
+  max-width: min(88vw, 28rem);
+}
+
+.splash__sweep {
+  position: absolute;
+  inset: 16% 10% 40% 10%;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 10px;
+}
+
+.splash__sweep::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -45%;
+  width: 34%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 40%,
+    rgba(255, 245, 200, 0.38) 50%,
+    rgba(255, 255, 255, 0.06) 60%,
+    transparent 100%
+  );
+  transform: skewX(-16deg);
+  animation: splash-sweep 1.1s var(--ease-out) 1.05s both;
+}
+
+.splash--reduced .splash__rays,
+.splash--reduced .splash__particle,
+.splash--reduced .splash__lion-glow,
+.splash--reduced .splash__crest-wrap,
+.splash--reduced .splash__sweep::after {
+  animation: none !important;
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+.splash--reduced {
+  transition-duration: 180ms;
+}
+
+.splash--reduced.splash--exit .splash__crest-wrap {
+  transition-duration: 140ms;
+}
+
+@keyframes splash-crest-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes splash-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.006);
+  }
+}
+
+@keyframes splash-glow-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.86);
+  }
+  to {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes splash-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+}
+
+@keyframes splash-rays {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(0deg) scale(0.92);
+  }
+  40% {
+    opacity: 0.75;
+  }
+  to {
+    opacity: 0.42;
+    transform: translate(-50%, -50%) rotate(12deg) scale(1);
+  }
+}
+
+@keyframes splash-particle {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.6);
+  }
+  14% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(8px, -70vh, 0) scale(1);
+  }
+}
+
+@keyframes splash-sweep {
+  from {
+    opacity: 0;
+    transform: translateX(0) skewX(-16deg);
+  }
+  16% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(340%) skewX(-16deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash,
+  .splash__rays,
+  .splash__particle,
+  .splash__lion-glow,
+  .splash__crest-wrap,
+  .splash__sweep::after,
+  .splash--exit .splash__crest-wrap {
+    animation: none !important;
+    transition: opacity 180ms linear !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .splash__stage {
+    width: min(96vw, 22rem);
+  }
+}

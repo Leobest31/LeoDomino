@@ -1,0 +1,57 @@
+.flying-domino {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+
+.flying-domino__inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--from-w);
+  height: var(--from-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  will-change: transform;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.42));
+  animation: flying-domino-slide var(--flight-duration) var(--ease-flight) forwards;
+}
+
+.flying-domino__inner .domino {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  box-shadow: var(--shadow-tile);
+}
+
+/* Natural table slide: transform-only, shallow lift, soft settle. */
+@keyframes flying-domino-slide {
+  0% {
+    transform:
+      translate3d(var(--from-x), var(--from-y), 0)
+      rotate(0deg)
+      scale(1, 1);
+  }
+  55% {
+    transform:
+      translate3d(
+        calc(var(--from-x) + (var(--to-x) - var(--from-x)) * 0.55),
+        calc(var(--from-y) + (var(--to-y) - var(--from-y)) * 0.55 - var(--arc-lift)),
+        0
+      )
+      rotate(calc(var(--flight-rotate) * 0.55))
+      scale(
+        calc(1 + (var(--to-scale-x) - 1) * 0.55),
+        calc(1 + (var(--to-scale-y) - 1) * 0.55)
+      );
+  }
+  100% {
+    transform:
+      translate3d(var(--to-x), var(--to-y), 0)
+      rotate(var(--flight-rotate))
+      scale(var(--to-scale-x), var(--to-scale-y));
+  }
+}

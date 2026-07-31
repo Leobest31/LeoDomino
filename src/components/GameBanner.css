@@ -1,0 +1,112 @@
+.game-banner {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  z-index: 70;
+  min-width: min(18rem, calc(100vw - 2rem));
+  max-width: 22rem;
+  padding: 1.15rem 1.35rem;
+  text-align: center;
+  pointer-events: none;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  background:
+    linear-gradient(165deg, rgba(28, 24, 16, 0.96), rgba(8, 12, 10, 0.97));
+  box-shadow: var(--shadow-panel), var(--glow-gold);
+  transform: translate(-50%, -50%);
+  animation: banner-in var(--duration-slow) var(--ease-out) both;
+}
+
+.game-banner::before {
+  content: "";
+  position: absolute;
+  inset: -28%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 162, 39, 0.22), transparent 68%);
+  animation: banner-bloom 900ms var(--ease-out) both;
+  pointer-events: none;
+}
+
+.game-banner--match {
+  border-color: rgba(232, 197, 71, 0.55);
+}
+
+.game-banner--match::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.25);
+  animation: banner-pulse 1.2s ease-in-out 2;
+}
+
+.game-banner__title {
+  font-family: var(--font-brand);
+  font-size: 1.35rem;
+  font-weight: 600;
+  background: linear-gradient(180deg, #f3e2a0, var(--color-gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.game-banner__subtitle {
+  margin-top: 0.4rem;
+  font-size: 0.92rem;
+  color: var(--color-text-muted);
+  animation: banner-sub-in 520ms var(--ease-out) 120ms both;
+}
+
+@keyframes banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes banner-sub-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes banner-bloom {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes banner-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-banner,
+  .game-banner::before,
+  .game-banner--match::after,
+  .game-banner__subtitle {
+    animation: none !important;
+  }
+}

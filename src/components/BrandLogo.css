@@ -1,0 +1,52 @@
+/* Official crest — height-driven, aspect locked, never stretched. */
+
+.brand-logo {
+  --crest-aspect: 999 / 1024;
+  display: block;
+  height: 2.15rem;
+  width: auto;
+  aspect-ratio: var(--crest-aspect);
+  max-width: 100%;
+  overflow: visible;
+  flex-shrink: 0;
+  user-select: none;
+  pointer-events: none;
+  /* Soft brand halo only — does not alter artwork. */
+  filter: drop-shadow(0 0 8px rgba(40, 160, 255, 0.16));
+}
+
+.brand-logo image {
+  /* Keep embedded crest pixel-crisp when scaled down. */
+  image-rendering: auto;
+}
+
+.brand-logo--sm {
+  height: 1.7rem;
+}
+
+.brand-logo--md {
+  height: 2.2rem;
+}
+
+.brand-logo--lg {
+  height: clamp(2.6rem, 7vw, 3.6rem);
+}
+
+.brand-logo--xl {
+  height: clamp(4rem, 14vw, 6.5rem);
+}
+
+.brand-logo--splash {
+  height: auto;
+  width: 100%;
+  max-height: min(72vh, 28rem);
+  aspect-ratio: var(--crest-aspect);
+  filter: drop-shadow(0 0 26px rgba(40, 160, 255, 0.26))
+    drop-shadow(0 16px 36px rgba(0, 0, 0, 0.5));
+}
+
+@media (min-width: 768px) {
+  .brand-logo--md {
+    height: 2.45rem;
+  }
+}

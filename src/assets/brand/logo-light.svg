@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" fill="none" role="img" aria-label="LeoDomino">
+  <defs>
+    <linearGradient id="goldLight" x1="90" y1="20" x2="400" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A67C12"/>
+      <stop offset="0.45" stop-color="#C9A227"/>
+      <stop offset="1" stop-color="#6B5210"/>
+    </linearGradient>
+    <linearGradient id="tileFaceLight" x1="12" y1="12" x2="68" y2="108" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.5" stop-color="#F7F2E8"/>
+      <stop offset="1" stop-color="#E2D8C6"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <rect x="8" y="16" width="56" height="88" rx="8" fill="url(#tileFaceLight)" stroke="#2A2318" stroke-width="2.4"/>
+    <line x1="18" y1="60" x2="54" y2="60" stroke="#2A2318" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="22" cy="30" r="4" fill="#1A1814"/>
+    <circle cx="36" cy="38" r="4" fill="#1A1814"/>
+    <circle cx="50" cy="46" r="4" fill="#1A1814"/>
+    <circle cx="22" cy="72" r="4" fill="#1A1814"/>
+    <circle cx="22" cy="84" r="4" fill="#1A1814"/>
+    <circle cx="22" cy="96" r="4" fill="#1A1814"/>
+    <circle cx="50" cy="72" r="4" fill="#1A1814"/>
+    <circle cx="50" cy="84" r="4" fill="#1A1814"/>
+    <circle cx="50" cy="96" r="4" fill="#1A1814"/>
+  </g>
+  <text
+    x="88"
+    y="78"
+    fill="url(#goldLight)"
+    font-family="Georgia, 'Source Serif 4', 'Times New Roman', serif"
+    font-size="58"
+    font-weight="700"
+    letter-spacing="0.5"
+  >LeoDomino</text>
+</svg>

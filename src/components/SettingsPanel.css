@@ -1,0 +1,198 @@
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  border: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-med) var(--ease-out);
+}
+
+.settings-backdrop--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  width: min(20rem, 92vw);
+  height: 100%;
+  padding: var(--space-md);
+  background:
+    linear-gradient(165deg, rgba(22, 30, 26, 0.98), rgba(8, 12, 10, 0.98));
+  border-left: 1px solid var(--color-panel-border);
+  box-shadow: var(--shadow-panel);
+  transform: translateX(105%);
+  transition: transform var(--duration-med) var(--ease-out);
+}
+
+.settings-panel--open {
+  transform: translateX(0);
+}
+
+.settings-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid rgba(201, 162, 39, 0.2);
+}
+
+.settings-panel__title {
+  font-family: var(--font-brand);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--color-accent-strong);
+}
+
+.settings-panel__close {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.settings-panel__close:hover {
+  color: var(--color-text);
+  border-color: var(--color-panel-border);
+  background: var(--color-accent-soft);
+}
+
+.settings-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding-top: var(--space-lg);
+  overflow-y: auto;
+  padding-bottom: var(--space-xl);
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.settings-panel__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+}
+
+.settings-panel .language-switcher__select,
+.settings-panel .difficulty-switcher__select {
+  width: 100%;
+  max-width: none;
+  min-height: 2.6rem;
+}
+
+.settings-panel__fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.settings-panel__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.92rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.settings-panel__toggle input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--color-gold);
+}
+
+.settings-panel__range {
+  width: 100%;
+  accent-color: var(--color-gold);
+  height: 1.5rem;
+}
+
+.settings-panel__range:disabled {
+  opacity: 0.4;
+}
+
+.settings-panel__select {
+  width: 100%;
+  min-height: 2.6rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-panel-border);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.settings-panel__stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(201, 162, 39, 0.18);
+}
+
+.settings-panel__stats-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.settings-panel__stats-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.settings-panel__stats-list strong {
+  color: var(--color-accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-panel__reset {
+  width: 100%;
+  min-height: 2.5rem;
+}
+
+:root[dir="rtl"] .settings-panel {
+  right: auto;
+  left: 0;
+  border-left: 0;
+  border-right: 1px solid var(--color-panel-border);
+  transform: translateX(-105%);
+}
+
+:root[dir="rtl"] .settings-panel--open {
+  transform: translateX(0);
+}

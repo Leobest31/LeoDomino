@@ -1,0 +1,122 @@
+@import "./variables.css";
+@import "./reset.css";
+@import "./motion.css";
+
+body {
+  background:
+    radial-gradient(ellipse 100% 70% at 50% -10%, rgba(20, 90, 60, 0.22), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(201, 162, 39, 0.07), transparent 50%),
+    radial-gradient(ellipse 40% 35% at 0% 80%, rgba(0, 0, 0, 0.5), transparent 45%),
+    linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-deep) 100%);
+  background-attachment: fixed;
+}
+
+.app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app--booting {
+  min-height: 100%;
+}
+
+.app--game {
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: 2.85rem;
+  min-width: 44px;
+  padding: 0.65rem 1.35rem;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: var(--radius-md);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    filter var(--duration-fast) var(--ease-out);
+}
+
+.btn:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(2px) scale(0.98);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.42;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+  box-shadow: none;
+}
+
+.btn--primary {
+  background: linear-gradient(180deg, var(--color-gold-bright) 0%, var(--color-gold) 48%, var(--color-gold-dim) 100%);
+  color: #1a140c;
+  border: 1px solid rgba(255, 230, 160, 0.35);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.btn--primary:hover:not(:disabled):not([aria-disabled="true"]) {
+  filter: brightness(1.07);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 8px 20px rgba(0, 0, 0, 0.4),
+    var(--glow-gold);
+}
+
+.btn--ghost {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-panel-border);
+  color: var(--color-text);
+}
+
+.btn--ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--color-accent-soft);
+  border-color: rgba(201, 162, 39, 0.45);
+}
+
+.btn--secondary {
+  background: linear-gradient(180deg, rgba(28, 40, 34, 0.95), rgba(14, 22, 18, 0.98));
+  border: 1px solid var(--color-panel-border);
+  color: var(--color-text);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.btn--secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+  border-color: rgba(201, 162, 39, 0.5);
+  background: rgba(24, 42, 34, 0.98);
+}
+
+/* RTL-ready: prefer logical properties in new UI; mirror language select chevron. */
+:root[dir="rtl"] .language-switcher__select {
+  background-position:
+    14px 55%,
+    9px 55%;
+  padding: 0.35rem 0.65rem 0.35rem 1.75rem;
+}

@@ -1,0 +1,115 @@
+:root {
+  /* Room & surfaces — dark luxury */
+  --color-bg-deep: #040806;
+  --color-bg: #08110e;
+  --color-bg-elevated: #121c18;
+  --color-bg-panel: rgba(8, 14, 12, 0.9);
+  --color-felt: #0d4633;
+  --color-felt-mid: #157a52;
+  --color-felt-dark: #08291f;
+  --color-felt-light: #1f8f61;
+  --color-felt-hot: #2aa572;
+  --color-wood: #2a180c;
+  --color-wood-mid: #4c3018;
+  --color-wood-light: #734926;
+  --color-wood-edge: #160d07;
+  --color-wood-highlight: rgba(232, 200, 130, 0.22);
+
+  /* Domino tiles — bone ivory */
+  --color-tile: #f4efe6;
+  --color-tile-hi: #fffcf7;
+  --color-tile-edge: #d2c8b6;
+  --color-tile-shadow: rgba(0, 0, 0, 0.5);
+  --color-pip: #15130f;
+  --color-tile-back: #14352b;
+  --color-tile-back-edge: #1d4a3c;
+
+  /* Brass / gold metal */
+  --color-gold: #c9a227;
+  --color-gold-bright: #e8c547;
+  --color-gold-dim: #8a7020;
+  --color-accent: #c4a35a;
+  --color-accent-soft: rgba(201, 162, 39, 0.14);
+  --color-accent-strong: #e0c36a;
+  --color-panel-border: rgba(201, 162, 39, 0.3);
+
+  /* UI chrome */
+  --color-panel: rgba(8, 14, 12, 0.94);
+  --color-text: #f0ebe3;
+  --color-text-muted: #a8b5ad;
+  --color-text-dim: #6d7c74;
+  --color-danger: #c45c4a;
+  --color-success: #3d9b6e;
+
+  /* Typography */
+  --font-brand: "Source Serif 4", Georgia, serif;
+  --font-ui: "Outfit", sans-serif;
+
+  /* Spacing & layout */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --header-height: 3.55rem;
+  --bottom-bar-height: 4.25rem;
+  --game-max: 1180px;
+
+  /* Domino sizing — fluid, mobile-first */
+  --domino-w: clamp(2rem, 7.2vw, 3.05rem);
+  --domino-h: clamp(3.85rem, 13.6vw, 5.85rem);
+  --domino-pip: clamp(0.26rem, 0.9vw, 0.42rem);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-snap: cubic-bezier(0.18, 0.9, 0.22, 1);
+  --duration-fast: 160ms;
+  --duration-med: 320ms;
+  --duration-slow: 560ms;
+
+  /* Depth */
+  --shadow-tile:
+    0 1px 1px rgba(0, 0, 0, 0.2),
+    0 4px 8px rgba(0, 0, 0, 0.28),
+    0 10px 22px var(--color-tile-shadow),
+    0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  --shadow-panel:
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 220, 150, 0.08);
+  --shadow-wood:
+    0 18px 42px rgba(0, 0, 0, 0.58),
+    0 2px 0 rgba(255, 220, 160, 0.14) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.45) inset;
+  --glow-gold: 0 0 22px rgba(201, 162, 39, 0.22);
+  --glow-turn: 0 0 0 1px rgba(232, 197, 71, 0.35), 0 0 18px rgba(201, 162, 39, 0.28);
+}
+
+/* Noir theme — deeper felt, cooler brass */
+:root[data-theme="noir"] {
+  --color-bg-deep: #020504;
+  --color-bg: #050b09;
+  --color-bg-elevated: #0c1411;
+  --color-felt: #063528;
+  --color-felt-mid: #0c5c40;
+  --color-felt-dark: #031a14;
+  --color-felt-light: #147a52;
+  --color-felt-hot: #1b8f60;
+  --color-wood: #1a100a;
+  --color-wood-mid: #3a2414;
+  --color-wood-light: #5c3a1e;
+  --color-gold: #b8922a;
+  --color-gold-bright: #d4b04a;
+  --color-text: #ebe6de;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --header-height: 4.1rem;
+    --bottom-bar-height: 4.5rem;
+  }
+}

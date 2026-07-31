@@ -1,0 +1,194 @@
+.domino {
+  --_w: var(--domino-w);
+  --_h: var(--domino-h);
+  --_pip: var(--domino-pip);
+
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  width: var(--_w);
+  height: var(--_h);
+  padding: 0.22rem;
+  border: none;
+  border-radius: calc(var(--_w) * 0.12);
+  background:
+    linear-gradient(155deg, var(--color-tile-hi) 0%, var(--color-tile) 48%, var(--color-tile-edge) 100%);
+  box-shadow: var(--shadow-tile);
+  color: var(--color-pip);
+  user-select: none;
+  /* Contact shadow on the felt */
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.22));
+  transition:
+    transform var(--duration-med) var(--ease-out),
+    box-shadow var(--duration-med) var(--ease-out),
+    outline-color var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) linear,
+    filter var(--duration-med) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.domino::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.domino--hidden {
+  opacity: 0 !important;
+  pointer-events: none;
+  transform: none !important;
+}
+
+.domino--sm {
+  --_w: calc(var(--domino-w) * 0.72);
+  --_h: calc(var(--domino-h) * 0.72);
+  --_pip: calc(var(--domino-pip) * 0.72);
+  padding: 0.14rem;
+}
+
+.domino--lg {
+  --_w: calc(var(--domino-w) * 1.12);
+  --_h: calc(var(--domino-h) * 1.12);
+  --_pip: calc(var(--domino-pip) * 1.08);
+}
+
+.domino--horizontal {
+  width: var(--_h);
+  height: var(--_w);
+  flex-direction: row;
+}
+
+.domino--vertical {
+  flex-direction: column;
+}
+
+.domino--interactive {
+  cursor: pointer;
+  min-width: 44px;
+  touch-action: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .domino--interactive:hover {
+    transform: translateY(-5px) scale(1.03);
+    filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.32));
+    box-shadow:
+      0 12px 22px rgba(0, 0, 0, 0.42),
+      0 1px 0 rgba(255, 255, 255, 0.55) inset;
+  }
+}
+
+.domino--interactive:active {
+  transform: translateY(-2px) scale(0.98);
+  transition-duration: 80ms;
+}
+
+.domino--selected {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+  transform: translateY(-8px) scale(1.04);
+  filter: drop-shadow(0 10px 8px rgba(0, 0, 0, 0.35));
+  box-shadow:
+    0 14px 24px rgba(0, 0, 0, 0.48),
+    0 0 0 1px rgba(201, 162, 39, 0.45),
+    var(--glow-gold);
+  animation: domino-select-pop var(--duration-med) var(--ease-out);
+}
+
+@keyframes domino-select-pop {
+  0% {
+    transform: translateY(-2px) scale(0.98);
+  }
+  100% {
+    transform: translateY(-8px) scale(1.04);
+  }
+}
+
+.domino--facedown {
+  background:
+    linear-gradient(145deg, var(--color-tile-back-edge) 0%, var(--color-tile-back) 55%, #0f261f 100%);
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.45),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+.domino__half {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+}
+
+.domino__pips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  width: 78%;
+  height: 78%;
+  place-items: center;
+}
+
+.domino__pip {
+  width: var(--_pip);
+  height: var(--_pip);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.domino__pip--on {
+  background: var(--color-pip);
+  box-shadow:
+    0 0.5px 0.5px rgba(255, 255, 255, 0.2) inset,
+    0 1px 1px rgba(0, 0, 0, 0.25);
+}
+
+.domino__divider {
+  flex-shrink: 0;
+  background: rgba(26, 24, 20, 0.5);
+  border-radius: 1px;
+}
+
+.domino--vertical .domino__divider {
+  width: 72%;
+  height: 1.5px;
+  margin: 0 auto;
+}
+
+.domino--horizontal .domino__divider {
+  width: 1.5px;
+  height: 72%;
+  margin: auto 0;
+}
+
+.domino__back {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--_w) * 0.08);
+  overflow: hidden;
+}
+
+.domino__back-pattern {
+  display: block;
+  width: 70%;
+  height: 78%;
+  border: 1.5px solid rgba(201, 162, 39, 0.32);
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(
+      -32deg,
+      transparent,
+      transparent 3px,
+      rgba(201, 162, 39, 0.1) 3px,
+      rgba(201, 162, 39, 0.1) 4px
+    );
+}

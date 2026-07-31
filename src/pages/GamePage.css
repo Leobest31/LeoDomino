@@ -1,0 +1,120 @@
+.game-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 42%, rgba(18, 78, 54, 0.22), transparent 58%),
+    radial-gradient(ellipse 50% 40% at 100% 0%, rgba(201, 162, 39, 0.05), transparent 50%),
+    linear-gradient(180deg, #07110d 0%, #050a08 100%);
+}
+
+.game-page--celebrate .game-table__felt {
+  animation: felt-celebrate 1.15s var(--ease-out);
+}
+
+@keyframes felt-celebrate {
+  0% {
+    filter: brightness(1);
+  }
+  35% {
+    filter: brightness(1.12);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+.game-page__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 0.15rem;
+}
+
+/* Mobile-first: table owns the viewport; reserve + score share a compact HUD row. */
+.game-page__mid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  padding: 0.25rem 0.55rem 0.35rem;
+  align-content: stretch;
+}
+
+.game-page__mid .game-table {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-height: 0;
+}
+
+.game-page__sidebar {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  min-width: 0;
+}
+
+.game-page__sidebar--left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.game-page__sidebar--right {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+@media (min-width: 720px) {
+  .game-page__mid {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.35rem 0.85rem;
+    max-width: calc(var(--game-max) + 16rem);
+    width: 100%;
+    margin-inline: auto;
+  }
+
+  .game-page__sidebar {
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .game-page__sidebar--left {
+    grid-column: 1;
+    grid-row: 1;
+    width: 5.75rem;
+  }
+
+  .game-page__sidebar--right {
+    grid-column: 3;
+    grid-row: 1;
+    width: 12rem;
+  }
+
+  .game-page__mid .game-table {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+@media (min-width: 1100px) {
+  .game-page__mid {
+    gap: 1rem;
+    padding-inline: 1.1rem;
+  }
+
+  .game-page__sidebar--left {
+    width: 6.5rem;
+  }
+
+  .game-page__sidebar--right {
+    width: 13.25rem;
+  }
+}

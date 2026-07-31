@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="LeoDomino">
+  <defs>
+    <linearGradient id="iconBg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#121C18"/>
+      <stop offset="1" stop-color="#050A08"/>
+    </linearGradient>
+    <linearGradient id="iconTile" x1="180" y1="96" x2="332" y2="400" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFCF6"/>
+      <stop offset="0.5" stop-color="#F3EEE4"/>
+      <stop offset="1" stop-color="#D8CFBF"/>
+    </linearGradient>
+    <linearGradient id="iconGold" x1="120" y1="420" x2="392" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6E7A8"/>
+      <stop offset="0.5" stop-color="#C9A227"/>
+      <stop offset="1" stop-color="#8A6818"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#iconBg)"/>
+  <rect x="176" y="72" width="160" height="268" rx="22" fill="url(#iconTile)" stroke="#2A2318" stroke-width="6"/>
+  <line x1="204" y1="206" x2="308" y2="206" stroke="#2A2318" stroke-width="6" stroke-linecap="round"/>
+  <!-- 3 -->
+  <circle cx="214" cy="118" r="12" fill="#1A1814"/>
+  <circle cx="256" cy="140" r="12" fill="#1A1814"/>
+  <circle cx="298" cy="162" r="12" fill="#1A1814"/>
+  <!-- 6 -->
+  <circle cx="214" cy="244" r="12" fill="#1A1814"/>
+  <circle cx="214" cy="274" r="12" fill="#1A1814"/>
+  <circle cx="214" cy="304" r="12" fill="#1A1814"/>
+  <circle cx="298" cy="244" r="12" fill="#1A1814"/>
+  <circle cx="298" cy="274" r="12" fill="#1A1814"/>
+  <circle cx="298" cy="304" r="12" fill="#1A1814"/>
+  <text
+    x="256"
+    y="420"
+    text-anchor="middle"
+    fill="url(#iconGold)"
+    font-family="Georgia, 'Source Serif 4', 'Times New Roman', serif"
+    font-size="52"
+    font-weight="700"
+  >LeoDomino</text>
+</svg>
