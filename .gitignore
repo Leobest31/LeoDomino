@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# QA artifacts / local dumps
+.qa-screens/
+.env
+.env.*
+!.env.example

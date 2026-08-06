@@ -5,6 +5,8 @@ import {
   AI_DIFFICULTY_STORAGE_KEY,
   normalizeDifficulty,
   applyAiTurn,
+  applyAutoAction,
+  chooseAutoAction,
   chooseThinkTimeMs,
   drawTile,
   getAvailableActions,
@@ -14,26 +16,49 @@ import {
   startNextRound,
   resolvePlayChoice,
 } from "../game/index.js";
+import {
+  HUMAN_INDEX,
+  PLAYER_COUNT_STORAGE_KEY,
+  buildOfflinePlayerIds,
+  isAiSeat,
+  normalizePlayerCount,
+} from "../game/players.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import { MOTION } from "../utils/motion.js";
 import {
   clearMatchSave,
   loadMatch,
+  sanitizeMatchState,
   saveMatch,
   recordMatch,
   recordRound,
 } from "../persistence/index.js";
 
-const HUMAN_INDEX = 0;
-const OPPONENT_INDEX = 1;
-
 function readStoredDifficulty() {
   return normalizeDifficulty(readStorage(AI_DIFFICULTY_STORAGE_KEY, DEFAULT_DIFFICULTY));
+}
+
+function readStoredPlayerCount() {
+  return normalizePlayerCount(readStorage(PLAYER_COUNT_STORAGE_KEY, 2));
+}
+
+function createMatchState(options) {
+  const playerCount = normalizePlayerCount(
+    options.playerCount ?? readStoredPlayerCount()
+  );
+  return startMatch({
+    seed: options.seed,
+    targetScore: options.targetScore,
+    playerCount,
+    playerIds: buildOfflinePlayerIds(playerCount),
+  });
 }
 
 function createInitialState(options) {
   const saved = options.skipResume ? null : loadMatch();
   if (saved?.state) {
+    // Resume integrity: table size comes from the saved match, not prefs.
+    const resumedCount = normalizePlayerCount(saved.state.players?.length);
     return {
       state: saved.state,
       difficulty:
@@ -42,33 +67,41 @@ function createInitialState(options) {
           : normalizeDifficulty(saved.difficulty),
       selectedId: saved.selectedId,
       resumed: true,
+      matchStartedAt: saved.matchStartedAt || Date.now(),
+      playerCount: resumedCount,
     };
   }
+  const preferredCount = normalizePlayerCount(
+    options.playerCount ?? readStoredPlayerCount()
+  );
   return {
-    state: startMatch({
-      seed: options.seed,
-      targetScore: options.targetScore,
-      playerIds: ["you", "rival"],
-    }),
+    state: createMatchState({ ...options, playerCount: preferredCount }),
     difficulty:
       options.difficulty != null
         ? normalizeDifficulty(options.difficulty)
         : readStoredDifficulty(),
     selectedId: null,
     resumed: false,
+    matchStartedAt: Date.now(),
+    playerCount: preferredCount,
   };
 }
 
 /**
  * Bridge rules + commercial AI → UI, with offline save / resume / stats.
- * Does not change engine rules.
+ * Offline V1: human seat 0, AI on every other seat (2 / 3 / 4 players).
  */
 export function useMatch(options = {}) {
   const targetScore = options.targetScore;
   const [boot] = useState(() => createInitialState(options));
   const [difficulty, setDifficultyState] = useState(() => boot.difficulty);
+  const [playerCount, setPlayerCountState] = useState(() => boot.playerCount);
   const [state, setState] = useState(() => boot.state);
   const [selectedId, setSelectedId] = useState(() => boot.selectedId);
+  const [matchStartedAt, setMatchStartedAt] = useState(() => boot.matchStartedAt);
+  const [matchEndedAt, setMatchEndedAt] = useState(() =>
+    boot.state.phase === PHASE.MATCH_OVER ? Date.now() : null
+  );
   const [errorKey, setErrorKey] = useState(null);
   const [aiThinking, setAiThinking] = useState(false);
   const [motionLock, setMotionLock] = useState(false);
@@ -76,8 +109,12 @@ export function useMatch(options = {}) {
   stateRef.current = state;
   const difficultyRef = useRef(difficulty);
   difficultyRef.current = difficulty;
+  const playerCountRef = useRef(playerCount);
+  playerCountRef.current = playerCount;
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
+  const matchStartedAtRef = useRef(matchStartedAt);
+  matchStartedAtRef.current = matchStartedAt;
   const prevPhaseRef = useRef(state.phase);
 
   const actions = useMemo(() => getAvailableActions(state), [state]);
@@ -91,6 +128,7 @@ export function useMatch(options = {}) {
       state: stateRef.current,
       difficulty: difficultyRef.current,
       selectedId: selectedRef.current,
+      matchStartedAt: matchStartedAtRef.current,
     });
   }, []);
 
@@ -100,15 +138,27 @@ export function useMatch(options = {}) {
     writeStorage(AI_DIFFICULTY_STORAGE_KEY, normalized);
   }, []);
 
+  const setPlayerCount = useCallback((next) => {
+    const normalized = normalizePlayerCount(next);
+    setPlayerCountState(normalized);
+    playerCountRef.current = normalized;
+    writeStorage(PLAYER_COUNT_STORAGE_KEY, normalized);
+  }, []);
+
   const restart = useCallback(() => {
     setSelectedId(null);
     setErrorKey(null);
     setAiThinking(false);
     setMotionLock(false);
-    const next = startMatch({
+    const startedAt = Date.now();
+    setMatchStartedAt(startedAt);
+    matchStartedAtRef.current = startedAt;
+    setMatchEndedAt(null);
+    const count = normalizePlayerCount(playerCountRef.current);
+    const next = createMatchState({
       seed: Date.now(),
       targetScore,
-      playerIds: ["you", "rival"],
+      playerCount: count,
     });
     stateRef.current = next;
     setState(next);
@@ -117,6 +167,7 @@ export function useMatch(options = {}) {
       state: next,
       difficulty: difficultyRef.current,
       selectedId: null,
+      matchStartedAt: startedAt,
     });
   }, [targetScore]);
 
@@ -251,21 +302,26 @@ export function useMatch(options = {}) {
     }
 
     if (state.phase === PHASE.MATCH_OVER) {
+      setMatchEndedAt((current) => current ?? Date.now());
       recordMatch({
         won: state.matchWinner === HUMAN_INDEX,
         humanScore: state.scores[HUMAN_INDEX] ?? 0,
         fingerprint: `${state.seed}:m:${state.scores.join("-")}:${state.matchWinner}`,
       });
+    } else if (prev === PHASE.MATCH_OVER) {
+      setMatchEndedAt(null);
     }
   }, [state]);
 
+  // Multi-AI orchestration: every non-human seat takes its own turn.
   useEffect(() => {
     if (motionLock) return undefined;
     if (state.phase !== PHASE.PLAYING) {
       setAiThinking(false);
       return undefined;
     }
-    if (state.currentPlayer !== OPPONENT_INDEX) {
+    const seat = state.currentPlayer;
+    if (!isAiSeat(seat)) {
       setAiThinking(false);
       return undefined;
     }
@@ -275,18 +331,27 @@ export function useMatch(options = {}) {
 
     const timer = window.setTimeout(() => {
       setState((current) => {
-        if (current.phase !== PHASE.PLAYING || current.currentPlayer !== OPPONENT_INDEX) {
+        if (current.phase !== PHASE.PLAYING || current.currentPlayer !== seat) {
           return current;
         }
         try {
           const next = applyAiTurn(current, {
             difficulty,
-            aiIndex: OPPONENT_INDEX,
+            aiIndex: seat,
           });
           stateRef.current = next;
           return next;
         } catch {
-          return current;
+          // Last-ditch legal recovery (draw/pass/play) — no AI heuristics.
+          try {
+            const unlocked = sanitizeMatchState(current);
+            const action = chooseAutoAction(unlocked);
+            const recovered = action ? applyAutoAction(unlocked, action) : unlocked;
+            stateRef.current = recovered;
+            return recovered;
+          } catch {
+            return current;
+          }
         }
       });
       setAiThinking(false);
@@ -322,6 +387,19 @@ export function useMatch(options = {}) {
     return { id, left: tile.a, right: tile.b };
   });
 
+  const opponentHands = state.players
+    .map((player, index) => ({
+      index,
+      id: player.id,
+      count: player.hand.length,
+    }))
+    .filter((entry) => entry.index !== HUMAN_INDEX);
+
+  const thinkingSeat =
+    aiThinking && state.phase === PHASE.PLAYING && isAiSeat(state.currentPlayer)
+      ? state.currentPlayer
+      : null;
+
   return {
     state,
     stateRef,
@@ -330,11 +408,20 @@ export function useMatch(options = {}) {
     actions,
     isHumanTurn,
     aiThinking,
+    thinkingSeat,
     difficulty,
     setDifficulty,
+    playerCount,
+    setPlayerCount,
     boardTiles,
     humanHand,
-    opponentCount: state.players[OPPONENT_INDEX].hand.length,
+    opponentHands,
+    opponentCount: opponentHands[0]?.count ?? 0,
+    matchStartedAt,
+    matchDurationSeconds: Math.max(
+      0,
+      Math.floor(((matchEndedAt ?? Date.now()) - matchStartedAt) / 1000)
+    ),
     selectTile,
     clearSelection,
     playSelected,
@@ -346,7 +433,6 @@ export function useMatch(options = {}) {
     continueRound,
     setMotionLock,
     HUMAN_INDEX,
-    OPPONENT_INDEX,
   };
 }
 

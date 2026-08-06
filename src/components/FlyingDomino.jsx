@@ -1,10 +1,9 @@
-import Domino from "./Domino";
+import DominoTile from "./DominoTile";
 import "./FlyingDomino.css";
 
 /**
- * Viewport-fixed tile that slides between two screen rects.
- * Transform-only (translate / rotate / scale) for 60 FPS compositing.
- * Positions by tile center so scale + rotate land on the destination rect.
+ * Viewport-fixed DominoTile — translate + rotate only.
+ * Same physical DominoTile as hand and board (no size morph).
  */
 function FlyingDomino({
   left = 0,
@@ -14,18 +13,14 @@ function FlyingDomino({
   to,
   startOrientation = "vertical",
   endOrientation = "horizontal",
-  durationMs = 480,
-  arcLiftPx = 10,
+  durationMs = 230,
+  arcLiftPx = 2,
   onComplete,
 }) {
   if (!from || !to) return null;
 
   const rotating = startOrientation !== endOrientation;
   const rotate = rotating ? (endOrientation === "horizontal" ? -90 : 90) : 0;
-
-  // Scale before rotate so the post-rotate silhouette matches the destination rect.
-  const scaleX = from.w > 0 ? (rotating ? to.h / from.w : to.w / from.w) : 1;
-  const scaleY = from.h > 0 ? (rotating ? to.w / from.h : to.h / from.h) : 1;
 
   const fromTx = from.x;
   const fromTy = from.y;
@@ -36,12 +31,8 @@ function FlyingDomino({
     "--flight-duration": `${durationMs}ms`,
     "--from-x": `${fromTx}px`,
     "--from-y": `${fromTy}px`,
-    "--from-w": `${from.w}px`,
-    "--from-h": `${from.h}px`,
     "--to-x": `${toTx}px`,
     "--to-y": `${toTy}px`,
-    "--to-scale-x": String(scaleX),
-    "--to-scale-y": String(scaleY),
     "--flight-rotate": `${rotate}deg`,
     "--arc-lift": `${arcLiftPx}px`,
   };
@@ -49,12 +40,11 @@ function FlyingDomino({
   return (
     <div className="flying-domino" style={style} aria-hidden="true">
       <div className="flying-domino__inner" onAnimationEnd={() => onComplete?.()}>
-        <Domino
+        <DominoTile
           left={left}
           right={right}
           faceDown={faceDown}
           orientation={startOrientation}
-          size="md"
         />
       </div>
     </div>

@@ -1,158 +1,159 @@
-.scoreboard {
+/* Premium score HUD — pixel-aligned rows, table-anchored */
+.scoreboard--table {
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0;
   width: 100%;
   min-width: 0;
-  padding: 0.7rem 0.85rem;
+  padding: 0.65rem 0.72rem;
   background:
-    linear-gradient(165deg, rgba(52, 38, 18, 0.96), rgba(14, 16, 14, 0.97) 55%, rgba(10, 14, 12, 0.98));
-  border: 1px solid rgba(201, 162, 39, 0.4);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-panel);
-  position: relative;
-  overflow: hidden;
+    linear-gradient(165deg, rgba(14, 18, 26, 0.95) 0%, rgba(4, 8, 10, 0.93) 100%);
+  border: 1px solid rgba(201, 162, 39, 0.5);
+  border-radius: var(--radius-hud);
+  box-shadow:
+    var(--shadow-hud),
+    0 0 0 1px rgba(47, 125, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-.scoreboard::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(120deg, rgba(255, 220, 150, 0.07), transparent 40%);
+.scoreboard__line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.75rem;
+  align-items: center;
+  column-gap: 0.55rem;
+  min-height: 1.45rem;
+  padding: 0.22rem 0;
 }
 
-.scoreboard__round {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  padding-bottom: 0.35rem;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.22);
-  position: relative;
-}
-
-.scoreboard__round-label {
+.scoreboard__label {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.35rem;
+  font-family: var(--font-ui);
   font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.11em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.95;
+  min-width: 0;
 }
 
-.scoreboard__round-value {
-  font-family: var(--font-brand);
-  font-size: 1.18rem;
-  font-weight: 600;
+.scoreboard__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.scoreboard__label--gold {
   color: var(--color-gold-bright);
 }
 
-.scoreboard__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  position: relative;
+.scoreboard__label--you {
+  color: #4ade80;
 }
 
-.scoreboard__row-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  margin-bottom: 0.25rem;
+.scoreboard__label--rival {
+  color: #f87171;
 }
 
-.scoreboard__name {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-}
-
+.scoreboard__value,
 .scoreboard__points {
-  font-family: var(--font-brand);
-  font-size: 1.12rem;
-  font-weight: 600;
-  color: var(--color-text);
+  display: block;
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
   line-height: 1;
-  display: inline-block;
-  transition: transform var(--duration-med) var(--ease-out), color var(--duration-fast) linear;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .scoreboard__points--bump {
   color: var(--color-gold-bright);
-  transform: scale(1.12);
+  transform: translateY(-1px) scale(1.04);
 }
 
-.scoreboard__track {
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  overflow: hidden;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+.scoreboard__value--target {
+  color: var(--color-gold-bright);
+  font-size: 1.1rem;
 }
 
-.scoreboard__fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  transition: width var(--duration-med) var(--ease-out);
-}
-
-.scoreboard__fill--player {
-  background: linear-gradient(90deg, var(--color-gold-dim), var(--color-gold-bright));
-  box-shadow: 0 0 8px rgba(232, 197, 71, 0.35);
-}
-
-.scoreboard__fill--opponent {
-  background: linear-gradient(90deg, #355446, #8fad9c);
-}
-
-.scoreboard__target {
-  font-size: 0.7rem;
-  color: var(--color-text-dim);
-  text-align: center;
-  position: relative;
-}
-
-.scoreboard__target strong {
-  color: var(--color-accent-strong);
-  font-weight: 600;
+.scoreboard__line--target {
+  margin-top: 0.12rem;
+  padding-top: 0.38rem;
+  border-top: 1px solid rgba(201, 162, 39, 0.28);
 }
 
 @media (max-width: 719px) {
-  .scoreboard {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.55rem 0.85rem;
-    height: 100%;
+  .scoreboard--table {
+    padding: 0.48rem 0.55rem;
   }
 
-  .scoreboard__round {
-    border-bottom: none;
-    padding-bottom: 0;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0;
+  .scoreboard__line {
+    min-height: 1.32rem;
+    padding: 0.14rem 0;
+    grid-template-columns: minmax(0, 1fr) 2.4rem;
+    column-gap: 0.4rem;
   }
 
-  .scoreboard__rows {
-    flex: 1;
-    min-width: 8.5rem;
+  .scoreboard__label {
+    font-size: 0.64rem;
+    grid-template-columns: 0.9rem minmax(0, 1fr);
+    column-gap: 0.28rem;
   }
 
-  .scoreboard__target {
-    width: 100%;
-    text-align: left;
+  .scoreboard__icon {
+    width: 0.9rem;
+    height: 0.9rem;
+    font-size: 0.62rem;
+  }
+
+  .scoreboard__value,
+  .scoreboard__points,
+  .scoreboard__value--target {
+    font-size: 0.98rem;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .scoreboard__points,
-  .scoreboard__points--bump,
-  .scoreboard__fill {
-    transition: none !important;
-    animation: none !important;
-    transform: none !important;
+/* 4-player (and 3p) scoreboards need slightly denser but readable rows */
+@media (max-width: 719px) {
+  .game-page--players-3 .scoreboard--table,
+  .game-page--players-4 .scoreboard--table {
+    padding: 0.42rem 0.5rem;
+  }
+
+  .game-page--players-3 .scoreboard__line,
+  .game-page--players-4 .scoreboard__line {
+    min-height: 1.2rem;
+    padding: 0.1rem 0;
+  }
+
+  .game-page--players-3 .scoreboard__label,
+  .game-page--players-4 .scoreboard__label {
+    font-size: 0.63rem;
+    letter-spacing: 0.035em;
+  }
+
+  .game-page--players-3 .scoreboard__value,
+  .game-page--players-3 .scoreboard__points,
+  .game-page--players-3 .scoreboard__value--target,
+  .game-page--players-4 .scoreboard__value,
+  .game-page--players-4 .scoreboard__points,
+  .game-page--players-4 .scoreboard__value--target {
+    font-size: 0.9rem;
   }
 }

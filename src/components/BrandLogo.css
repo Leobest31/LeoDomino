@@ -25,11 +25,11 @@
 }
 
 .brand-logo--md {
-  height: 2.2rem;
+  height: 3.45rem;
 }
 
 .brand-logo--lg {
-  height: clamp(2.6rem, 7vw, 3.6rem);
+  height: clamp(2.9rem, 7.5vw, 4rem);
 }
 
 .brand-logo--xl {
@@ -47,6 +47,6 @@
 
 @media (min-width: 768px) {
   .brand-logo--md {
-    height: 2.45rem;
+    height: 3.05rem;
   }
 }

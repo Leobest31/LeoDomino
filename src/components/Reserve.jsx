@@ -1,15 +1,26 @@
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
-import Domino from "./Domino";
+import DominoTile from "./DominoTile";
 import "./Reserve.css";
 
 function Reserve({ count = 0, label }) {
   const { t } = useI18n();
   const resolvedLabel = label ?? t("game.reserve");
-  const visibleStack = Math.min(count, 4);
+  const visibleStack = Math.min(count, 3);
+  const prevCount = useRef(count);
+  const [pulse, setPulse] = useState(false);
+
+  useEffect(() => {
+    if (prevCount.current === count) return undefined;
+    prevCount.current = count;
+    setPulse(true);
+    const id = window.setTimeout(() => setPulse(false), 420);
+    return () => window.clearTimeout(id);
+  }, [count]);
 
   return (
     <aside
-      className="reserve"
+      className={`reserve${pulse ? " reserve--pulse" : ""}`}
       aria-label={t("game.reserveAria", { label: resolvedLabel, count })}
       data-reserve-root="true"
     >
@@ -25,7 +36,7 @@ function Reserve({ count = 0, label }) {
                 zIndex: index,
               }}
             >
-              <Domino faceDown orientation="vertical" size="sm" />
+              <DominoTile faceDown orientation="vertical" size="sm" />
             </div>
           ))}
           {count === 0 && <div className="reserve__empty-slot" data-reserve-top="true" />}
@@ -34,7 +45,7 @@ function Reserve({ count = 0, label }) {
 
       <div className="reserve__info">
         <span className="reserve__label">{resolvedLabel}</span>
-        <span className="reserve__count">{count}</span>
+        <span className={`reserve__count${pulse ? " reserve__count--tick" : ""}`}>{count}</span>
       </div>
     </aside>
   );

@@ -1,5 +1,5 @@
 /**
- * App preferences — theme, vibration (offline localStorage).
+ * App preferences — theme, tile skin, vibration (offline localStorage).
  */
 
 import { readStorage, writeStorage } from "../utils/storage.js";
@@ -7,9 +7,11 @@ import { readStorage, writeStorage } from "../utils/storage.js";
 export const PREFS_STORAGE_KEY = "leodomino.prefs";
 
 export const THEMES = Object.freeze(["classic", "noir"]);
+export const TILE_SKINS = Object.freeze(["classic", "premium"]);
 
 export const DEFAULT_PREFS = Object.freeze({
   theme: "classic",
+  tileSkin: "classic",
   vibration: true,
 });
 
@@ -22,8 +24,12 @@ export function normalizePrefs(value) {
   const theme = THEMES.includes(/** @type {string} */ (raw.theme))
     ? /** @type {"classic"|"noir"} */ (raw.theme)
     : DEFAULT_PREFS.theme;
+  const tileSkin = TILE_SKINS.includes(/** @type {string} */ (raw.tileSkin))
+    ? /** @type {"classic"|"premium"} */ (raw.tileSkin)
+    : DEFAULT_PREFS.tileSkin;
   return {
     theme,
+    tileSkin,
     vibration: raw.vibration == null ? DEFAULT_PREFS.vibration : Boolean(raw.vibration),
   };
 }
@@ -53,6 +59,15 @@ export function savePrefs(patch) {
 export function applyTheme(theme) {
   const resolved = THEMES.includes(theme) ? theme : DEFAULT_PREFS.theme;
   document.documentElement.dataset.theme = resolved;
+  return resolved;
+}
+
+/**
+ * @param {"classic"|"premium"} tileSkin
+ */
+export function applyTileSkin(tileSkin) {
+  const resolved = TILE_SKINS.includes(tileSkin) ? tileSkin : DEFAULT_PREFS.tileSkin;
+  document.documentElement.dataset.tileSkin = resolved;
   return resolved;
 }
 

@@ -17,16 +17,61 @@ export { buildMemory, opponentMatchProbability, boardFingerprint } from "./memor
 export { scoreMove } from "./evaluate.js";
 export { chooseAiAction, chooseThinkTimeMs } from "./policies.js";
 
-import { applyAutoAction } from "../rules/drawDominoes.js";
+import { applyAutoAction, chooseAutoAction } from "../rules/drawDominoes.js";
 import { chooseAiAction } from "./policies.js";
 
 /**
+ * Clear a must-play constraint that no longer exists in the current hand.
+ * Does not change move legality heuristics — only removes an impossible lock.
+ * @param {object} state
+ * @returns {object}
+ */
+function clearOrphanMustPlay(state) {
+  const must = state?.mustPlayTileId;
+  if (must == null) return state;
+  const hand = state.players?.[state.currentPlayer]?.hand;
+  if (typeof must === "string" && Array.isArray(hand) && hand.includes(must)) {
+    return state;
+  }
+  return { ...state, mustPlayTileId: null };
+}
+
+/**
+ * Legal draw / pass / first play — no scoring heuristics.
+ * @param {object} state
+ * @returns {object}
+ */
+function applyLegalFallback(state) {
+  const action = chooseAutoAction(state);
+  if (!action) return state;
+  return applyAutoAction(state, action);
+}
+
+/**
  * Decide and apply an AI action in one step.
+ * On strategy errors or null actions, recovers with a legal rules action
+ * (draw/pass/play) without inventing new heuristics.
  * @param {object} state
  * @param {object} [options]
  */
 export function applyAiTurn(state, options = {}) {
-  const action = chooseAiAction(state, options);
-  if (!action) return state;
-  return applyAutoAction(state, action);
+  try {
+    const action = chooseAiAction(state, options);
+    if (action) return applyAutoAction(state, action);
+  } catch {
+    // Strategy failed — fall through to legal recovery.
+  }
+
+  // Softlock path (e.g. orphan mustPlayTileId): unlock, then retry strategy once.
+  const unlocked = clearOrphanMustPlay(state);
+  if (unlocked !== state) {
+    try {
+      const retry = chooseAiAction(unlocked, options);
+      if (retry) return applyAutoAction(unlocked, retry);
+    } catch {
+      // Fall through to pure legal fallback.
+    }
+  }
+
+  return applyLegalFallback(unlocked);
 }

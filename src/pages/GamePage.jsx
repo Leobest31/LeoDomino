@@ -11,6 +11,7 @@ import BottomBar from "../components/BottomBar";
 import FlyingDomino from "../components/FlyingDomino";
 import DragGhost from "../components/DragGhost";
 import GameBanner from "../components/GameBanner";
+import MatchOverModal from "../components/MatchOverModal";
 import { useMatch } from "../hooks/useMatch";
 import { useFlightDirector } from "../hooks/useFlightDirector";
 import { usePrefs } from "../hooks/usePrefs.js";
@@ -24,6 +25,21 @@ import {
 } from "../game/index.js";
 import { MOTION, wait } from "../utils/motion.js";
 import "./GamePage.css";
+
+// Where each non-human seat sits around the felt, keyed by opponent count.
+// 2 players → 1 opponent (top). 3 players → 2 opponents (top, left).
+// 4 players → 3 opponents (top, left, right).
+const OPPONENT_SEAT_LAYOUT = {
+  1: ["top"],
+  2: ["top", "left"],
+  3: ["top", "left", "right"],
+};
+const OPPONENT_SEAT_LAYOUT_MAX = 3;
+
+function seatDisplayName(t, seatOrder, opponentCount) {
+  if (opponentCount <= 1) return t("game.rival");
+  return t("game.aiSeat", { n: seatOrder + 1 });
+}
 
 function hitDropEnd(clientX, clientY) {
   const zones = document.querySelectorAll("[data-drop-end]");
@@ -44,7 +60,7 @@ function hitDropEnd(clientX, clientY) {
 /**
  * Match screen — natural auto-place, drag-when-both, sequential draw.
  */
-function GamePage() {
+function GamePage({ onMainMenu }) {
   const { t } = useI18n();
   const { play } = useAudio();
   const { vibrate } = usePrefs();
@@ -54,12 +70,14 @@ function GamePage() {
     selectedId,
     actions,
     isHumanTurn,
-    aiThinking,
     difficulty,
     setDifficulty,
     boardTiles,
     humanHand,
-    opponentCount,
+    thinkingSeat,
+    playerCount,
+    setPlayerCount,
+    matchDurationSeconds,
     selectTile,
     clearSelection,
     commitPlay,
@@ -68,28 +86,40 @@ function GamePage() {
     restart,
     setMotionLock,
     HUMAN_INDEX,
-    OPPONENT_INDEX,
   } = useMatch();
 
   const { flight, hiddenIds, runFlight, hideTile, showTile } = useFlightDirector();
   const [newestId, setNewestId] = useState(null);
   const [banner, setBanner] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [enteringIds, setEnteringIds] = useState(() => new Set());
   const [drag, setDrag] = useState(null);
   const [hotEnd, setHotEnd] = useState(null);
+  const [hudReserve, setHudReserve] = useState(0);
+  const tableStageRef = useRef(null);
+  const hudScoreRef = useRef(null);
+  const hudReserveBoxRef = useRef(null);
   const prevBoardRef = useRef(boardTiles.map((tile) => tile.id));
   const prevPhaseRef = useRef(state.phase);
   const prevHandRef = useRef([]);
   const prevTurnRef = useRef(isHumanTurn);
   const prevReserveRef = useRef(state.reserve.length);
-  const prevOppCountRef = useRef(opponentCount);
+  const prevHandCountsRef = useRef(state.players.map((player) => player.hand.length));
   const hiddenIdsRef = useRef(hiddenIds);
   const dragRef = useRef(null);
   const drawingRef = useRef(false);
   const skipClickRef = useRef(false);
   const autoDrawKeyRef = useRef("");
+  const openingTileIdRef = useRef(null);
   hiddenIdsRef.current = hiddenIds;
   dragRef.current = drag;
+
+  // Layout-only: remember the opening tile so the chain stays centered on it.
+  if (boardTiles.length === 0) {
+    openingTileIdRef.current = null;
+  } else if (boardTiles.length === 1) {
+    openingTileIdRef.current = boardTiles[0].id;
+  }
 
   const ambiguousSelected =
     Boolean(selectedId) && isAmbiguousPlacement(actions.legalMoves, selectedId);
@@ -134,6 +164,7 @@ function GamePage() {
         },
         onLanded: () => {
           setNewestId(tileId);
+          showTile(tileId);
           play("place");
           vibrate(14);
         },
@@ -141,7 +172,7 @@ function GamePage() {
       setMotionLock(false);
       return true;
     },
-    [clearSelection, commitPlay, play, runFlight, setMotionLock, stateRef, vibrate]
+    [clearSelection, commitPlay, play, runFlight, setMotionLock, showTile, stateRef, vibrate]
   );
 
   const finishDrag = useCallback(
@@ -313,14 +344,14 @@ function GamePage() {
         const legalMoves = getAvailableActions(after).legalMoves;
         const ends = legalEndsForTile(legalMoves, drawnId);
 
-        if (ends.length === 1) {
-          const move = resolvePlayChoice(legalMoves, drawnId);
-          if (move) await placeTileOnBoard(drawnId, move.end);
-          break;
-        }
-
-        if (ends.length > 1) {
-          selectTile(drawnId);
+        // Tabletop rule: a drawn tile always lands in the hand and waits for
+        // the player — it is never auto-played, even when only one end is
+        // legal. When it's playable both ways, pre-select it so the existing
+        // drop-zone UI immediately offers the left/right choice.
+        if (ends.length > 0) {
+          if (ends.length > 1) {
+            selectTile(drawnId);
+          }
           play("pickup");
           break;
         }
@@ -329,15 +360,7 @@ function GamePage() {
       drawingRef.current = false;
       setMotionLock(false);
     }
-  }, [
-    commitDraw,
-    placeTileOnBoard,
-    play,
-    runFlight,
-    selectTile,
-    setMotionLock,
-    stateRef,
-  ]);
+  }, [commitDraw, play, runFlight, selectTile, setMotionLock, stateRef]);
 
   const handleDraw = async () => {
     if (!getAvailableActions(stateRef.current).canDraw) {
@@ -377,21 +400,42 @@ function GamePage() {
     state.reserve.length,
   ]);
 
+  // AI / external board additions — fly onto the shared board.
+  // Board tiles stay visible always; flight is cosmetic only (no hideTile).
+  const boardSignature = state.board.map((tile) => tile.id).join("|");
+  const handCountsSignature = state.players.map((player) => player.hand.length).join("|");
+
   useLayoutEffect(() => {
     const prev = prevBoardRef.current;
-    const nextIds = boardTiles.map((tile) => tile.id);
+    const prevCounts = prevHandCountsRef.current;
+    const nextIds = state.board.map((tile) => tile.id);
+    const nextCounts = state.players.map((player) => player.hand.length);
     const added = nextIds.filter((id) => !prev.includes(id));
     prevBoardRef.current = nextIds;
 
     if (!added.length) return undefined;
 
-    const tileId = added[added.length - 1];
-    if (hiddenIdsRef.current.has(tileId)) return undefined;
+    // Sync hand baselines only when a board tile was added (AI/human play).
+    prevHandCountsRef.current = nextCounts;
 
-    const placed = boardTiles.find((tile) => tile.id === tileId);
+    const tileId = added[added.length - 1];
+    // Human plays already animate via placeTileOnBoard — skip duplicate flight.
+    if (hiddenIdsRef.current.has(tileId)) {
+      // Ensure any stale hide cannot leave a board tile invisible in the hand layer.
+      showTile(tileId);
+      return undefined;
+    }
+
+    const placed = state.board.find((tile) => tile.id === tileId);
     if (!placed) return undefined;
 
-    hideTile(tileId);
+    const fromSeat = nextCounts.findIndex(
+      (count, index) => index !== HUMAN_INDEX && count < (prevCounts[index] ?? count)
+    );
+    const fromSelector =
+      fromSeat >= 0
+        ? `[data-opponent-origin][data-seat-index="${fromSeat}"]`
+        : "[data-opponent-origin]";
 
     const timer = window.setTimeout(() => {
       setMotionLock(true);
@@ -400,7 +444,7 @@ function GamePage() {
         left: placed.left,
         right: placed.right,
         faceDown: false,
-        fromSelector: "[data-opponent-origin]",
+        fromSelector,
         toSelector: `[data-board-tile="${tileId}"]`,
         startOrientation: "vertical",
         endOrientation: placed.orientation || "horizontal",
@@ -409,37 +453,53 @@ function GamePage() {
         skipHide: true,
         onLanded: () => {
           setNewestId(tileId);
-          play("aiMove");
+          play("place");
+          showTile(tileId);
         },
       }).finally(() => {
+        showTile(tileId);
         setMotionLock(false);
       });
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [boardTiles, hideTile, play, runFlight, setMotionLock]);
+  }, [boardSignature, handCountsSignature, HUMAN_INDEX, play, runFlight, setMotionLock, showTile, state.board, state.players]);
 
-  // AI draws one face-down tile at a time from the reserve.
+  // Safety: every board tile must remain visible for the whole round.
+  useEffect(() => {
+    for (const tile of state.board) {
+      if (hiddenIdsRef.current.has(tile.id)) {
+        showTile(tile.id);
+      }
+    }
+  }, [boardSignature, showTile, state.board]);
+
+  // AI draws one face-down tile at a time from the reserve into the drawing seat.
   useLayoutEffect(() => {
     const prevReserve = prevReserveRef.current;
-    const prevOpp = prevOppCountRef.current;
+    const prevCounts = prevHandCountsRef.current;
     const reserveNow = state.reserve.length;
-    const oppNow = opponentCount;
+    const nextCounts = state.players.map((player) => player.hand.length);
+    const drewSeat = nextCounts.findIndex(
+      (count, index) =>
+        index !== HUMAN_INDEX &&
+        count > (prevCounts[index] ?? count) &&
+        reserveNow < prevReserve
+    );
     prevReserveRef.current = reserveNow;
-    prevOppCountRef.current = oppNow;
+    prevHandCountsRef.current = nextCounts;
 
-    const drew = reserveNow < prevReserve && oppNow > prevOpp;
-    if (!drew || drawingRef.current) return undefined;
+    if (drewSeat < 0 || drawingRef.current) return undefined;
 
     const timer = window.setTimeout(() => {
       setMotionLock(true);
       runFlight({
-        tileId: `ai-draw-${reserveNow}-${oppNow}`,
+        tileId: `ai-draw-${drewSeat}-${reserveNow}-${nextCounts[drewSeat]}`,
         left: 0,
         right: 0,
         faceDown: true,
         fromSelector: '[data-reserve-top="true"]',
-        toSelector: "[data-opponent-origin]",
+        toSelector: `[data-opponent-origin][data-seat-index="${drewSeat}"]`,
         startOrientation: "vertical",
         endOrientation: "vertical",
         durationMs: MOTION.drawFlightMs,
@@ -453,7 +513,7 @@ function GamePage() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [opponentCount, play, runFlight, setMotionLock, state.reserve.length]);
+  }, [HUMAN_INDEX, handCountsSignature, play, runFlight, setMotionLock, state.players, state.reserve.length]);
 
   useLayoutEffect(() => {
     const prev = new Set(prevHandRef.current);
@@ -480,6 +540,50 @@ function GamePage() {
     return () => window.clearTimeout(timer);
   }, [humanHand]);
 
+  // Permanent safe gap between the domino chain and the scoreboard/reserve
+  // HUD: measure the HUD chrome's real on-screen footprint (accounts for
+  // every breakpoint/orientation rule in GamePage.css automatically) and
+  // feed it to the board so it never routes tiles underneath it.
+  useLayoutEffect(() => {
+    const stage = tableStageRef.current;
+    if (!stage) return undefined;
+
+    const HUD_SAFE_GAP = 48; // permanent visual clearance (40-60px target)
+
+    const measure = () => {
+      const stageRect = stage.getBoundingClientRect();
+      let minLeft = Infinity;
+      for (const ref of [hudScoreRef, hudReserveBoxRef]) {
+        const el = ref.current;
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0) minLeft = Math.min(minLeft, rect.left);
+      }
+      if (!Number.isFinite(minLeft)) {
+        setHudReserve(0);
+        return;
+      }
+      const raw = Math.max(0, stageRect.right - minLeft) + HUD_SAFE_GAP;
+      // On phone widths the scoreboard can claim ~38% of the felt; feeding that
+      // full footprint (+ safe gap) into the layout engine collapses play
+      // bounds until the board renders zero tiles. Cap the reserve so the
+      // chain always keeps a usable search region.
+      const reserve = Math.min(raw, stageRect.width * 0.3);
+      setHudReserve((current) => (Math.abs(current - reserve) > 1 ? reserve : current));
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(stage);
+    if (hudScoreRef.current) ro.observe(hudScoreRef.current);
+    if (hudReserveBoxRef.current) ro.observe(hudReserveBoxRef.current);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
   useEffect(() => {
     const wasHuman = prevTurnRef.current;
     prevTurnRef.current = isHumanTurn;
@@ -494,11 +598,18 @@ function GamePage() {
     if (prev === state.phase) return undefined;
 
     if (state.phase === PHASE.ROUND_OVER && state.roundResult) {
-      const humanWon = state.roundResult.winnerIndex === HUMAN_INDEX;
+      const winnerIndex = state.roundResult.winnerIndex;
+      const humanWon = winnerIndex === HUMAN_INDEX;
       play(humanWon ? "roundWin" : "defeat");
       if (humanWon) vibrate([12, 30, 12]);
       else vibrate(30);
-      const winnerName = humanWon ? t("game.you") : t("game.rival");
+      const winnerName = humanWon
+        ? t("game.you")
+        : seatDisplayName(
+            t,
+            Math.max(0, winnerIndex - 1),
+            Math.max(1, state.players.length - 1)
+          );
       setBanner({
         variant: "round",
         title: t("dialog.roundOver"),
@@ -515,25 +626,29 @@ function GamePage() {
       play(humanWon ? "matchWin" : "defeat");
       if (humanWon) vibrate([16, 40, 16, 40, 24]);
       else vibrate(40);
-      const winnerName = humanWon ? t("game.you") : t("game.rival");
-      setBanner({
-        variant: "match",
-        title: t("dialog.matchOver"),
-        subtitle: t("rules.matchWon", { name: winnerName }),
-      });
-      const timer = window.setTimeout(() => setBanner(null), MOTION.celebrationMs);
-      return () => window.clearTimeout(timer);
+      // Official Match Over modal owns this moment — no transient banner.
+      setBanner(null);
+      return undefined;
     }
 
     return undefined;
-  }, [HUMAN_INDEX, play, state.matchWinner, state.phase, state.roundResult, t, vibrate]);
+  }, [HUMAN_INDEX, play, state.matchWinner, state.phase, state.players.length, state.roundResult, t, vibrate]);
 
   const celebrating = Boolean(banner);
+  const matchOver = state.phase === PHASE.MATCH_OVER;
+  const humanWonMatch = state.matchWinner === HUMAN_INDEX;
+  const playerNames = state.players.map((_, index) => {
+    if (index === HUMAN_INDEX) return t("game.you");
+    return seatDisplayName(t, index - 1, state.players.length - 1);
+  });
+  const winnerName =
+    state.matchWinner == null
+      ? ""
+      : playerNames[state.matchWinner] ?? t("game.rival");
+
   const humanStatus = (() => {
-    if (state.phase === PHASE.MATCH_OVER) {
-      return state.matchWinner === HUMAN_INDEX
-        ? t("rules.matchWon", { name: t("game.you") })
-        : t("rules.matchWon", { name: t("game.rival") });
+    if (matchOver) {
+      return t("rules.matchWon", { name: winnerName || t("game.rival") });
     }
     if (state.phase === PHASE.ROUND_OVER) return t("dialog.roundOver");
     if (drag || ambiguousSelected) return t("game.dragToEnd");
@@ -541,79 +656,173 @@ function GamePage() {
     return t("game.waiting");
   })();
 
-  const opponentStatus = (() => {
-    if (state.phase !== PHASE.PLAYING) return t("game.waiting");
-    if (aiThinking) return t("game.thinking");
-    return t("game.waiting");
-  })();
+  // Seat layout for every non-human player (2 / 3 / 4 player tables).
+  const opponentSeats = state.players
+    .map((player, index) => ({ player, index }))
+    .filter(({ index }) => index !== HUMAN_INDEX)
+    .map(({ player, index }, seatOrder, seats) => {
+      const layout =
+        OPPONENT_SEAT_LAYOUT[seats.length] ??
+        OPPONENT_SEAT_LAYOUT[OPPONENT_SEAT_LAYOUT_MAX];
+      const thinking = thinkingSeat === index;
+      const isTurn = state.currentPlayer === index && state.phase === PHASE.PLAYING;
+      return {
+        index,
+        position: layout[seatOrder] ?? "top",
+        name: seatDisplayName(t, seatOrder, seats.length),
+        status: thinking ? t("game.thinking") : t("game.waiting"),
+        tileCount: player.hand.length,
+        thinking,
+        isTurn,
+      };
+    });
+  const topSeats = opponentSeats.filter((seat) => seat.position === "top");
+  const leftSeats = opponentSeats.filter((seat) => seat.position === "left");
+  const rightSeats = opponentSeats.filter((seat) => seat.position === "right");
 
   const canPlayButton =
     isHumanTurn &&
     Boolean(selectedId) &&
     isAutoPlaceable(actions.legalMoves, selectedId);
 
-  return (
-    <div className={`game-page${celebrating ? " game-page--celebrate" : ""}`}>
-      <Header difficulty={difficulty} onDifficultyChange={setDifficulty} />
+  const handleNewMatch = () => {
+    play("button");
+    restart();
+  };
 
-      <div className="game-page__body">
-        <OpponentPanel
-          name={t("game.rival")}
-          status={opponentStatus}
-          tileCount={opponentCount}
-          thinking={aiThinking}
-          isTurn={state.currentPlayer === OPPONENT_INDEX && state.phase === PHASE.PLAYING}
+  const handlePlayerCountChange = (next) => {
+    setPlayerCount(next);
+  };
+
+  const handleMatchStats = () => {
+    play("button");
+    setSettingsOpen(true);
+  };
+
+  const handleMainMenu = () => {
+    play("button");
+    restart();
+    onMainMenu?.();
+  };
+
+  return (
+    <div
+      className={`game-page game-page--players-${state.players.length}${
+        celebrating ? " game-page--celebrate" : ""
+      }${matchOver ? " game-page--match-over" : ""}`}
+    >
+      <div className="game-page__shell">
+        <Header
+          difficulty={difficulty}
+          onDifficultyChange={setDifficulty}
+          playerCount={playerCount}
+          onPlayerCountChange={handlePlayerCountChange}
+          settingsOpen={settingsOpen}
+          onSettingsOpenChange={setSettingsOpen}
         />
 
-        <div className="game-page__mid">
-          <div className="game-page__sidebar game-page__sidebar--left">
-            <Reserve count={state.reserve.length} />
-          </div>
-
-          <GameTable
-            tiles={boardTiles}
-            hiddenIds={hiddenIds}
-            newestId={newestId}
-            dropActive={Boolean(drag) || ambiguousSelected}
-            hotEnd={hotEnd}
-            validEnds={dragValidEnds}
-          />
-
-          <div className="game-page__sidebar game-page__sidebar--right">
-            <ScoreBoard
-              playerScore={state.scores[HUMAN_INDEX]}
-              opponentScore={state.scores[OPPONENT_INDEX]}
-              target={state.targetScore}
-              round={state.round}
-              playerName={t("game.you")}
-              opponentName={t("game.rival")}
+        <div className="game-page__body" {...(matchOver ? { inert: true } : {})}>
+          {topSeats.map((seat) => (
+            <OpponentPanel
+              key={seat.index}
+              position="top"
+              seatIndex={seat.index}
+              name={seat.name}
+              status={seat.status}
+              tileCount={seat.tileCount}
+              thinking={seat.thinking}
+              isTurn={seat.isTurn}
             />
+          ))}
+
+          <div className="game-page__mid">
+            {leftSeats.length > 0 ? (
+              <div className="game-page__side-seats game-page__side-seats--left">
+                {leftSeats.map((seat) => (
+                  <OpponentPanel
+                    key={seat.index}
+                    position="left"
+                    seatIndex={seat.index}
+                    name={seat.name}
+                    status={seat.status}
+                    tileCount={seat.tileCount}
+                    thinking={seat.thinking}
+                    isTurn={seat.isTurn}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            <div className="game-page__table-stage" ref={tableStageRef}>
+              <GameTable
+                tiles={boardTiles}
+                newestId={newestId}
+                centerTileId={openingTileIdRef.current}
+                dropActive={Boolean(drag) || ambiguousSelected}
+                hotEnd={hotEnd}
+                validEnds={dragValidEnds}
+                hudReserve={hudReserve}
+              />
+
+              <div className="game-page__hud-score" ref={hudScoreRef}>
+                <ScoreBoard
+                  scores={state.scores}
+                  names={playerNames}
+                  humanIndex={HUMAN_INDEX}
+                  target={state.targetScore}
+                  round={state.round}
+                />
+              </div>
+
+              <div className="game-page__hud-reserve" ref={hudReserveBoxRef}>
+                <Reserve count={state.reserve.length} />
+              </div>
+            </div>
+
+            {rightSeats.length > 0 ? (
+              <div className="game-page__side-seats game-page__side-seats--right">
+                {rightSeats.map((seat) => (
+                  <OpponentPanel
+                    key={seat.index}
+                    position="right"
+                    seatIndex={seat.index}
+                    name={seat.name}
+                    status={seat.status}
+                    tileCount={seat.tileCount}
+                    thinking={seat.thinking}
+                    isTurn={seat.isTurn}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
+
+          <PlayerPanel
+            name={t("game.you")}
+            status={humanStatus}
+            tiles={humanHand}
+            selectedId={selectedId}
+            onSelectTile={isHumanTurn ? handleTileSelect : undefined}
+            onTilePointerDown={isHumanTurn ? handleTilePointerDown : undefined}
+            draggingId={drag?.tileId ?? null}
+            isTurn={isHumanTurn}
+            hiddenIds={hiddenIds}
+            enteringIds={enteringIds}
+          />
         </div>
 
-        <PlayerPanel
-          name={t("game.you")}
-          status={humanStatus}
-          tiles={humanHand}
-          selectedId={selectedId}
-          onSelectTile={isHumanTurn ? handleTileSelect : undefined}
-          onTilePointerDown={isHumanTurn ? handleTilePointerDown : undefined}
-          draggingId={drag?.tileId ?? null}
-          isTurn={isHumanTurn}
-          hiddenIds={hiddenIds}
-          enteringIds={enteringIds}
-        />
+        <div {...(matchOver ? { inert: true } : {})}>
+          <BottomBar
+            canPlay={canPlayButton}
+            canDraw={isHumanTurn && actions.canDraw && !drag}
+            canPass={isHumanTurn && actions.canPass}
+            onPlay={handlePlay}
+            onDraw={handleDraw}
+            onPass={pass}
+            onNewGame={restart}
+          />
+        </div>
       </div>
-
-      <BottomBar
-        canPlay={canPlayButton}
-        canDraw={isHumanTurn && actions.canDraw && !drag}
-        canPass={isHumanTurn && actions.canPass}
-        onPlay={handlePlay}
-        onDraw={handleDraw}
-        onPass={pass}
-        onNewGame={restart}
-      />
 
       {flight ? (
         <FlyingDomino
@@ -636,8 +845,6 @@ function GamePage() {
           right={drag.right}
           x={drag.x}
           y={drag.y}
-          width={drag.w}
-          height={drag.h}
         />
       ) : null}
 
@@ -646,6 +853,18 @@ function GamePage() {
         variant={banner?.variant}
         title={banner?.title}
         subtitle={banner?.subtitle}
+      />
+
+      <MatchOverModal
+        open={matchOver}
+        humanWon={humanWonMatch}
+        winnerName={winnerName}
+        scores={state.scores}
+        roundsPlayed={state.round}
+        durationSeconds={matchDurationSeconds}
+        onNewMatch={handleNewMatch}
+        onStatistics={handleMatchStats}
+        onMainMenu={handleMainMenu}
       />
     </div>
   );

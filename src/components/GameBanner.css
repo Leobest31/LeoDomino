@@ -5,14 +5,17 @@
   z-index: 70;
   min-width: min(18rem, calc(100vw - 2rem));
   max-width: 22rem;
-  padding: 1.15rem 1.35rem;
+  padding: 1.25rem 1.5rem;
   text-align: center;
   pointer-events: none;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(201, 162, 39, 0.4);
+  border: 1px solid rgba(201, 162, 39, 0.48);
   background:
-    linear-gradient(165deg, rgba(28, 24, 16, 0.96), rgba(8, 12, 10, 0.97));
-  box-shadow: var(--shadow-panel), var(--glow-gold);
+    linear-gradient(165deg, rgba(36, 28, 16, 0.97), rgba(8, 12, 10, 0.98));
+  box-shadow:
+    var(--shadow-panel),
+    var(--glow-gold),
+    inset 0 1px 0 rgba(255, 230, 170, 0.1);
   transform: translate(-50%, -50%);
   animation: banner-in var(--duration-slow) var(--ease-out) both;
 }

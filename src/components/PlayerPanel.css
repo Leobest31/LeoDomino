@@ -1,149 +1,199 @@
 .player-panel {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.35rem 0.65rem 0;
-  max-width: var(--game-max);
+  gap: 0;
+  padding: 0.02rem 0.55rem 0.02rem;
   width: 100%;
   margin: 0 auto;
+  position: relative;
+  z-index: 8;
+  /* Hand tiles slightly larger for tap comfort — scoped, board unchanged */
+  --domino-hand-w: clamp(1.85rem, 5vw, 2.28rem);
+  --domino-hand-h: clamp(3.4rem, 9.4vw, 4.25rem);
+  --domino-hand-pip: clamp(0.21rem, 0.58vw, 0.3rem);
+  --domino-w: var(--domino-hand-w);
+  --domino-h: var(--domino-hand-h);
+  --domino-pip: var(--domino-hand-pip);
+  background:
+    linear-gradient(180deg, rgba(8, 18, 28, 0.4) 0%, rgba(4, 10, 8, 0.72) 55%, rgba(3, 7, 6, 0.88) 100%);
+  border-top: 1px solid rgba(201, 162, 39, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(47, 125, 255, 0.06),
+    0 -4px 14px rgba(0, 0, 0, 0.16);
+}
+
+/* Collapse decorative title — reclaim dark gap between table and hand */
+.player-panel__title {
+  display: none;
+}
+
+.player-panel__title-rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(232, 197, 71, 0.45), rgba(47, 125, 255, 0.25));
+}
+
+.player-panel__title-rule--end {
+  background: linear-gradient(90deg, rgba(47, 125, 255, 0.25), rgba(232, 197, 71, 0.45), transparent);
+}
+
+.player-panel__title-text {
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-size: 0.58rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(232, 197, 71, 0.92);
 }
 
 .player-panel__meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  padding: 0.48rem 0.75rem;
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(165deg, rgba(18, 28, 24, 0.92), rgba(6, 12, 10, 0.88));
-  border: 1px solid rgba(201, 162, 39, 0.2);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  justify-content: center;
+  padding: 0 0 0.02rem;
+  min-height: 0.55rem;
 }
 
 .player-panel__identity {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  min-width: 0;
+  gap: 0.4rem;
 }
 
 .player-panel__text {
   display: flex;
-  flex-direction: column;
-  gap: 0.08rem;
-  min-width: 0;
+  align-items: center;
 }
 
-.player-panel__name {
-  font-family: var(--font-brand);
-  font-size: 1.02rem;
-  font-weight: 600;
-  color: var(--color-text);
+.player-panel__name,
+.player-panel .avatar,
+.player-panel__count {
+  display: none;
 }
 
 .player-panel__status {
-  font-size: 0.76rem;
+  font-size: 0.55rem;
   font-weight: 500;
-  color: var(--color-text-muted);
   letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .player-panel__status--turn {
   color: var(--color-gold-bright);
-  animation: turn-pulse 1.4s ease-in-out infinite;
-}
-
-.player-panel--turn .player-panel__meta {
-  border-color: rgba(232, 197, 71, 0.48);
-  box-shadow: var(--glow-turn), inset 0 1px 0 rgba(255, 230, 160, 0.08);
-  animation: turn-glow 1.8s ease-in-out infinite;
-}
-
-@keyframes turn-pulse {
-  0%,
-  100% {
-    opacity: 0.72;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes turn-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 1px rgba(232, 197, 71, 0.2), 0 0 10px rgba(201, 162, 39, 0.12);
-  }
-  50% {
-    box-shadow: var(--glow-turn);
-  }
-}
-
-.player-panel__count {
-  font-size: 0.76rem;
-  color: var(--color-text-dim);
-  white-space: nowrap;
-  padding: 0.2rem 0.55rem;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(201, 162, 39, 0.14);
+  font-weight: 600;
 }
 
 .player-panel__tray {
+  display: flex;
+  justify-content: center;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 0.35rem 0.15rem 0.65rem;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 0.1rem 0.36rem 0.1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(201, 162, 39, 0.18);
+  background:
+    radial-gradient(ellipse 70% 120% at 50% 100%, rgba(47, 125, 255, 0.1), transparent 55%),
+    linear-gradient(180deg, rgba(12, 20, 28, 0.52) 0%, rgba(4, 8, 10, 0.7) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 12px rgba(0, 0, 0, 0.2);
   scrollbar-width: thin;
-  scrollbar-color: rgba(201, 162, 39, 0.35) transparent;
+  scrollbar-color: rgba(201, 162, 39, 0.3) transparent;
   -webkit-overflow-scrolling: touch;
+  transition: padding 180ms var(--ease-out);
 }
 
 .player-panel__hand {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 0.32rem;
-  min-width: min-content;
-  margin: 0 auto;
-  padding-top: 0.35rem;
+  gap: var(--domino-gap);
+  width: max-content;
+  min-height: calc(var(--domino-hand-h) + 0.12rem);
+  margin: 0;
+  padding-bottom: 0.02rem;
 }
 
-.player-panel__tile {
-  will-change: transform;
+.player-panel__hand > * {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Hand size comes from CSS vars — don’t force a 44px floor that fights compact scale */
+.player-panel .domino--interactive {
+  min-width: 0;
+}
+
+.player-panel .domino--selected {
+  filter: drop-shadow(0 2.5px 3.5px rgba(40, 30, 15, 0.26));
 }
 
 .player-panel__tile--enter {
-  animation: hand-rise var(--duration-med) var(--ease-out) both;
+  animation: hand-rise 200ms var(--ease-out) both;
 }
 
 @keyframes hand-rise {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.94);
+    transform: translate3d(0, 8px, 0) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @media (min-width: 768px) {
   .player-panel {
-    padding: 0.45rem 1rem 0;
-    gap: 0.5rem;
+    padding: 0.02rem 0.9rem 0.02rem;
   }
 
   .player-panel__hand {
-    gap: 0.42rem;
+    gap: 0.38rem;
+  }
+
+  .player-panel__tray {
+    padding: 0.1rem 0.5rem 0.1rem;
+  }
+}
+
+@media (max-width: 719px) {
+  .player-panel {
+    padding: 0.02rem 0.35rem 0.02rem;
+    --domino-hand-w: clamp(1.9rem, 5.4vw, 2.2rem);
+    --domino-hand-h: clamp(3.5rem, 10vw, 4.1rem);
+  }
+
+  .player-panel__tray {
+    padding: 0.08rem 0.28rem 0.08rem;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .player-panel {
+    --domino-hand-w: clamp(1.55rem, 4.2vh, 1.95rem);
+    --domino-hand-h: clamp(2.75rem, 7.8vh, 3.55rem);
+    --domino-hand-pip: clamp(0.18rem, 0.5vh, 0.26rem);
+  }
+
+  .player-panel__tray {
+    padding: 0.04rem 0.22rem;
+  }
+
+  .player-panel__hand {
+    min-height: calc(var(--domino-hand-h) + 0.06rem);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .player-panel__status--turn,
-  .player-panel__tile--enter,
-  .player-panel--turn .player-panel__meta {
+  .player-panel__tile--enter {
     animation: none;
   }
 }

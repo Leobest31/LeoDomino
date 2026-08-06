@@ -6,10 +6,20 @@ import BrandLogo from "./BrandLogo";
 import SettingsPanel from "./SettingsPanel";
 import "./Header.css";
 
-function Header({ difficulty, onDifficultyChange }) {
+function Header({
+  difficulty,
+  onDifficultyChange,
+  playerCount,
+  onPlayerCountChange,
+  settingsOpen: settingsOpenProp,
+  onSettingsOpenChange,
+}) {
   const { t } = useI18n();
   const { muted, toggleMute, play, unlock } = useAudio();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpenInternal, setSettingsOpenInternal] = useState(false);
+  const controlled = typeof onSettingsOpenChange === "function";
+  const settingsOpen = controlled ? Boolean(settingsOpenProp) : settingsOpenInternal;
+  const setSettingsOpen = controlled ? onSettingsOpenChange : setSettingsOpenInternal;
 
   return (
     <>
@@ -64,6 +74,8 @@ function Header({ difficulty, onDifficultyChange }) {
         onClose={() => setSettingsOpen(false)}
         difficulty={difficulty}
         onDifficultyChange={onDifficultyChange}
+        playerCount={playerCount}
+        onPlayerCountChange={onPlayerCountChange}
       />
     </>
   );

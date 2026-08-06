@@ -31,7 +31,7 @@ function BottomBar({
         <div className="bottom-bar__actions">
           <button
             type="button"
-            className="btn btn--primary bottom-bar__btn"
+            className="btn btn--play bottom-bar__btn"
             aria-disabled={!canPlay}
             onClick={() => tap(canPlay, onPlay)}
           >
@@ -40,7 +40,7 @@ function BottomBar({
           </button>
           <button
             type="button"
-            className="btn btn--secondary bottom-bar__btn"
+            className="btn btn--draw bottom-bar__btn"
             aria-disabled={!canDraw}
             onClick={() => tap(canDraw, onDraw)}
           >
@@ -49,7 +49,7 @@ function BottomBar({
           </button>
           <button
             type="button"
-            className="btn btn--ghost bottom-bar__btn"
+            className="btn btn--pass bottom-bar__btn"
             aria-disabled={!canPass}
             onClick={() => tap(canPass, onPass)}
           >
@@ -60,7 +60,7 @@ function BottomBar({
 
         <button
           type="button"
-          className="btn btn--ghost bottom-bar__new"
+          className="btn btn--new bottom-bar__new"
           onClick={() => {
             play("button");
             onNewGame?.();

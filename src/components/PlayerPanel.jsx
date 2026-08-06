@@ -1,5 +1,5 @@
 import { useI18n } from "../i18n";
-import Domino from "./Domino";
+import DominoTile from "./DominoTile";
 import Avatar from "./Avatar";
 import { useFlipGroup } from "../hooks/useFlipGroup";
 import "./PlayerPanel.css";
@@ -27,6 +27,12 @@ function PlayerPanel({
       className={`player-panel${isTurn ? " player-panel--turn" : ""}`}
       aria-label={t("game.handAria", { name: resolvedName })}
     >
+      <div className="player-panel__title" aria-hidden="true">
+        <span className="player-panel__title-rule" />
+        <span className="player-panel__title-text">{t("game.yourHand")}</span>
+        <span className="player-panel__title-rule player-panel__title-rule--end" />
+      </div>
+
       <div className="player-panel__meta">
         <div className="player-panel__identity">
           <Avatar label={resolvedName} tone="player" active={isTurn} />
@@ -70,11 +76,10 @@ function PlayerPanel({
                     : undefined
                 }
               >
-                <Domino
+                <DominoTile
                   left={tile.left}
                   right={tile.right}
                   orientation="vertical"
-                  size="md"
                   selected={selectedId === tile.id}
                   dragging={draggingId === tile.id}
                   onClick={onSelectTile ? () => onSelectTile(tile.id) : undefined}

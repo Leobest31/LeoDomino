@@ -1,42 +1,49 @@
 :root {
-  /* Room & surfaces — dark luxury */
-  --color-bg-deep: #040806;
-  --color-bg: #08110e;
+  /* Room & surfaces — dark luxury salon */
+  --color-bg-deep: #030705;
+  --color-bg: #07110d;
   --color-bg-elevated: #121c18;
-  --color-bg-panel: rgba(8, 14, 12, 0.9);
-  --color-felt: #0d4633;
-  --color-felt-mid: #157a52;
-  --color-felt-dark: #08291f;
-  --color-felt-light: #1f8f61;
-  --color-felt-hot: #2aa572;
-  --color-wood: #2a180c;
-  --color-wood-mid: #4c3018;
-  --color-wood-light: #734926;
-  --color-wood-edge: #160d07;
-  --color-wood-highlight: rgba(232, 200, 130, 0.22);
+  --color-bg-panel: rgba(7, 14, 11, 0.92);
+  /* Felt — deep casino green (tiles stay the focus) */
+  --color-felt: #0a5c24;
+  --color-felt-mid: #084a1c;
+  --color-felt-dark: #063816;
+  --color-felt-light: #0c6a2c;
+  --color-felt-hot: #0c6a2c;
+  --color-felt-glow: rgba(12, 106, 44, 0.16);
+  /* Wood frame — reference .game-area border #4b250e */
+  --color-wood: #4b250e;
+  --color-wood-mid: #4b250e;
+  --color-wood-light: #6a3818;
+  --color-wood-edge: #2e1608;
+  --color-wood-highlight: rgba(255, 255, 255, 0.08);
+  --color-wood-brass: rgba(75, 37, 14, 0.9);
 
-  /* Domino tiles — bone ivory */
-  --color-tile: #f4efe6;
-  --color-tile-hi: #fffcf7;
-  --color-tile-edge: #d2c8b6;
-  --color-tile-shadow: rgba(0, 0, 0, 0.5);
-  --color-pip: #15130f;
-  --color-tile-back: #14352b;
-  --color-tile-back-edge: #1d4a3c;
+  /* Domino tiles — warm ivory porcelain */
+  --color-tile: #f5ebe0;
+  --color-tile-hi: #faf6f0;
+  --color-tile-mid: #e6d9cb;
+  --color-tile-edge: #cfc3b6;
+  --color-tile-shadow: rgba(0, 0, 0, 0.32);
+  --color-pip: #000000;
+  --color-pip-hi: rgba(255, 255, 255, 0.52);
+  --color-tile-back: #12352b;
+  --color-tile-back-edge: #1c4a3c;
+  --color-tile-back-deep: #0c221c;
 
   /* Brass / gold metal */
   --color-gold: #c9a227;
-  --color-gold-bright: #e8c547;
+  --color-gold-bright: #ebc84a;
   --color-gold-dim: #8a7020;
-  --color-accent: #c4a35a;
+  --color-accent: #c8a65c;
   --color-accent-soft: rgba(201, 162, 39, 0.14);
-  --color-accent-strong: #e0c36a;
-  --color-panel-border: rgba(201, 162, 39, 0.3);
+  --color-accent-strong: #e3c66e;
+  --color-panel-border: rgba(201, 162, 39, 0.32);
 
   /* UI chrome */
   --color-panel: rgba(8, 14, 12, 0.94);
-  --color-text: #f0ebe3;
-  --color-text-muted: #a8b5ad;
+  --color-text: #f2ede5;
+  --color-text-muted: #a9b7af;
   --color-text-dim: #6d7c74;
   --color-danger: #c45c4a;
   --color-success: #3d9b6e;
@@ -52,41 +59,73 @@
   --space-lg: 1.5rem;
   --space-xl: 2rem;
   --space-2xl: 3rem;
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-hud: 12px;
+  --radius-btn: 12px;
+  --radius-tile: 16%;
   --radius-pill: 999px;
-  --header-height: 3.55rem;
-  --bottom-bar-height: 4.25rem;
-  --game-max: 1180px;
+  --header-height: 3.15rem;
+  --bottom-bar-height: 3.45rem;
+  --game-max: 100%;
+  /* Prefer filling the mid stage — high ceiling so the felt can grow */
+  --game-area-height: clamp(24rem, 78dvh, 62rem);
+  --game-area-width: 100%;
+  --game-area-max-width: none;
 
-  /* Domino sizing — fluid, mobile-first */
-  --domino-w: clamp(2rem, 7.2vw, 3.05rem);
-  --domino-h: clamp(3.85rem, 13.6vw, 5.85rem);
-  --domino-pip: clamp(0.26rem, 0.9vw, 0.42rem);
+  /* Hand — compact but nearer comfortable tap width on phones */
+  --domino-hand-w: clamp(1.63rem, 4.3vw, 2.11rem);
+  --domino-hand-h: clamp(3.1rem, 8.2vw, 4.01rem);
+  --domino-hand-pip: clamp(0.19rem, 0.52vw, 0.28rem);
+  --domino-w: var(--domino-hand-w);
+  --domino-h: var(--domino-hand-h);
+  --domino-pip: var(--domino-hand-pip);
+  --domino-gap: 0.3rem;
 
-  /* Motion */
+  /* Brand accents — gold / leo-blue / black (subtle) */
+  --color-leo-blue: #2f7dff;
+  --color-leo-blue-soft: rgba(47, 125, 255, 0.16);
+  --glow-leo: 0 0 16px rgba(47, 125, 255, 0.18);
+  --shadow-hud:
+    0 8px 18px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-btn:
+    0 1px 0 rgba(255, 255, 255, 0.32) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.22) inset,
+    0 5px 12px rgba(0, 0, 0, 0.32),
+    1px 7px 16px rgba(0, 0, 0, 0.18);
+
+  /* Motion — shared language */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-snap: cubic-bezier(0.18, 0.9, 0.22, 1);
-  --duration-fast: 160ms;
-  --duration-med: 320ms;
-  --duration-slow: 560ms;
+  --ease-snap: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-med: 300ms;
+  --duration-slow: 520ms;
 
   /* Depth */
   --shadow-tile:
-    0 1px 1px rgba(0, 0, 0, 0.2),
-    0 4px 8px rgba(0, 0, 0, 0.28),
-    0 10px 22px var(--color-tile-shadow),
-    0 1px 0 rgba(255, 255, 255, 0.5) inset;
+    0 1px 1px rgba(0, 0, 0, 0.18),
+    0 3px 6px rgba(0, 0, 0, 0.22),
+    0 8px 18px var(--color-tile-shadow),
+    0 1px 0 rgba(255, 255, 255, 0.62) inset,
+    0 -1px 1px rgba(0, 0, 0, 0.08) inset;
+  --shadow-tile-lift:
+    0 2px 2px rgba(0, 0, 0, 0.2),
+    0 10px 20px rgba(0, 0, 0, 0.38),
+    0 18px 32px rgba(0, 0, 0, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.65) inset;
   --shadow-panel:
-    0 10px 28px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 220, 150, 0.08);
+    0 12px 32px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 220, 150, 0.1);
   --shadow-wood:
-    0 18px 42px rgba(0, 0, 0, 0.58),
-    0 2px 0 rgba(255, 220, 160, 0.14) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.45) inset;
-  --glow-gold: 0 0 22px rgba(201, 162, 39, 0.22);
-  --glow-turn: 0 0 0 1px rgba(232, 197, 71, 0.35), 0 0 18px rgba(201, 162, 39, 0.28);
+    0 22px 48px rgba(0, 0, 0, 0.62),
+    0 2px 0 rgba(255, 220, 160, 0.16) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.5) inset,
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+  --glow-gold: 0 0 24px rgba(201, 162, 39, 0.24);
+  --glow-turn: 0 0 0 1px rgba(232, 197, 71, 0.38), 0 0 20px rgba(201, 162, 39, 0.3);
 }
 
 /* Noir theme — deeper felt, cooler brass */
@@ -94,14 +133,15 @@
   --color-bg-deep: #020504;
   --color-bg: #050b09;
   --color-bg-elevated: #0c1411;
-  --color-felt: #063528;
-  --color-felt-mid: #0c5c40;
-  --color-felt-dark: #031a14;
-  --color-felt-light: #147a52;
-  --color-felt-hot: #1b8f60;
-  --color-wood: #1a100a;
-  --color-wood-mid: #3a2414;
-  --color-wood-light: #5c3a1e;
+  --color-felt: #08501e;
+  --color-felt-mid: #063c16;
+  --color-felt-dark: #04280e;
+  --color-felt-light: #0a5c24;
+  --color-felt-hot: #0a5c24;
+  --color-felt-glow: rgba(10, 92, 36, 0.14);
+  --color-wood: #3a1c0a;
+  --color-wood-mid: #3a1c0a;
+  --color-wood-light: #5a2e12;
   --color-gold: #b8922a;
   --color-gold-bright: #d4b04a;
   --color-text: #ebe6de;
@@ -109,7 +149,7 @@
 
 @media (min-width: 768px) {
   :root {
-    --header-height: 4.1rem;
-    --bottom-bar-height: 4.5rem;
+    --header-height: 3.25rem;
+    --bottom-bar-height: 3.55rem;
   }
 }

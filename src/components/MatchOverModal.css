@@ -1,0 +1,326 @@
+/*
+  Official LeoDomino end-of-match screen.
+  Premium modal — blocks play until the player chooses an action.
+*/
+
+.match-over {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding:
+    max(clamp(0.75rem, 3vw, 1.5rem), env(safe-area-inset-top, 0px))
+    max(clamp(0.75rem, 3vw, 1.5rem), env(safe-area-inset-right, 0px))
+    max(clamp(0.75rem, 3vw, 1.5rem), env(safe-area-inset-bottom, 0px))
+    max(clamp(0.75rem, 3vw, 1.5rem), env(safe-area-inset-left, 0px));
+  pointer-events: auto;
+}
+
+.match-over__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 4, 0.62);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  animation: match-over-fade 420ms var(--ease-out) both;
+}
+
+.match-over__confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.match-over__confetti-piece {
+  position: absolute;
+  top: -12px;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: match-over-confetti;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: both;
+}
+
+.match-over__confetti-piece--gold {
+  background: linear-gradient(180deg, #f3e2a0, #c9a227);
+}
+
+.match-over__confetti-piece--cream {
+  background: linear-gradient(180deg, #fff8e8, #e8d9b0);
+}
+
+.match-over__confetti-piece--amber {
+  background: linear-gradient(180deg, #e8c547, #8a7020);
+}
+
+.match-over__panel {
+  position: relative;
+  z-index: 2;
+  width: min(26rem, 100%);
+  padding: clamp(1.35rem, 4vw, 1.85rem) clamp(1.2rem, 4vw, 1.75rem) 1.35rem;
+  border-radius: 18px;
+  border: 1.5px solid rgba(232, 197, 71, 0.72);
+  background:
+    linear-gradient(165deg, rgba(42, 32, 16, 0.98) 0%, rgba(10, 14, 12, 0.98) 55%, rgba(6, 10, 8, 0.99) 100%);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 40px rgba(201, 162, 39, 0.22),
+    inset 0 1px 0 rgba(255, 230, 170, 0.16);
+  text-align: center;
+  animation: match-over-zoom 420ms var(--ease-out) both;
+}
+
+.match-over__panel::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 162, 39, 0.18);
+  pointer-events: none;
+}
+
+.match-over__trophy-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 0.55rem;
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.match-over__trophy-glow {
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 197, 71, 0.55), transparent 68%);
+  animation: match-over-glow 1.8s ease-in-out infinite;
+  filter: blur(2px);
+}
+
+.match-over--defeat .match-over__trophy-glow {
+  background: radial-gradient(circle, rgba(160, 170, 180, 0.35), transparent 68%);
+  animation: none;
+  opacity: 0.7;
+}
+
+.match-over__trophy {
+  position: relative;
+  font-size: 2.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.match-over__title {
+  margin: 0;
+  font-family: var(--font-brand);
+  font-size: clamp(1.45rem, 5vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #f7ebc0, #e8c547 45%, #c9a227);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.match-over--defeat .match-over__title {
+  background: linear-gradient(180deg, #e8ebe9, #9aaca3);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.match-over__stats {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1.25rem 0 1.35rem;
+  text-align: left;
+}
+
+.match-over__stat {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 162, 39, 0.14);
+}
+
+.match-over__stat dt {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.match-over__stat dd {
+  margin: 0;
+  font-family: var(--font-brand);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.match-over__winner {
+  color: #e8c547 !important;
+}
+
+.match-over--defeat .match-over__winner {
+  color: #c5d0ca !important;
+}
+
+.match-over__actions {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.match-over__btn {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  min-height: 2.85rem;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  transition:
+    transform 140ms var(--ease-out),
+    background 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out),
+    border-color 140ms var(--ease-out);
+}
+
+.match-over__btn:focus-visible {
+  outline: 2px solid rgba(232, 197, 71, 0.85);
+  outline-offset: 2px;
+}
+
+.match-over__btn--primary {
+  color: #1a1408;
+  background: linear-gradient(180deg, #f3e2a0, #c9a227);
+  box-shadow:
+    0 8px 20px rgba(201, 162, 39, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.match-over__btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 24px rgba(201, 162, 39, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.match-over__btn--secondary {
+  color: #f3e2a0;
+  background: rgba(201, 162, 39, 0.1);
+  border: 1px solid rgba(201, 162, 39, 0.42);
+}
+
+.match-over__btn--secondary:hover {
+  background: rgba(201, 162, 39, 0.16);
+}
+
+.match-over__btn--ghost {
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.match-over__btn--ghost:hover {
+  color: var(--color-text);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes match-over-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes match-over-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes match-over-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes match-over-confetti {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift, 20px), 110vh, 0) rotate(520deg);
+  }
+}
+
+@media (max-width: 479px) {
+  .match-over__panel {
+    padding: 1.2rem 1rem 1.1rem;
+    border-radius: 16px;
+  }
+
+  .match-over__stat {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+
+  .match-over__stat dd {
+    font-size: 1.12rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .match-over__panel {
+    width: min(28rem, 100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-over__backdrop,
+  .match-over__panel,
+  .match-over__trophy-glow,
+  .match-over__confetti-piece {
+    animation: none !important;
+  }
+
+  .match-over__panel {
+    opacity: 1;
+    transform: none;
+  }
+}

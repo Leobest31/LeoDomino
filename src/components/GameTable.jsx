@@ -1,19 +1,21 @@
 import { useI18n } from "../i18n";
-import Domino from "./Domino";
-import { useFlipGroup } from "../hooks/useFlipGroup";
+import BoardContainer from "../board/BoardContainer";
 import "./GameTable.css";
 
+/**
+ * Table chrome (walnut frame + felt + drop zones).
+ * Board geometry lives in BoardContainer + DominoLayoutEngine — not here.
+ */
 function GameTable({
   tiles = [],
-  hiddenIds,
   newestId,
+  centerTileId = null,
   dropActive = false,
   hotEnd = null,
   validEnds = null,
+  hudReserve = 0,
 }) {
   const { t } = useI18n();
-  const flipKey = tiles.map((tile) => `${tile.id}:${tile.orientation}`).join("|");
-  const chainRef = useFlipGroup(flipKey);
   const showDrops = dropActive && tiles.length > 0;
   const leftValid = !validEnds || validEnds.includes("left");
   const rightValid = !validEnds || validEnds.includes("right");
@@ -22,8 +24,6 @@ function GameTable({
     <section className="game-table" aria-label={t("game.table")}>
       <div className="game-table__frame">
         <div className="game-table__felt">
-          <div className="game-table__grain" aria-hidden="true" />
-
           {showDrops && leftValid ? (
             <div
               className={`game-table__drop game-table__drop--left${
@@ -43,39 +43,13 @@ function GameTable({
             />
           ) : null}
 
-          <div
-            className="game-table__chain"
-            role="list"
-            aria-label={t("game.playedTiles")}
-            ref={chainRef}
-            data-board-root="true"
-          >
-            {tiles.length === 0 ? (
-              <p className="game-table__empty">{t("game.tableReady")}</p>
-            ) : (
-              tiles.map((tile) => (
-                <div
-                  key={tile.id}
-                  className={
-                    tile.id === newestId
-                      ? "game-table__slot game-table__slot--enter"
-                      : "game-table__slot"
-                  }
-                  role="listitem"
-                  data-flip-id={`board-${tile.id}`}
-                >
-                  <Domino
-                    left={tile.left}
-                    right={tile.right}
-                    orientation={tile.orientation || "horizontal"}
-                    size="md"
-                    boardTileId={tile.id}
-                    hidden={hiddenIds?.has(tile.id)}
-                  />
-                </div>
-              ))
-            )}
-          </div>
+          <BoardContainer
+            tiles={tiles}
+            newestId={newestId}
+            centerTileId={centerTileId}
+            emptyLabel={t("game.tableReady")}
+            hudReserve={hudReserve}
+          />
         </div>
       </div>
     </section>

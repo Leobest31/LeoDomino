@@ -3,16 +3,17 @@
  */
 
 export const MOTION = Object.freeze({
-  tileFlightMs: 480,
-  drawFlightMs: 440,
+  /** Play / AI place flight — 200–250ms premium slide. */
+  tileFlightMs: 230,
+  drawFlightMs: 220,
   snapMs: 200,
-  handFlipMs: 280,
-  scoreMs: 420,
-  bannerMs: 1400,
-  celebrationMs: 1800,
-  /** Soft table-slide lift (px) — keep low for a natural slide. */
-  playArcLiftPx: 10,
-  drawArcLiftPx: 6,
+  handFlipMs: 220,
+  scoreMs: 300,
+  bannerMs: 1000,
+  celebrationMs: 1200,
+  /** Minimal lift — no exaggerated arc. */
+  playArcLiftPx: 2,
+  drawArcLiftPx: 2,
 });
 
 /**

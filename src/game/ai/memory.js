@@ -1,5 +1,6 @@
 /**
  * Tile memory / remaining-set inference for stronger AI levels.
+ * Supports 2–4 players: unknown tiles live in the reserve + every other hand.
  */
 
 import { PIP_MAX } from "../constants.js";
@@ -12,8 +13,23 @@ import { generateSet } from "../tiles.js";
 export function buildMemory(state, aiIndex) {
   const playedIds = new Set(state.board.map((tile) => tile.id));
   const aiHandIds = new Set(state.players[aiIndex].hand);
-  const opponentIndex = aiIndex === 0 ? 1 : 0;
-  const opponentHandSize = state.players[opponentIndex]?.hand.length ?? 0;
+  const playerCount = state.players.length;
+
+  /** @type {number[]} */
+  const otherHandSizes = [];
+  for (let i = 0; i < playerCount; i += 1) {
+    if (i === aiIndex) continue;
+    otherHandSizes.push(state.players[i].hand.length);
+  }
+
+  // Closest-to-empty opponent — used for dump/block urgency.
+  const opponentHandSize = otherHandSizes.length ? Math.min(...otherHandSizes) : 0;
+
+  // Next seat in turn order (wraps); primary probability target.
+  const nextIndex = (aiIndex + 1) % Math.max(playerCount, 1);
+  const nextOpponentHandSize =
+    nextIndex === aiIndex ? 0 : (state.players[nextIndex]?.hand.length ?? 0);
+
   const reserveSize = state.reserve.length;
 
   /** @type {string[]} */
@@ -43,23 +59,31 @@ export function buildMemory(state, aiIndex) {
     unknownIds,
     pipRemaining,
     matchingTileCounts,
+    otherHandSizes,
     opponentHandSize,
+    nextOpponentHandSize,
     reserveSize,
+    playerCount,
   };
 }
 
 /**
- * Approximate P(opponent can answer this pip).
+ * Approximate P(the focused opponent can answer this pip).
+ * Defaults to the next seat in turn order (multiplayer-aware).
  * @param {number} pip
  * @param {ReturnType<typeof buildMemory>} memory
+ * @param {number} [handSize] - override hand size used for the draw model
  * @returns {number}
  */
-export function opponentMatchProbability(pip, memory) {
+export function opponentMatchProbability(pip, memory, handSize) {
   const matchingTiles = memory.matchingTileCounts[pip] ?? 0;
   if (matchingTiles <= 0 || memory.unknownIds.length === 0) return 0;
 
   const unknown = memory.unknownIds.length;
-  const opp = memory.opponentHandSize;
+  const opp =
+    handSize != null
+      ? handSize
+      : (memory.nextOpponentHandSize ?? memory.opponentHandSize ?? 0);
   if (opp <= 0) return 0;
   if (opp >= unknown) return 1;
 

@@ -1,234 +1,183 @@
+/*
+  Premium table chrome — lean frame, open felt, board is the star.
+*/
+
 .game-table {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
   display: flex;
   align-items: stretch;
   justify-content: center;
   padding: 0;
   width: 100%;
+  min-height: 0;
+  height: 100%;
 }
 
 .game-table__frame {
   position: relative;
   width: 100%;
-  max-width: var(--game-max);
-  border-radius: calc(var(--radius-lg) + 2px);
-  padding: clamp(0.42rem, 1.5vw, 0.85rem);
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  border-radius: 16px;
+  padding: 0;
+  box-sizing: border-box;
   background:
-    linear-gradient(
-      145deg,
-      #8a5a30 0%,
-      var(--color-wood-light) 18%,
-      var(--color-wood-mid) 46%,
-      var(--color-wood) 74%,
-      var(--color-wood-edge) 100%
-    );
-  box-shadow: var(--shadow-wood);
-  isolation: isolate;
-}
-
-/* Outer brass lip */
-.game-table__frame::before {
-  content: "";
-  position: absolute;
-  inset: 0.22rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(232, 197, 71, 0.32);
-  pointer-events: none;
+    linear-gradient(145deg, #5e3618 0%, #3d200e 42%, #2a1508 100%);
+  border: 8px solid #32190a;
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.4) inset,
-    0 1px 0 rgba(255, 220, 160, 0.12);
-  z-index: 2;
+    0 16px 36px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(232, 200, 140, 0.22),
+    inset 0 -1px 3px rgba(0, 0, 0, 0.4);
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Wood grain wash */
-.game-table__frame::after {
+.game-table__frame::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  opacity: 0.35;
-  background-image:
+  z-index: 4;
+  background:
     repeating-linear-gradient(
-      95deg,
-      transparent,
-      transparent 3px,
-      rgba(0, 0, 0, 0.05) 3px,
-      rgba(0, 0, 0, 0.05) 4px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 5px,
-      rgba(255, 210, 140, 0.03) 5px,
-      rgba(255, 210, 140, 0.03) 6px
+      92deg,
+      transparent 0 4px,
+      rgba(255, 220, 160, 0.028) 4px 5px
     );
   mix-blend-mode: soft-light;
-  z-index: 1;
+  opacity: 0.85;
+}
+
+.game-table__frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 5;
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 197, 120, 0.18),
+    inset 0 1px 0 rgba(255, 230, 180, 0.16);
 }
 
 .game-table__felt {
   position: relative;
   z-index: 0;
+  width: 100%;
   height: 100%;
-  min-height: clamp(12.5rem, 34vh, 22rem);
-  border-radius: calc(var(--radius-lg) - 2px);
+  min-height: 0;
+  border-radius: 10px;
   overflow: hidden;
   background:
-    radial-gradient(ellipse 70% 55% at 50% 38%, var(--color-felt-hot) 0%, transparent 55%),
-    radial-gradient(ellipse 95% 75% at 50% 42%, var(--color-felt-light) 0%, var(--color-felt-mid) 38%, var(--color-felt) 68%, var(--color-felt-dark) 100%);
+    /* Soft upper wash — restrained so cloth stays deep casino green. */
+    radial-gradient(ellipse 52% 38% at 40% 20%, rgba(48, 110, 72, 0.14), transparent 64%),
+    radial-gradient(ellipse 96% 90% at 50% 54%, #0a5c24 0%, #084a1c 38%, #063816 68%, #042610 100%);
   box-shadow:
-    inset 0 0 70px rgba(0, 0, 0, 0.5),
-    inset 0 2px 0 rgba(255, 255, 255, 0.07),
-    inset 0 -18px 36px rgba(0, 0, 0, 0.28);
+    inset 0 0 40px rgba(0, 0, 0, 0.28),
+    inset 0 0 80px rgba(0, 0, 0, 0.2);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(0.75rem, 2.8vw, 1.6rem);
+  flex-direction: column;
+  padding: 0.22rem 0.28rem;
+  box-sizing: border-box;
 }
 
-/* Soft overhead lamp + corner falloff */
 .game-table__felt::before {
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   pointer-events: none;
+  z-index: 1;
+  opacity: 0.48;
   background:
-    radial-gradient(ellipse 55% 40% at 50% 18%, rgba(255, 255, 255, 0.11), transparent 60%),
-    radial-gradient(circle at 12% 12%, rgba(255, 255, 255, 0.06), transparent 32%),
-    radial-gradient(circle at 88% 82%, rgba(0, 0, 0, 0.35), transparent 42%);
-  z-index: 0;
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.16 0 0 0 0 0.07 0 0 0 0.38 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 2px,
+      rgba(255, 255, 255, 0.015) 2px 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 2px,
+      rgba(0, 0, 0, 0.032) 2px 3px
+    );
+  mix-blend-mode: soft-light;
 }
 
 .game-table__felt::after {
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   pointer-events: none;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
   z-index: 2;
-}
-
-.game-table__grain {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  opacity: 0.28;
-  z-index: 1;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.05) 2px,
-      rgba(0, 0, 0, 0.05) 3px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 3px,
-      rgba(255, 255, 255, 0.028) 3px,
-      rgba(255, 255, 255, 0.028) 4px
-    );
-  mix-blend-mode: soft-light;
-}
-
-.game-table__chain {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  max-width: 100%;
-  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.28));
-}
-
-.game-table__slot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  will-change: transform;
-}
-
-.game-table__slot--enter {
-  animation: slot-snap 200ms var(--ease-snap) both;
-}
-
-.game-table__empty {
-  position: relative;
-  z-index: 3;
-  max-width: 18rem;
-  text-align: center;
-  font-size: 0.92rem;
-  color: rgba(232, 235, 233, 0.55);
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  background:
+    /* Very soft play-area lift — no bright center hotspot competing with tiles. */
+    radial-gradient(ellipse 48% 42% at 50% 50%, rgba(255, 236, 190, 0.028), transparent 70%),
+    radial-gradient(ellipse 50% 38% at 38% 22%, rgba(255, 228, 170, 0.035), transparent 64%),
+    radial-gradient(ellipse 94% 90% at 50% 50%, transparent 48%, rgba(0, 0, 0, 0.3) 100%);
 }
 
 .game-table__drop {
   position: absolute;
-  top: 12%;
-  bottom: 12%;
-  width: min(32%, 7.5rem);
+  top: 20%;
+  bottom: 20%;
+  width: min(18%, 4.5rem);
   z-index: 4;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   pointer-events: none;
   transition:
-    background 120ms var(--ease-out),
-    box-shadow 120ms var(--ease-out),
-    border-color 120ms var(--ease-out);
+    background 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out),
+    border-color 140ms var(--ease-out);
 }
 
 .game-table__drop--left {
-  left: 0.35rem;
+  left: 0.4rem;
 }
 
 .game-table__drop--right {
-  right: 0.35rem;
+  right: 0.4rem;
 }
 
 .game-table__drop--ready {
-  border: 1px dashed rgba(232, 197, 71, 0.45);
-  background: rgba(232, 197, 71, 0.08);
-  box-shadow: inset 0 0 20px rgba(232, 197, 71, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .game-table__drop--hot {
-  border: 1px solid rgba(232, 197, 71, 0.75);
-  background: rgba(232, 197, 71, 0.18);
+  border: 1.5px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 719px) {
+  .game-table__frame {
+    border-width: 7px;
+    border-radius: 14px;
+  }
+
+  .game-table__felt {
+    padding: 0.35rem 0.4rem;
+  }
+}
+
+:root[data-theme="noir"] .game-table__felt {
+  background:
+    radial-gradient(ellipse 52% 38% at 40% 20%, rgba(36, 95, 58, 0.12), transparent 64%),
+    radial-gradient(ellipse 96% 90% at 50% 54%, #08501e 0%, #063c16 46%, #04280e 100%);
   box-shadow:
-    inset 0 0 24px rgba(232, 197, 71, 0.14),
-    0 0 18px rgba(232, 197, 71, 0.22);
+    inset 0 0 40px rgba(0, 0, 0, 0.32),
+    inset 0 0 80px rgba(0, 0, 0, 0.24);
 }
 
-@keyframes slot-snap {
-  from {
-    opacity: 0.55;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@media (min-width: 720px) {
-  .game-table__felt {
-    min-height: clamp(14rem, 38vh, 24rem);
-  }
-
-  .game-table__chain {
-    gap: 0.28rem;
-  }
-}
-
-@media (min-width: 1100px) {
-  .game-table__felt {
-    min-height: clamp(16rem, 42vh, 26rem);
-    padding: clamp(1rem, 2.4vw, 1.85rem);
-  }
+:root[data-theme="noir"] .game-table__frame {
+  background: linear-gradient(145deg, #4a2a12 0%, #2a1608 100%);
+  border-color: #1e1006;
 }

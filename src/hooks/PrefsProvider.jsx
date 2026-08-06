@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   applyTheme,
+  applyTileSkin,
   loadPrefs,
   savePrefs,
   vibrate as vibrateDevice,
@@ -8,7 +9,7 @@ import {
 import { PrefsContext } from "./PrefsContext.js";
 
 /**
- * Theme + vibration preferences (persisted offline).
+ * Theme + tile skin + vibration preferences (persisted offline).
  */
 export function PrefsProvider({ children }) {
   const [prefs, setPrefs] = useState(() => loadPrefs());
@@ -17,8 +18,16 @@ export function PrefsProvider({ children }) {
     applyTheme(prefs.theme);
   }, [prefs.theme]);
 
+  useEffect(() => {
+    applyTileSkin(prefs.tileSkin);
+  }, [prefs.tileSkin]);
+
   const setTheme = useCallback((theme) => {
     setPrefs(savePrefs({ theme }));
+  }, []);
+
+  const setTileSkin = useCallback((tileSkin) => {
+    setPrefs(savePrefs({ tileSkin }));
   }, []);
 
   const setVibration = useCallback((vibration) => {
@@ -33,10 +42,11 @@ export function PrefsProvider({ children }) {
     () => ({
       ...prefs,
       setTheme,
+      setTileSkin,
       setVibration,
       vibrate,
     }),
-    [prefs, setTheme, setVibration, vibrate]
+    [prefs, setTheme, setTileSkin, setVibration, vibrate]
   );
 
   return <PrefsContext.Provider value={value}>{children}</PrefsContext.Provider>;

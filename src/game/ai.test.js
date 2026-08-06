@@ -184,4 +184,65 @@ section("five difficulty levels registered");
   }
 }
 
+// --- Softlock recovery: orphan mustPlayTileId must not freeze AI ---
+{
+  let state = startMatch({ seed: 55, playerIds: ["a", "b"], targetScore: 100 });
+  // Corrupt: force a must-play id that is not in the current hand.
+  state = {
+    ...state,
+    mustPlayTileId: "nope-tile",
+  };
+  const beforeSeat = state.currentPlayer;
+  const beforePhase = state.phase;
+  const actionsBefore = getAvailableActions(state);
+  assert.equal(actionsBefore.canDraw, false);
+  assert.equal(actionsBefore.canPass, false);
+  assert.equal(actionsBefore.canPlay, false);
+
+  const next = applyAiTurn(state, {
+    difficulty: DIFFICULTY.MEDIUM,
+    aiIndex: state.currentPlayer,
+  });
+
+  assert.ok(
+    next.phase !== beforePhase ||
+      next.currentPlayer !== beforeSeat ||
+      next.board.length !== state.board.length ||
+      next.reserve.length !== state.reserve.length ||
+      next.mustPlayTileId !== "nope-tile",
+    "AI turn must escape orphan mustPlay softlock"
+  );
+  assert.notEqual(next.mustPlayTileId, "nope-tile");
+  section("applyAiTurn recovers from orphan mustPlayTileId");
+}
+
+// --- chooseAiAction null path still advances via legal fallback ---
+{
+  let state = startMatch({ seed: 61, playerIds: ["a", "b"], targetScore: 100 });
+  state = {
+    ...state,
+    mustPlayTileId: "missing-6-6",
+    reserve: state.reserve.slice(),
+  };
+  assert.equal(chooseAiAction(state, { aiIndex: state.currentPlayer }), null);
+  const next = applyAiTurn(state, {
+    difficulty: DIFFICULTY.EASY,
+    aiIndex: state.currentPlayer,
+  });
+  assert.equal(next.mustPlayTileId, null);
+  const actions = getAvailableActions(next);
+  // After unlock, either a move was applied or legal actions exist for the seat.
+  assert.ok(
+    next.currentPlayer !== state.currentPlayer ||
+      next.board.length > state.board.length ||
+      next.reserve.length < state.reserve.length ||
+      actions.canPlay ||
+      actions.canDraw ||
+      actions.canPass ||
+      next.phase !== PHASE.PLAYING,
+    "null chooseAiAction must not leave a permanent softlock"
+  );
+  section("null chooseAiAction recovers without changing strategy code");
+}
+
 console.log("\nPhase 5 AI tests passed.\n");

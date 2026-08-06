@@ -8,11 +8,21 @@ import assert from "node:assert/strict";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./config.js";
 import { loadAllCatalogs } from "./locales/loadCatalog.js";
 
+const PLURAL_CATEGORIES = new Set([
+  "zero",
+  "one",
+  "two",
+  "few",
+  "many",
+  "other",
+]);
+
 function isPluralMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  if (!keys.length) return false;
   return (
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
+    keys.every((key) => PLURAL_CATEGORIES.has(key)) &&
     Object.values(value).every((entry) => typeof entry === "string")
   );
 }

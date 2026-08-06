@@ -16,10 +16,17 @@ import "./SettingsPanel.css";
 /**
  * Slide-over settings — language, AI, sound, music, vibration, theme, stats.
  */
-function SettingsPanel({ open, onClose, difficulty, onDifficultyChange }) {
+function SettingsPanel({
+  open,
+  onClose,
+  difficulty,
+  onDifficultyChange,
+  playerCount,
+  onPlayerCountChange,
+}) {
   const { t } = useI18n();
   const { volume, muted, ambient, setVolume, setMuted, setAmbient, play } = useAudio();
-  const { theme, vibration, setTheme, setVibration } = usePrefs();
+  const { theme, tileSkin, vibration, setTheme, setTileSkin, setVibration } = usePrefs();
   const [stats, setStats] = useState(() => loadStats());
   const wasOpen = useRef(false);
 
@@ -110,6 +117,26 @@ function SettingsPanel({ open, onClose, difficulty, onDifficultyChange }) {
             </label>
           ) : null}
 
+          {playerCount != null && onPlayerCountChange ? (
+            <label className="settings-panel__field">
+              <span className="settings-panel__label">{t("game.playerCount")}</span>
+              <select
+                className="settings-panel__select"
+                value={playerCount}
+                aria-label={t("game.playerCountAria")}
+                onChange={(event) => {
+                  onPlayerCountChange(Number(event.target.value));
+                  play("button");
+                }}
+              >
+                <option value={2}>{t("game.playersN", { n: 2 })}</option>
+                <option value={3}>{t("game.playersN", { n: 3 })}</option>
+                <option value={4}>{t("game.playersN", { n: 4 })}</option>
+              </select>
+              <span className="settings-panel__hint">{t("game.playerCountHint")}</span>
+            </label>
+          ) : null}
+
           <fieldset className="settings-panel__fieldset">
             <legend className="settings-panel__label">{t("audio.title")}</legend>
 
@@ -184,6 +211,21 @@ function SettingsPanel({ open, onClose, difficulty, onDifficultyChange }) {
               >
                 <option value="classic">{t("settings.themeClassic")}</option>
                 <option value="noir">{t("settings.themeNoir")}</option>
+              </select>
+            </label>
+
+            <label className="settings-panel__field">
+              <span className="settings-panel__label">{t("settings.tileSkin")}</span>
+              <select
+                className="settings-panel__select"
+                value={tileSkin}
+                onChange={(event) => {
+                  setTileSkin(event.target.value);
+                  play("button");
+                }}
+              >
+                <option value="classic">{t("settings.tileSkinClassic")}</option>
+                <option value="premium">{t("settings.tileSkinPremium")}</option>
               </select>
             </label>
           </fieldset>

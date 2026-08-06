@@ -1,0 +1,30 @@
+/* Canvas 2D replacement for `.domino__face` (see Domino.css). Occupies the
+ * exact same inset box `.domino__face` used to occupy — same top/left/
+ * right/bottom bevel insets, same corner radius — so swapping between the
+ * CSS and canvas renderers (dev flag) never changes the tile's footprint,
+ * only what is painted inside it. Purely decorative: no pointer events,
+ * no focus, `aria-hidden` on the element itself (belt-and-suspenders with
+ * the JSX attribute).
+ */
+.canvas-domino-surface {
+  /* `<canvas>` is a replaced element — unlike the `<div>` `.domino__face`
+     replaced, `top/left/right/bottom` with `width/height: auto` resolves
+     against its intrinsic size (the `width`/`height` HTML attributes),
+     not the offsets. Explicit `calc()` sizing avoids that entirely: no
+     `auto` dimension is ever involved, so there is no intrinsic-size
+     fallback to fall into. */
+  position: absolute;
+  z-index: 2;
+  top: var(--_bevel-hi);
+  left: var(--_bevel-hi);
+  width: calc(100% - var(--_bevel-hi) - var(--_bevel-lo));
+  height: calc(100% - var(--_bevel-hi) - var(--_bevel-lo));
+  display: block;
+  border-radius: calc(var(--_radius) - var(--_bevel-hi) * 0.35);
+  pointer-events: none;
+}
+
+/* Note: halves/divider orientation is handled by CanvasDominoSurface's own
+   `orientation` prop -> DominoBitmapPainter, not by CSS flex-direction like
+   `.domino--horizontal .domino__face` — there is no flex layout inside a
+   <canvas>, so no `.domino--horizontal` override is needed here. */

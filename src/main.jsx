@@ -10,11 +10,13 @@ import "@fontsource/source-serif-4/700.css";
 import { I18nProvider } from "./i18n";
 import { AudioProvider } from "./audio";
 import { PrefsProvider } from "./hooks/PrefsProvider.jsx";
-import { applyTheme, loadPrefs } from "./persistence/index.js";
+import { applyTheme, applyTileSkin, loadPrefs } from "./persistence/index.js";
 import "./styles/global.css";
 import App from "./App.jsx";
 
-applyTheme(loadPrefs().theme);
+const prefs = loadPrefs();
+applyTheme(prefs.theme);
+applyTileSkin(prefs.tileSkin);
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

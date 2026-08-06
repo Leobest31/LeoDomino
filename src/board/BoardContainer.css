@@ -1,0 +1,108 @@
+/* BoardContainer — absolute spatial slots (no flex/grid tile flow) */
+
+.board-container {
+  --board-tile-scale: 1;
+  --domino-w: calc(var(--domino-hand-w) * 3.96 * var(--board-tile-scale));
+  --domino-h: calc(var(--domino-hand-h) * 3.96 * var(--board-tile-scale));
+  --domino-pip: calc(var(--domino-hand-pip) * 3.96 * var(--board-tile-scale));
+
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  contain: layout paint;
+}
+
+.board-container__measure {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  /* --domino-w/h/pip are only *declared* (and therefore only
+     re-evaluated) on .board-container. Overriding --board-tile-scale
+     alone here would not re-run that calc() — the probe would keep
+     inheriting the already-resolved, board-scaled value from the
+     parent, silently corrupting every future "1x" measurement. Redeclare
+     all three so the probe always measures the true unscaled tile. */
+  --board-tile-scale: 1;
+  --domino-w: calc(var(--domino-hand-w) * 3.96 * var(--board-tile-scale));
+  --domino-h: calc(var(--domino-hand-h) * 3.96 * var(--board-tile-scale));
+  --domino-pip: calc(var(--domino-hand-pip) * 3.96 * var(--board-tile-scale));
+}
+
+.board-container__layer {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.board-container__slot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.board-container__slot .domino,
+.board-container__slot .leo-domino-premium {
+  flex: 0 0 auto;
+}
+
+/* Walnut/gold "Premium Classic" skin keeps its own established resting
+   shadow here (unchanged). The ivory Classic tile intentionally does NOT
+   get a filter override here — it must fall through to `.domino`'s own
+   layered contact/penumbra/ambient shadow (Domino.css), which this rule
+   was previously and silently overriding on every placed board tile,
+   flattening its realism. */
+.board-container__slot .leo-domino-premium {
+  filter:
+    drop-shadow(0 0.5px 0.55px rgba(8, 5, 2, 0.5))
+    drop-shadow(0 1.5px 2.25px rgba(10, 6, 2, 0.28));
+}
+
+.board-container__slot--tip {
+  z-index: 3;
+}
+
+.board-container__slot--enter {
+  animation: board-container-place 200ms cubic-bezier(0.45, 0.05, 0.55, 0.95) both;
+  z-index: 5;
+}
+
+@keyframes board-container-place {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.board-container__empty {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  color: rgba(232, 235, 233, 0.55);
+  font-family: var(--font-ui, "Outfit", system-ui, sans-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  text-align: center;
+  pointer-events: none;
+}
+
+.board-container__debug {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}

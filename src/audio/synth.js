@@ -46,11 +46,14 @@ export function buildSoundBank(ctx) {
   /** @type {Record<string, AudioBuffer>} */
   const bank = {};
 
-  // Soft wood place — low thud + brief noise tick.
-  bank.place = renderBuffer(ctx, 0.22, (t, i) => {
-    const thud = Math.sin(2 * Math.PI * (140 - t * 90) * t) * envelope(t, 0.004, 0.12);
-    const tick = noiseSample(i) * Math.exp(-t * 55) * 0.22;
-    return clamp((thud * 0.55 + tick) * 0.7);
+  // Domino click — short ivory-on-felt tap when a tile lands.
+  bank.place = renderBuffer(ctx, 0.14, (t, i) => {
+    const body =
+      Math.sin(2 * Math.PI * (185 - t * 110) * t) * envelope(t, 0.002, 0.055) * 0.42;
+    const click = noiseSample(i) * Math.exp(-t * 140) * 0.38;
+    const tip =
+      Math.sin(2 * Math.PI * 920 * t) * Math.exp(-t * 90) * 0.08;
+    return clamp((body + click + tip) * 0.72);
   });
 
   // Pickup — light lift click.
@@ -86,11 +89,12 @@ export function buildSoundBank(ctx) {
     return clamp((a + b) * envelope(t, 0.008, 0.1));
   });
 
-  // AI move — quieter wood place.
-  bank.aiMove = renderBuffer(ctx, 0.2, (t, i) => {
-    const thud = Math.sin(2 * Math.PI * (130 - t * 70) * t) * envelope(t, 0.005, 0.11);
-    const tick = noiseSample(i) * Math.exp(-t * 60) * 0.16;
-    return clamp((thud * 0.45 + tick) * 0.55);
+  // AI land — same click family, slightly softer.
+  bank.aiMove = renderBuffer(ctx, 0.13, (t, i) => {
+    const body =
+      Math.sin(2 * Math.PI * (175 - t * 100) * t) * envelope(t, 0.002, 0.05) * 0.36;
+    const click = noiseSample(i) * Math.exp(-t * 145) * 0.3;
+    return clamp((body + click) * 0.62);
   });
 
   // Turn notice — soft two-tone chime.
@@ -112,22 +116,25 @@ export function buildSoundBank(ctx) {
     return clamp(sample);
   });
 
-  bank.matchWin = renderBuffer(ctx, 0.85, (t) => {
-    const notes = [392, 523.25, 659.25, 783.99];
+  bank.matchWin = renderBuffer(ctx, 1.15, (t) => {
+    const notes = [392, 523.25, 659.25, 783.99, 1046.5];
     let sample = 0;
     for (let n = 0; n < notes.length; n += 1) {
-      const start = n * 0.11;
+      const start = n * 0.1;
       if (t < start) continue;
       const local = t - start;
-      sample += Math.sin(2 * Math.PI * notes[n] * local) * Math.exp(-local * 4.2) * 0.11;
+      sample += Math.sin(2 * Math.PI * notes[n] * local) * Math.exp(-local * 3.8) * 0.12;
     }
-    return clamp(sample);
+    const shimmer =
+      Math.sin(2 * Math.PI * 1568 * t) * Math.exp(-t * 5) * 0.04 * (t > 0.35 ? 1 : 0);
+    return clamp(sample + shimmer);
   });
 
-  bank.defeat = renderBuffer(ctx, 0.55, (t) => {
-    const a = Math.sin(2 * Math.PI * (240 - t * 60) * t) * Math.exp(-t * 3.5) * 0.14;
-    const b = Math.sin(2 * Math.PI * (180 - t * 40) * t) * Math.exp(-t * 4) * 0.1;
-    return clamp(a + b);
+  bank.defeat = renderBuffer(ctx, 0.75, (t) => {
+    const a = Math.sin(2 * Math.PI * (220 - t * 70) * t) * Math.exp(-t * 2.8) * 0.15;
+    const b = Math.sin(2 * Math.PI * (165 - t * 45) * t) * Math.exp(-t * 3.4) * 0.11;
+    const c = Math.sin(2 * Math.PI * (110 - t * 20) * t) * Math.exp(-t * 2.2) * 0.06;
+    return clamp(a + b + c);
   });
 
   bank.error = renderBuffer(ctx, 0.16, (t, i) => {

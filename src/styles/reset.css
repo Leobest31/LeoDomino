@@ -16,6 +16,7 @@ body,
 #root {
   min-height: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -26,7 +27,7 @@ body {
   background: var(--color-bg-deep);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 img,

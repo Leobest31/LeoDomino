@@ -1,5 +1,5 @@
 .avatar {
-  --avatar-size: 2.35rem;
+  --avatar-size: 2.45rem;
   position: relative;
   width: var(--avatar-size);
   height: var(--avatar-size);
@@ -34,8 +34,9 @@
   font-weight: 600;
   color: var(--color-text);
   background:
-    radial-gradient(circle at 35% 30%, #2a3d34 0%, #121a16 70%);
+    radial-gradient(circle at 35% 28%, #334e42 0%, #121a16 72%);
   border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .avatar--rival .avatar__face {
@@ -44,17 +45,25 @@
 }
 
 .avatar--active .avatar__ring {
-  box-shadow: var(--glow-gold), 0 2px 8px rgba(0, 0, 0, 0.45);
-  animation: avatar-glow 1.6s ease-in-out infinite;
+  background:
+    conic-gradient(
+      from 210deg,
+      var(--color-gold-dim),
+      var(--color-gold-bright),
+      var(--color-leo-blue),
+      var(--color-gold-dim)
+    );
+  box-shadow: var(--glow-gold), var(--glow-leo), 0 2px 8px rgba(0, 0, 0, 0.45);
+  animation: avatar-glow 1.8s ease-in-out infinite;
 }
 
 @keyframes avatar-glow {
   0%,
   100% {
-    filter: brightness(1);
+    opacity: 1;
   }
   50% {
-    filter: brightness(1.15);
+    opacity: 0.88;
   }
 }
 

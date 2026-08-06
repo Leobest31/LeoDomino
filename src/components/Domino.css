@@ -1,71 +1,269 @@
+/* Shared DominoTile — premium ivory (engraved, beveled, ambient-shadowed)
+ *
+ * Every effect below (bevel, side band, highlight, shadow) is painted
+ * strictly *inside* the tile's own --domino-w/h box via absolutely
+ * positioned inner layers and box-shadow/gradient tricks. The outer
+ * `.domino` element — the one the Board Layout Engine measures and
+ * positions — never changes size, so spacing/collision geometry from the
+ * layout engine is completely unaffected by this file.
+ */
+
 .domino {
   --_w: var(--domino-w);
   --_h: var(--domino-h);
-  --_pip: var(--domino-pip);
+  /* Pip scale toward reference ~pip/half-face ratio; outer box unchanged. */
+  --_pip: calc(var(--domino-pip) * 1.12);
+  /* Soft premium corners — machined pillowed silhouette. */
+  --_radius: calc(var(--_w) * 0.16);
+  /*
+    Continuous molded fillet (not a thick beveled frame).
+    Nearly equal inset on all sides so the top flows into the walls
+    as one porcelain piece — tiny BR bias only for light direction.
+  */
+  --_bevel-hi: min(2.75px, calc(var(--_w) * 0.046));
+  --_bevel-lo: min(3.5px, calc(var(--_w) * 0.058));
+
+  /* Warm ivory porcelain — primary mid tone #F5EBE0 (never chalk white) */
+  --_ivory-top: #faf6f0;
+  --_ivory-mid: #f5ebe0;
+  --_ivory-shade: #e6d9cb;
+  --_edge: #cfc3b6;
+  --_edge-hi: #f8f3ec;
+  --_edge-deep: #c0b0a0;
+  --_border: #cfc3b6;
+  --_divider: #050505;
+  --_divider-groove: rgba(255, 250, 242, 0.28);
+  --_pip-color: #000000;
 
   position: relative;
-  display: flex;
+  display: block;
   flex-shrink: 0;
   width: var(--_w);
   height: var(--_h);
-  padding: 0.22rem;
+  padding: 0;
   border: none;
-  border-radius: calc(var(--_w) * 0.12);
-  background:
-    linear-gradient(155deg, var(--color-tile-hi) 0%, var(--color-tile) 48%, var(--color-tile-edge) 100%);
-  box-shadow: var(--shadow-tile);
-  color: var(--color-pip);
+  border-radius: var(--_radius);
+  background: transparent;
+  color: var(--_pip-color);
   user-select: none;
-  /* Contact shadow on the felt */
-  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.22));
+  isolation: isolate;
   transition:
-    transform var(--duration-med) var(--ease-out),
-    box-shadow var(--duration-med) var(--ease-out),
+    transform 280ms var(--ease-out),
+    filter 280ms var(--ease-out),
     outline-color var(--duration-fast) var(--ease-out),
-    opacity var(--duration-fast) linear,
-    filter var(--duration-med) var(--ease-out);
+    opacity var(--duration-fast) linear;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  /* Tight felt contact — dark kiss + soft penumbra (never floating). */
+  filter:
+    drop-shadow(0 0.5px 0.4px rgba(0, 0, 0, 0.92))
+    drop-shadow(0 1.25px 1.75px rgba(0, 0, 0, 0.58))
+    drop-shadow(0 3px 5px rgba(0, 0, 0, 0.22));
 }
 
-.domino::before {
+/*
+  Molded porcelain body — one continuous cream volume.
+  Gradients sell the soft fillet from the top deck into the side walls;
+  there is no darker "frame" material under a separate face plate.
+*/
+.domino__base {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: var(--_radius);
+  background:
+    /* Upper-left key light rolling over the continuous shoulder. */
+    radial-gradient(
+      125% 110% at 14% 10%,
+      rgba(255, 250, 242, 0.58) 0%,
+      rgba(255, 248, 238, 0.16) 30%,
+      transparent 54%
+    ),
+    /* Soft top-lip catch — continuous with the deck, not a hard rim stripe. */
+    linear-gradient(
+      180deg,
+      rgba(255, 250, 242, 0.48) 0%,
+      rgba(255, 248, 238, 0.1) 11%,
+      transparent 24%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 250, 242, 0.3) 0%,
+      rgba(255, 248, 238, 0.07) 10%,
+      transparent 22%
+    ),
+    /* Gentle wall falloff into the lower-right — same cream family. */
+    radial-gradient(
+      95% 95% at 96% 96%,
+      rgba(110, 85, 60, 0.24) 0%,
+      rgba(110, 85, 60, 0.09) 36%,
+      transparent 60%
+    ),
+    /* Annular curvature — soft shade where deck turns into sides. */
+    radial-gradient(
+      100% 100% at 50% 50%,
+      transparent 54%,
+      rgba(90, 70, 48, 0.055) 74%,
+      rgba(78, 58, 40, 0.13) 100%
+    ),
+    /* Core molded ivory — identical tokens to the face deck. */
+    linear-gradient(
+      155deg,
+      var(--_ivory-top) 0%,
+      var(--_ivory-mid) 48%,
+      var(--_ivory-shade) 100%
+    );
+  box-shadow:
+    /* Continuous soft occlusion along the molded underside — not a shelf. */
+    inset 0 -1.65px 3px rgba(48, 34, 20, 0.18),
+    inset -1.2px -1.2px 2.4px rgba(48, 34, 20, 0.12),
+    inset 0.9px 0.9px 1.85px rgba(255, 250, 242, 0.32),
+    /* Soft outer silhouette — no hard digital hairline. */
+    0 0 0 0.55px rgba(160, 145, 125, 0.32);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.domino__side--y,
+.domino__side--x {
+  display: none;
+}
+
+/*
+  Top deck — same porcelain as the body, floating only by a soft fillet
+  inset so the piece reads as one molded tile (not a plate on a frame).
+*/
+.domino__face {
+  position: absolute;
+  z-index: 2;
+  top: var(--_bevel-hi);
+  left: var(--_bevel-hi);
+  right: var(--_bevel-lo);
+  bottom: var(--_bevel-lo);
+  display: flex;
+  padding: calc(var(--_w) * 0.07);
+  /* Radius stays close to the outer shell so the shoulder is continuous. */
+  border-radius: calc(var(--_radius) - var(--_bevel-hi) * 0.4);
+  overflow: hidden;
+  background:
+    radial-gradient(
+      135% 115% at 30% 20%,
+      rgba(255, 250, 242, 0.32) 0%,
+      transparent 58%
+    ),
+    linear-gradient(
+      158deg,
+      var(--_ivory-top) 0%,
+      var(--_ivory-mid) 52%,
+      var(--_ivory-shade) 100%
+    );
+  border: none;
+  box-shadow:
+    /* Soft continuous fillet — highlight into shade, no outline ring. */
+    inset 0 1.4px 2.4px rgba(255, 250, 242, 0.42),
+    inset 0 -1.75px 2.75px rgba(62, 46, 28, 0.13),
+    inset 1.2px 0 2px rgba(255, 250, 242, 0.2),
+    inset -1.35px -0.55px 2.25px rgba(62, 46, 28, 0.11);
+}
+
+/* Subtle upper-left ambient highlight + faint porcelain grain (nearly invisible) */
+.domino__face::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  z-index: 0;
+  background:
+    /* Soft perimeter vignette — denser porcelain depth at the rim. */
+    radial-gradient(
+      128% 112% at 45% 40%,
+      transparent 60%,
+      rgba(72, 54, 28, 0.032) 84%,
+      rgba(72, 54, 28, 0.058) 100%
+    ),
+    /* Soft key-light bloom (upper-left). */
+    radial-gradient(
+      118% 88% at 20% 14%,
+      rgba(255, 250, 242, 0.26) 0%,
+      rgba(255, 248, 238, 0.06) 40%,
+      transparent 66%
+    ),
+    /* Quiet mineral banding — warm ivory variation only. */
+    radial-gradient(58% 44% at 30% 76%, rgba(128, 104, 68, 0.038), transparent 72%),
+    radial-gradient(50% 40% at 78% 20%, rgba(126, 102, 66, 0.03), transparent 72%),
+    radial-gradient(62% 48% at 66% 60%, rgba(142, 120, 82, 0.022), transparent 74%),
+    /* Sparse micro flecks — barely there, never noisy. */
+    radial-gradient(1px 1px at 12% 22%, rgba(98, 80, 54, 0.035), transparent 70%),
+    radial-gradient(0.9px 0.9px at 37% 30%, rgba(98, 80, 54, 0.03), transparent 70%),
+    radial-gradient(1.05px 1.05px at 62% 40%, rgba(98, 80, 54, 0.03), transparent 70%),
+    radial-gradient(0.95px 0.95px at 82% 24%, rgba(98, 80, 54, 0.026), transparent 70%),
+    radial-gradient(0.9px 0.9px at 52% 52%, rgba(98, 80, 54, 0.022), transparent 70%),
+    radial-gradient(0.85px 0.85px at 24% 58%, rgba(98, 80, 54, 0.02), transparent 70%);
+}
+
+/* Soft satin clear-coat — lightly waxed porcelain, not wet gloss. */
+.domino__face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.34;
+  background:
+    /* Broad UL bloom — satin catch-light, never a tight hotspot. */
+    radial-gradient(
+      105% 62% at 24% 14%,
+      rgba(255, 252, 246, 0.16) 0%,
+      rgba(255, 252, 246, 0.05) 38%,
+      transparent 72%
+    ),
+    /* Soft directional specular band across the ivory deck. */
+    linear-gradient(
+      124deg,
+      transparent 34%,
+      rgba(255, 252, 246, 0.04) 44%,
+      rgba(255, 252, 246, 0.09) 51%,
+      rgba(255, 252, 246, 0.12) 54%,
+      rgba(255, 252, 246, 0.06) 60%,
+      transparent 76%
+    );
+  mix-blend-mode: soft-light;
+}
+
+.domino--horizontal {
+  width: var(--_h);
+  height: var(--_w);
+}
+
+.domino--horizontal .domino__face {
+  flex-direction: row;
+}
+
+.domino--vertical .domino__face {
+  flex-direction: column;
 }
 
 .domino--hidden {
   opacity: 0 !important;
   pointer-events: none;
   transform: none !important;
+  filter: none !important;
 }
 
 .domino--sm {
-  --_w: calc(var(--domino-w) * 0.72);
-  --_h: calc(var(--domino-h) * 0.72);
-  --_pip: calc(var(--domino-pip) * 0.72);
-  padding: 0.14rem;
+  --_w: calc(var(--domino-w) * 0.55);
+  --_h: calc(var(--domino-h) * 0.55);
+  --_pip: calc(var(--domino-pip) * 0.55 * 1.12);
 }
 
-.domino--lg {
-  --_w: calc(var(--domino-w) * 1.12);
-  --_h: calc(var(--domino-h) * 1.12);
-  --_pip: calc(var(--domino-pip) * 1.08);
+.domino--sm .domino__face {
+  padding: calc(var(--_w) * 0.06);
 }
 
-.domino--horizontal {
-  width: var(--_h);
-  height: var(--_w);
-  flex-direction: row;
-}
-
-.domino--vertical {
-  flex-direction: column;
+.domino--md {
+  /* Identity — shared play size */
 }
 
 .domino--interactive {
@@ -76,46 +274,76 @@
 
 @media (hover: hover) and (pointer: fine) {
   .domino--interactive:hover {
-    transform: translateY(-5px) scale(1.03);
-    filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.32));
-    box-shadow:
-      0 12px 22px rgba(0, 0, 0, 0.42),
-      0 1px 0 rgba(255, 255, 255, 0.55) inset;
+    transform: translateY(-6px);
+    filter:
+      drop-shadow(0 1px 0.75px rgba(0, 0, 0, 0.72))
+      drop-shadow(0 5px 8px rgba(0, 0, 0, 0.36));
   }
 }
 
 .domino--interactive:active {
-  transform: translateY(-2px) scale(0.98);
+  transform: translateY(-2px);
   transition-duration: 80ms;
 }
 
 .domino--selected {
-  outline: 2px solid var(--color-gold-bright);
-  outline-offset: 2px;
-  transform: translateY(-8px) scale(1.04);
-  filter: drop-shadow(0 10px 8px rgba(0, 0, 0, 0.35));
-  box-shadow:
-    0 14px 24px rgba(0, 0, 0, 0.48),
-    0 0 0 1px rgba(201, 162, 39, 0.45),
-    var(--glow-gold);
-  animation: domino-select-pop var(--duration-med) var(--ease-out);
+  outline: none;
+  z-index: 2;
+  transform: translateY(-11px);
+  filter:
+    drop-shadow(0 1px 0.75px rgba(0, 0, 0, 0.72))
+    drop-shadow(0 6px 10px rgba(0, 0, 0, 0.38));
+  animation: domino-select-lift 320ms var(--ease-out);
 }
 
-@keyframes domino-select-pop {
+.domino--selected .domino__face {
+  box-shadow:
+    inset 0 1.4px 2.4px rgba(255, 250, 242, 0.48),
+    inset 0 -1.75px 2.75px rgba(62, 46, 28, 0.14),
+    inset 1.2px 0 2px rgba(255, 250, 242, 0.22),
+    inset -1.35px -0.55px 2.25px rgba(62, 46, 28, 0.12),
+    0 0 0 1.25px rgba(170, 145, 75, 0.38);
+}
+
+@keyframes domino-select-lift {
   0% {
-    transform: translateY(-2px) scale(0.98);
+    transform: translateY(-2px) scale(0.988);
+  }
+  55% {
+    transform: translateY(-12px) scale(1.012);
   }
   100% {
-    transform: translateY(-8px) scale(1.04);
+    transform: translateY(-11px) scale(1);
   }
 }
 
-.domino--facedown {
-  background:
-    linear-gradient(145deg, var(--color-tile-back-edge) 0%, var(--color-tile-back) 55%, #0f261f 100%);
+.domino--facedown .domino__face {
+  background: linear-gradient(165deg, #26332c 0%, #1c2622 60%, #172019 100%);
+  border: none;
   box-shadow:
-    0 3px 8px rgba(0, 0, 0, 0.45),
-    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+    inset 0 1.35px 2.25px rgba(255, 255, 255, 0.05),
+    inset 0 -1.6px 2.5px rgba(0, 0, 0, 0.28),
+    inset 1.15px 0 1.85px rgba(255, 255, 255, 0.03),
+    inset -1.25px -0.5px 2.1px rgba(0, 0, 0, 0.2);
+}
+
+.domino--facedown .domino__base {
+  background:
+    radial-gradient(
+      125% 110% at 14% 10%,
+      rgba(255, 255, 255, 0.06) 0%,
+      transparent 48%
+    ),
+    linear-gradient(145deg, #182620 0%, #0e1613 100%);
+  box-shadow:
+    inset 0 -1.5px 2.75px rgba(0, 0, 0, 0.35),
+    inset -1.1px -1.1px 2.25px rgba(0, 0, 0, 0.22),
+    inset 0.85px 0.85px 1.75px rgba(255, 255, 255, 0.04),
+    0 0 0 0.5px rgba(40, 55, 48, 0.4);
+}
+
+.domino--facedown .domino__face::before {
+  background: radial-gradient(circle at 30% 22%, rgba(180, 155, 70, 0.09), transparent 55%);
 }
 
 .domino__half {
@@ -125,15 +353,20 @@
   justify-content: center;
   min-height: 0;
   min-width: 0;
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  box-shadow: none;
 }
 
 .domino__pips {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  width: 78%;
-  height: 78%;
+  width: 80%;
+  height: 80%;
   place-items: center;
+  gap: 4%;
 }
 
 .domino__pip {
@@ -143,29 +376,151 @@
   background: transparent;
 }
 
+/* Deep carved glossy black pip — recessed crater + pale UL specular. */
 .domino__pip--on {
-  background: var(--color-pip);
+  position: relative;
+  background: radial-gradient(
+    circle at 36% 30%,
+    #222222 0%,
+    #0c0c0c 24%,
+    #030303 50%,
+    #000000 74%,
+    #000000 100%
+  );
   box-shadow:
-    0 0.5px 0.5px rgba(255, 255, 255, 0.2) inset,
-    0 1px 1px rgba(0, 0, 0, 0.25);
+    /* Near wall in deep shade (top-left key light). */
+    inset 1.3px 1.45px 2.9px rgba(0, 0, 0, 1),
+    inset 0.7px 0.7px 1.35px rgba(0, 0, 0, 0.88),
+    /* Far-wall bounce + rim catch inside the hole. */
+    inset -0.8px -0.95px 1.65px rgba(255, 255, 255, 0.22),
+    /* Raised cream lip around the carved indent. */
+    -0.5px -0.5px 0.55px rgba(36, 24, 12, 0.38),
+    0.55px 0.55px 0 rgba(255, 250, 242, 0.72),
+    0 0 0 0.5px rgba(18, 12, 6, 0.26);
 }
 
+/* Tiny pale white specular — polished drilled-pip catch-light (visible, soft). */
+.domino__pip--on::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 16%;
+  left: 18%;
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 255, 255, 0.52) 0%,
+    rgba(255, 255, 255, 0.22) 40%,
+    transparent 72%
+  );
+}
+
+/* Engraved center groove — a routed channel, not a printed stripe. The
+   linear gradient runs *across* the bar's thin axis to fake a cut
+   cross-section: a soft shadow where the near lip overhangs, a near-black
+   floor, then a bright hairline right at the far lip where it catches the
+   tile's top-left key light. Rounded caps read like a router bit's
+   entry/exit. A second, small radial layer sits on top of that hairline,
+   centered along the groove's *length* — a single elegant glint, as if
+   one point of the cut is catching the light source most directly, rather
+   than the whole lip glowing evenly end to end. */
 .domino__divider {
   flex-shrink: 0;
-  background: rgba(26, 24, 20, 0.5);
-  border-radius: 1px;
+  position: relative;
+  z-index: 2;
+  border-radius: 999px;
+  opacity: 1;
+}
+
+/* Brass/gold hinge stud — a small raised metal pin set exactly at the
+   tile's center, like the rivet found on real hinged/spinner dominoes.
+   Two background layers do the metal shading: a tight upper-left specular
+   fleck (the "shiny" catch-light every polished metal surface needs) over
+   a warm gold-to-bronze radial body. The box-shadow stack sells the "raised
+   above the surface" read — an inset highlight/shadow pair for its own
+   small bevel, plus a soft cast shadow onto the ivory around it. */
+.domino__divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--_pip) * 0.43);
+  height: calc(var(--_pip) * 0.43);
+  min-width: 3px;
+  min-height: 3px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    /* Tight specular fleck — the hard, near-white catch-light every
+       polished convex metal surface needs to read as metal rather than
+       matte plastic. */
+    radial-gradient(35% 35% at 28% 22%, rgba(255, 255, 250, 0.98) 0%, transparent 70%),
+    radial-gradient(
+      60% 60% at 32% 30%,
+      rgba(255, 249, 220, 0.9) 0%,
+      rgba(255, 246, 205, 0.32) 45%,
+      transparent 65%
+    ),
+    radial-gradient(circle at 44% 40%, #f6e3a8 0%, #dcae3e 32%, #ad7c17 62%, #6e4f0f 100%);
+  box-shadow:
+    inset 0.4px 0.4px 0.4px rgba(255, 250, 224, 0.65),
+    inset -0.5px -0.5px 0.6px rgba(50, 34, 8, 0.6),
+    0 0.7px 1.3px rgba(15, 10, 2, 0.55),
+    0 0 0 0.3px rgba(94, 68, 16, 0.45);
 }
 
 .domino--vertical .domino__divider {
-  width: 72%;
-  height: 1.5px;
+  width: 74%;
+  height: 2.25px;
   margin: 0 auto;
+  align-self: center;
+  background:
+    radial-gradient(
+      18% 200% at 50% 82%,
+      rgba(255, 250, 242, 0.32) 0%,
+      transparent 72%
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.72) 0%,
+      #000000 18%,
+      #000000 48%,
+      #0a0a0a 70%,
+      rgba(28, 22, 14, 0.92) 88%,
+      var(--_divider-groove) 100%
+    );
+  box-shadow:
+    0 1.15px 1.8px rgba(0, 0, 0, 0.52),
+    0.35px 0.85px 1.1px rgba(0, 0, 0, 0.28),
+    0 -0.4px 0.45px rgba(0, 0, 0, 0.35);
 }
 
 .domino--horizontal .domino__divider {
-  width: 1.5px;
-  height: 72%;
+  width: 2.25px;
+  height: 74%;
   margin: auto 0;
+  background:
+    radial-gradient(
+      200% 18% at 82% 50%,
+      rgba(255, 250, 242, 0.32) 0%,
+      transparent 72%
+    ),
+    linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.72) 0%,
+      #000000 18%,
+      #000000 48%,
+      #0a0a0a 70%,
+      rgba(28, 22, 14, 0.92) 88%,
+      var(--_divider-groove) 100%
+    );
+  box-shadow:
+    1.15px 0 1.8px rgba(0, 0, 0, 0.52),
+    0.85px 0.35px 1.1px rgba(0, 0, 0, 0.28),
+    -0.4px 0 0.45px rgba(0, 0, 0, 0.35);
 }
 
 .domino__back {
@@ -173,22 +528,58 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: calc(var(--_w) * 0.08);
+  border-radius: calc(var(--_radius) * 0.55);
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .domino__back-pattern {
   display: block;
-  width: 70%;
-  height: 78%;
-  border: 1.5px solid rgba(201, 162, 39, 0.32);
+  width: 68%;
+  height: 76%;
+  border: 1px solid rgba(170, 145, 75, 0.28);
   border-radius: 3px;
-  background:
-    repeating-linear-gradient(
-      -32deg,
-      transparent,
-      transparent 3px,
-      rgba(201, 162, 39, 0.1) 3px,
-      rgba(201, 162, 39, 0.1) 4px
-    );
+  box-shadow: none;
+  background: transparent;
+}
+
+/*
+  Hand / board / flight share identical DominoTile metrics and finish.
+*/
+.game-table__slot .domino,
+.player-panel .domino,
+.flying-domino__inner .domino,
+.drag-ghost .domino {
+  width: var(--_w);
+  height: var(--_h);
+  max-width: none;
+  max-height: none;
+}
+
+.game-table__slot .domino--horizontal,
+.player-panel .domino--horizontal,
+.flying-domino__inner .domino--horizontal,
+.drag-ghost .domino--horizontal {
+  width: var(--_h);
+  height: var(--_w);
+}
+
+.player-panel .domino--interactive:hover {
+  transform: translateY(-7px);
+}
+
+.player-panel .domino--selected {
+  transform: translateY(-11px);
+  filter:
+    drop-shadow(0 1px 0.75px rgba(0, 0, 0, 0.72))
+    drop-shadow(0 6px 10px rgba(0, 0, 0, 0.38));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .domino,
+  .domino--selected {
+    animation: none !important;
+    transition: none !important;
+  }
 }

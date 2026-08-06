@@ -2,6 +2,7 @@ export {
   MATCH_SAVE_KEY,
   MATCH_SAVE_VERSION,
   isValidSavedMatch,
+  sanitizeMatchState,
   sanitizeSelectedId,
   saveMatch,
   loadMatch,
@@ -24,10 +25,12 @@ export {
 export {
   PREFS_STORAGE_KEY,
   THEMES,
+  TILE_SKINS,
   DEFAULT_PREFS,
   normalizePrefs,
   loadPrefs,
   savePrefs,
   applyTheme,
+  applyTileSkin,
   vibrate,
 } from "./prefs.js";

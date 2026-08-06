@@ -84,6 +84,15 @@ export function useFlightDirector() {
       }
 
       const to = rectToLayer(toEl);
+      // Destination may be opacity:0 (pre-flight hide). Still a valid landing target.
+      if (to.w < 1 || to.h < 1) {
+        showTile(spec.tileId);
+        busyRef.current = false;
+        spec.onLanded?.();
+        drainQueue();
+        return;
+      }
+
       await new Promise((resolve) => {
         setFlight({
           tileId: spec.tileId,

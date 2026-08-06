@@ -56,66 +56,63 @@ function AnimatedValue({ value }) {
   );
 }
 
+/**
+ * Table HUD scores — one row per seat (2 / 3 / 4 players).
+ */
 function ScoreBoard({
-  playerScore = 0,
-  opponentScore = 0,
+  scores = [],
+  names = [],
+  humanIndex = 0,
   target = 100,
   round = 1,
-  playerName,
-  opponentName,
 }) {
   const { t, formatNumber } = useI18n();
-  const resolvedPlayer = playerName ?? t("game.you");
-  const resolvedOpponent = opponentName ?? t("game.rival");
-  const playerPct = Math.min(100, (playerScore / target) * 100);
-  const opponentPct = Math.min(100, (opponentScore / target) * 100);
+  const rows =
+    scores.length > 0
+      ? scores.map((score, index) => ({
+          score,
+          name: names[index] ?? t("game.playerN", { n: index + 1 }),
+          isHuman: index === humanIndex,
+        }))
+      : [];
 
   return (
-    <aside className="scoreboard" aria-label={t("game.scoreboard")}>
-      <div className="scoreboard__round">
-        <span className="scoreboard__round-label">{t("game.round")}</span>
-        <span className="scoreboard__round-value">{formatNumber(round)}</span>
+    <aside className="scoreboard scoreboard--table" aria-label={t("game.scoreboard")}>
+      <div className="scoreboard__line">
+        <span className="scoreboard__label scoreboard__label--gold">
+          <span className="scoreboard__icon" aria-hidden="true">
+            🏆
+          </span>
+          {t("game.round")}
+        </span>
+        <span className="scoreboard__value">{formatNumber(round)}</span>
       </div>
 
-      <div className="scoreboard__rows">
-        <div className="scoreboard__row">
-          <div className="scoreboard__row-top">
-            <span className="scoreboard__name">{resolvedPlayer}</span>
-            <AnimatedValue value={playerScore} />
-          </div>
-          <div
-            className="scoreboard__track"
-            role="progressbar"
-            aria-valuenow={playerScore}
-            aria-valuemin={0}
-            aria-valuemax={target}
-            aria-label={t("game.scoreAria", { name: resolvedPlayer })}
+      {rows.map((row, index) => (
+        <div className="scoreboard__line" key={`score-${index}`}>
+          <span
+            className={`scoreboard__label${
+              row.isHuman ? " scoreboard__label--you" : " scoreboard__label--rival"
+            }`}
           >
-            <span className="scoreboard__fill scoreboard__fill--player" style={{ width: `${playerPct}%` }} />
-          </div>
+            <span className="scoreboard__icon" aria-hidden="true">
+              {row.isHuman ? "👤" : "🤖"}
+            </span>
+            {row.name}
+          </span>
+          <AnimatedValue value={row.score} />
         </div>
+      ))}
 
-        <div className="scoreboard__row">
-          <div className="scoreboard__row-top">
-            <span className="scoreboard__name">{resolvedOpponent}</span>
-            <AnimatedValue value={opponentScore} />
-          </div>
-          <div
-            className="scoreboard__track"
-            role="progressbar"
-            aria-valuenow={opponentScore}
-            aria-valuemin={0}
-            aria-valuemax={target}
-            aria-label={t("game.scoreAria", { name: resolvedOpponent })}
-          >
-            <span className="scoreboard__fill scoreboard__fill--opponent" style={{ width: `${opponentPct}%` }} />
-          </div>
-        </div>
+      <div className="scoreboard__line scoreboard__line--target">
+        <span className="scoreboard__label scoreboard__label--gold">
+          <span className="scoreboard__icon" aria-hidden="true">
+            🎯
+          </span>
+          {t("game.playToLabel")}
+        </span>
+        <span className="scoreboard__value scoreboard__value--target">{formatNumber(target)}</span>
       </div>
-
-      <p className="scoreboard__target">
-        {t("game.playToLabel")} <strong>{formatNumber(target)}</strong>
-      </p>
     </aside>
   );
 }

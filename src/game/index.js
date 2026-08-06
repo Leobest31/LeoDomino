@@ -16,6 +16,17 @@ export {
 } from "./constants.js";
 
 export {
+  HUMAN_INDEX,
+  MIN_PLAYER_COUNT,
+  MAX_PLAYER_COUNT,
+  PLAYER_COUNT_STORAGE_KEY,
+  normalizePlayerCount,
+  buildOfflinePlayerIds,
+  isHumanSeat,
+  isAiSeat,
+} from "./players.js";
+
+export {
   tileId,
   createTile,
   generateSet,
@@ -89,5 +100,6 @@ export {
   chooseThinkTimeMs,
   applyAiTurn,
   buildMemory,
+  opponentMatchProbability,
   scoreMove,
 } from "./ai/index.js";
