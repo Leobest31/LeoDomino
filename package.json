@@ -9,6 +9,9 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:android": "npx cap open android",
+    "cap:ios": "npx cap open ios",
     "test:engine": "node src/game/verify.test.js",
     "test:rules": "node src/game/rules.test.js",
     "test:ai": "node src/game/ai.test.js",
@@ -32,6 +35,10 @@
     "test": "npm run test:engine && npm run test:rules && npm run test:ai && npm run test:i18n && npm run test:i18n:ui && npm run test:audio && npm run test:interaction && npm run test:persistence && npm run test:board-sync && npm run test:offline-mp && npm run test:chain-layout && npm run test:board-layout-stress && npm run test:board-opening-double && npm run test:board-fidelity && npm run test:board-presentation && npm run test:board-moves-stress && npm run test:match-over && npm run test:render-painter && npm run test:render-cache"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@fontsource/outfit": "^5.3.0",
     "@fontsource/source-serif-4": "^5.3.0",
     "react": "^19.2.8",

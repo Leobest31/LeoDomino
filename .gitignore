@@ -28,3 +28,15 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Capacitor / native local machine config
+android/local.properties
+android/.gradle/
+android/app/build/
+android/build/
+android/captures/
+android/.idea/
+ios/App/Pods/
+ios/DerivedData/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/

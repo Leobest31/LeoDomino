@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // Relative base so Capacitor native WebViews can load bundled dist assets offline.
+  // Also valid for the web/PWA deploy (absolute hosting still works with relative asset URLs).
+  base: "./",
   plugins: [
     react(),
     VitePWA({
