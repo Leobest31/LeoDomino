@@ -27,6 +27,32 @@ export default {
     aria: "Écran d’ouverture LeoDomino",
     tagline: "Table classique",
   },
+  setup: {
+    aria: "Configuration de partie LeoDomino",
+    title: "Configuration",
+    difficulty: "Niveau IA",
+    difficultyAdvanced: "Avancé",
+    soundOn: "Activé",
+    soundOff: "Coupé",
+    resumeMatch: "Reprendre la partie",
+    comingSoonLegend: "Bientôt",
+    onlineLabel: "Multijoueur en ligne",
+    onlineSubtitle: "Jouez avec des joueurs sur leurs propres téléphones/tablettes",
+    onlineComingSoon: "Multijoueur en ligne — Bientôt",
+    leagueLabel: "Ligue",
+    leagueSubtitle: "Classements • Championnats • Saisons",
+    leagueSoon: "Bientôt",
+    leagueComingSoon: "Ligue — Bientôt",
+    gameStyle: {
+      label: "Style de jeu",
+      aria: "Choisir le style de jeu",
+      classic: "Classique",
+      classicDescription:
+        "Piochez jusqu’à pouvoir jouer. Passez quand la réserve est vide. Premier à 100.",
+      classicSummary:
+        "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
+    },
+  },
   game: {
     play: "Jouer",
     draw: "Piocher",

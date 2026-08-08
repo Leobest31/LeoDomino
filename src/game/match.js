@@ -21,6 +21,7 @@ import { findLegalMove, getLegalMoves, hasLegalMove } from "./moves.js";
  * @property {PlayerState[]} players
  * @property {string[]} reserve
  * @property {object[]} board
+ * @property {string} [rulesetId]
  */
 
 /**
@@ -31,6 +32,7 @@ import { findLegalMove, getLegalMoves, hasLegalMove } from "./moves.js";
  * @param {number} [options.playerCount=2]
  * @param {number} [options.handSize=7]
  * @param {string[]} [options.playerIds]
+ * @param {string} [options.rulesetId]
  * @returns {MatchState}
  */
 export function createMatch(options = {}) {
@@ -49,7 +51,8 @@ export function createMatch(options = {}) {
     throw new Error("playerIds length must match playerCount");
   }
 
-  return {
+  /** @type {MatchState} */
+  const match = {
     seed: usedSeed,
     byId,
     players: playerIds.map((id, index) => ({
@@ -59,6 +62,12 @@ export function createMatch(options = {}) {
     reserve: reserve.slice(),
     board: createBoard(),
   };
+
+  if (typeof options.rulesetId === "string" && options.rulesetId) {
+    match.rulesetId = options.rulesetId;
+  }
+
+  return match;
 }
 
 /**

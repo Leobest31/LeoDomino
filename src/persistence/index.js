@@ -4,6 +4,7 @@ export {
   isValidSavedMatch,
   sanitizeMatchState,
   sanitizeSelectedId,
+  normalizeStateRuleset,
   saveMatch,
   loadMatch,
   clearMatchSave,

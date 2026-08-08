@@ -5,14 +5,15 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion.js";
 import BrandLogo from "../components/BrandLogo";
 import "./SplashPage.css";
 
-const SPLASH_HOLD_MS = 2600;
+/** Premium brand intro hold before Game Setup (~15s). */
+export const SPLASH_HOLD_MS = 15000;
 const SPLASH_EXIT_MS = 640;
-const SPLASH_REDUCED_MS = 720;
-const CLICK_AT_MS = 1080;
+const SPLASH_REDUCED_MS = 1600;
+const CLICK_AT_MS = 2400;
 
 /**
  * Launch splash — official LeoDomino crest presentation only.
- * Shown once on app start; never between matches.
+ * Shown on cold start; Game Setup follows. Not remounted between matches.
  */
 function SplashPage({ exiting = false, onFinished, onExitComplete }) {
   const { t } = useI18n();

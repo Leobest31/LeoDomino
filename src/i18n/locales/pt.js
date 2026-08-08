@@ -27,6 +27,32 @@ export default {
     aria: "Ecrã de abertura LeoDomino",
     tagline: "Mesa clássica",
   },
+  setup: {
+    aria: "Configuração de partida LeoDomino",
+    title: "Configuração",
+    difficulty: "Dificuldade IA",
+    difficultyAdvanced: "Avançado",
+    soundOn: "Ligado",
+    soundOff: "Desligado",
+    resumeMatch: "Retomar partida",
+    comingSoonLegend: "Em breve",
+    onlineLabel: "Multijogador online",
+    onlineSubtitle: "Jogue com jogadores nos seus próprios telemóveis/tablets",
+    onlineComingSoon: "Multijogador online — Em breve",
+    leagueLabel: "Liga",
+    leagueSubtitle: "Rankings • Campeonatos • Épocas",
+    leagueSoon: "Em breve",
+    leagueComingSoon: "Liga — Em breve",
+    gameStyle: {
+      label: "Estilo de jogo",
+      aria: "Escolher estilo de jogo",
+      classic: "Clássico",
+      classicDescription:
+        "Compre até poder jogar. Passe quando o monte estiver vazio. Primeiro a 100.",
+      classicSummary:
+        "Duplo-seis · 7 peças · duas pontas abertas · comprar até poder jogar · passar se vazio · jogar até 100",
+    },
+  },
   game: {
     play: "Jogar",
     draw: "Comprar",

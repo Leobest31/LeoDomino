@@ -27,6 +27,32 @@ export default {
     aria: "Pantalla de apertura de LeoDomino",
     tagline: "Mesa clásica",
   },
+  setup: {
+    aria: "Configuración de partida LeoDomino",
+    title: "Configuración",
+    difficulty: "Dificultad IA",
+    difficultyAdvanced: "Avanzado",
+    soundOn: "Activado",
+    soundOff: "Apagado",
+    resumeMatch: "Reanudar partida",
+    comingSoonLegend: "Próximamente",
+    onlineLabel: "Multijugador en línea",
+    onlineSubtitle: "Juega con jugadores en sus propios móviles/tablets",
+    onlineComingSoon: "Multijugador en línea — Próximamente",
+    leagueLabel: "Liga",
+    leagueSubtitle: "Clasificaciones • Campeonatos • Temporadas",
+    leagueSoon: "Próximamente",
+    leagueComingSoon: "Liga — Próximamente",
+    gameStyle: {
+      label: "Estilo de juego",
+      aria: "Elegir estilo de juego",
+      classic: "Clásico",
+      classicDescription:
+        "Roba hasta poder jugar. Pasa cuando el pozo está vacío. Primero a 100.",
+      classicSummary:
+        "Doble seis · 7 fichas · dos extremos abiertos · robar hasta poder jugar · pasar si vacío · jugar a 100",
+    },
+  },
   game: {
     play: "Jugar",
     draw: "Robar",

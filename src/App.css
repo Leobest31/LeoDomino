@@ -10,7 +10,12 @@
   background: #05070c;
 }
 
-.app--booting .game-page {
-  /* Table paints under splash for a seamless handoff. */
-  visibility: visible;
+/* Intro/setup: keep the shell a bounded flex column so Setup can scroll
+   instead of growing past the viewport and being clipped by overflow:hidden. */
+.app--game.app--booting {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
+
+/* Match is not mounted during intro/setup — avoids table flash under brand. */

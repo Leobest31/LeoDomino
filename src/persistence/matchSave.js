@@ -5,6 +5,11 @@
 
 import { PHASE } from "../game/rules/constants.js";
 import { MAX_PLAYER_COUNT, MIN_PLAYER_COUNT } from "../game/players.js";
+import {
+  DEFAULT_RULESET_ID,
+  coerceRulesetId,
+  isKnownRulesetId,
+} from "../game/rulesets/index.js";
 import { readStorage, writeStorage, removeStorage } from "../utils/storage.js";
 
 export const MATCH_SAVE_KEY = "leodomino.match";
@@ -116,18 +121,36 @@ export function isValidSavedMatch(value) {
     if (!hand.includes(s.mustPlayTileId)) return false;
   }
 
+  // rulesetId: missing is ok (migrate to legacy). Unknown id fails safely.
+  if (s.rulesetId != null && !isKnownRulesetId(s.rulesetId)) return false;
+
   return true;
 }
 
 /**
- * Drop a selected tile id that is no longer in the human hand.
+ * Ensure state carries a known rulesetId. Missing → legacy. Unknown → null.
+ * @param {object} state
+ * @returns {object|null}
+ */
+export function normalizeStateRuleset(state) {
+  if (!state || typeof state !== "object") return null;
+  const coerced = coerceRulesetId(/** @type {{ rulesetId?: unknown }} */ (state).rulesetId);
+  if (coerced == null) return null;
+  if (/** @type {{ rulesetId?: unknown }} */ (state).rulesetId === coerced) return state;
+  return { ...state, rulesetId: coerced };
+}
+
+/**
+ * Drop a selected tile id that is no longer in the active seat's hand.
  * @param {object} state
  * @param {string|null} selectedId
  * @returns {string|null}
  */
 export function sanitizeSelectedId(state, selectedId) {
   if (!selectedId || typeof selectedId !== "string") return null;
-  const hand = state?.players?.[0]?.hand;
+  const seat =
+    typeof state?.currentPlayer === "number" ? state.currentPlayer : 0;
+  const hand = state?.players?.[seat]?.hand;
   if (!Array.isArray(hand) || !hand.includes(selectedId)) return null;
   return selectedId;
 }
@@ -137,9 +160,16 @@ export function sanitizeSelectedId(state, selectedId) {
  * @param {object} payload.state
  * @param {string} payload.difficulty
  * @param {string|null} [payload.selectedId]
+ * @param {number} [payload.matchStartedAt]
  */
 export function saveMatch(payload) {
   if (!payload?.state) return;
+  const state = normalizeStateRuleset(payload.state);
+  if (!state) return;
+  const rulesetId =
+    typeof state.rulesetId === "string" && state.rulesetId
+      ? state.rulesetId
+      : DEFAULT_RULESET_ID;
   writeStorage(
     MATCH_SAVE_KEY,
     JSON.stringify({
@@ -150,14 +180,15 @@ export function saveMatch(payload) {
           ? payload.matchStartedAt
           : Date.now(),
       difficulty: payload.difficulty,
-      selectedId: sanitizeSelectedId(payload.state, payload.selectedId ?? null),
-      state: payload.state,
+      rulesetId,
+      selectedId: sanitizeSelectedId(state, payload.selectedId ?? null),
+      state,
     })
   );
 }
 
 /**
- * @returns {{ state: object, difficulty: string, selectedId: string|null, savedAt: number, matchStartedAt: number }|null}
+ * @returns {{ state: object, difficulty: string, selectedId: string|null, savedAt: number, matchStartedAt: number, rulesetId: string }|null}
  */
 export function loadMatch() {
   try {
@@ -172,10 +203,24 @@ export function loadMatch() {
     // Softlock recovery before validation: clear orphan mustPlayTileId.
     parsed.state = sanitizeMatchState(parsed.state);
 
+    // Old saves without rulesetId → legacy. Unknown id fails (rejected below).
+    const normalized = normalizeStateRuleset(parsed.state);
+    if (!normalized) {
+      clearMatchSave();
+      return null;
+    }
+    parsed.state = normalized;
+
     if (!isValidSavedMatch(parsed)) {
       clearMatchSave();
       return null;
     }
+
+    const rulesetId =
+      typeof parsed.state.rulesetId === "string" && parsed.state.rulesetId
+        ? parsed.state.rulesetId
+        : DEFAULT_RULESET_ID;
+
     return {
       state: parsed.state,
       difficulty: typeof parsed.difficulty === "string" ? parsed.difficulty : "medium",
@@ -185,6 +230,7 @@ export function loadMatch() {
         typeof parsed.matchStartedAt === "number" && Number.isFinite(parsed.matchStartedAt)
           ? parsed.matchStartedAt
           : Number(parsed.savedAt) || Date.now(),
+      rulesetId,
     };
   } catch {
     clearMatchSave();

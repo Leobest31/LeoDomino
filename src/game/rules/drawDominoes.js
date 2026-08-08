@@ -1,6 +1,7 @@
 /**
  * Draw Dominoes rules engine (Phase 4).
  * Pure JS — turn flow, draw-until-playable, pass, round/match end, scoring.
+ * Behavior is driven by the match's resolved Ruleset (default: legacy).
  */
 
 import { END } from "../constants.js";
@@ -11,9 +12,15 @@ import {
   listLegalMoves,
   playerHasLegalMove,
 } from "../match.js";
-import { DEFAULT_TARGET_SCORE, PHASE, ROUND_END_REASON } from "./constants.js";
-import { calculateRoundPoints, handPipTotal } from "./scoring.js";
-import { chooseStartingPlayer } from "./start.js";
+import { nextPlayerIndex } from "../players.js";
+import {
+  DEFAULT_RULESET_ID,
+  normalizeRulesetId,
+  resolveHandSize,
+  resolveRuleset,
+} from "../rulesets/index.js";
+import { PHASE, ROUND_END_REASON } from "./constants.js";
+import { handPipTotal } from "./scoring.js";
 
 /**
  * @typedef {object} GameState
@@ -27,6 +34,7 @@ import { chooseStartingPlayer } from "./start.js";
  * @property {number[]} scores
  * @property {number} round
  * @property {number} targetScore
+ * @property {string} rulesetId
  * @property {string|null} mustPlayTileId
  * @property {number} consecutivePasses
  * @property {object|null} roundResult
@@ -36,16 +44,32 @@ import { chooseStartingPlayer } from "./start.js";
  */
 
 /**
+ * @param {GameState|object} state
+ */
+function rulesetOf(state) {
+  return resolveRuleset(state?.rulesetId ?? DEFAULT_RULESET_ID);
+}
+
+/**
  * @param {object} [options]
  * @returns {GameState}
  */
 export function startMatch(options = {}) {
-  const targetScore = options.targetScore ?? DEFAULT_TARGET_SCORE;
-  const base = createMatch(options);
+  const rulesetId = normalizeRulesetId(options.rulesetId);
+  const ruleset = resolveRuleset(rulesetId);
+  const targetScore = options.targetScore ?? ruleset.defaultTargetScore;
+  const playerCount = options.playerCount;
+  const handSize = options.handSize ?? resolveHandSize(ruleset, playerCount);
+  const base = createMatch({
+    ...options,
+    handSize,
+    rulesetId,
+  });
   return beginRound(base, {
     scores: Array.from({ length: base.players.length }, () => 0),
     round: 1,
     targetScore,
+    rulesetId,
   });
 }
 
@@ -60,11 +84,14 @@ export function startMatch(options = {}) {
  * @param {number[]} meta.scores
  * @param {number} meta.round
  * @param {number} meta.targetScore
+ * @param {string} [meta.rulesetId]
  * @param {number} [meta.starterIndex] - previous winner (required for round > 1)
  * @returns {GameState}
  */
 function beginRound(base, meta) {
-  const freeOpen = meta.round > 1;
+  const rulesetId = normalizeRulesetId(base.rulesetId ?? meta.rulesetId);
+  const ruleset = resolveRuleset(rulesetId);
+  const freeOpen = meta.round > 1 && ruleset.freeOpenAfterRound1;
   let playerIndex;
   /** @type {string|null} */
   let tileId = null;
@@ -78,14 +105,17 @@ function beginRound(base, meta) {
       throw new Error("Later rounds require the previous round winner as starter");
     }
     playerIndex = meta.starterIndex;
-  } else {
-    const chosen = chooseStartingPlayer(base.players, base.byId);
+  } else if (ruleset.round1Starter === "highestDoubleElseHighest") {
+    const chosen = ruleset.policies.chooseStartingPlayer(base.players, base.byId);
     playerIndex = chosen.playerIndex;
-    tileId = chosen.tileId;
+    tileId = ruleset.forceOpeningTile ? chosen.tileId : null;
+  } else {
+    throw new Error(`Unsupported round1Starter: ${ruleset.round1Starter}`);
   }
 
   return {
     ...base,
+    rulesetId,
     phase: PHASE.PLAYING,
     currentPlayer: playerIndex,
     scores: meta.scores.slice(),
@@ -121,7 +151,7 @@ export function getCurrentLegalMoves(state) {
 }
 
 /**
- * What the current player is allowed to do.
+ * What the current player is allowed to do (policies from active ruleset).
  * @param {GameState} state
  */
 export function getAvailableActions(state) {
@@ -129,22 +159,33 @@ export function getAvailableActions(state) {
     return { canPlay: false, canDraw: false, canPass: false, legalMoves: [] };
   }
 
+  const ruleset = rulesetOf(state);
   const legalMoves = getCurrentLegalMoves(state);
   const hasMove = legalMoves.length > 0;
   const reserveEmpty = state.reserve.length === 0;
+  const lockedOpen = Boolean(state.mustPlayTileId);
+
+  let canDraw = false;
+  let canPass = false;
+
+  if (ruleset.drawPolicy === "drawUntilPlayable") {
+    canDraw = !hasMove && !reserveEmpty && !lockedOpen;
+  }
+
+  if (ruleset.passPolicy === "passWhenReserveEmpty") {
+    canPass = !hasMove && reserveEmpty && !lockedOpen;
+  }
 
   return {
     canPlay: hasMove,
-    // Draw while no legal play and tiles remain (draw-until-playable).
-    canDraw: !hasMove && !reserveEmpty && !state.mustPlayTileId,
-    // Pass only when no legal play and reserve is empty.
-    canPass: !hasMove && reserveEmpty && !state.mustPlayTileId,
+    canDraw,
+    canPass,
     legalMoves,
   };
 }
 
 function advancePlayer(state) {
-  const next = (state.currentPlayer + 1) % state.players.length;
+  const next = nextPlayerIndex(state.currentPlayer, state.players.length);
   return {
     ...state,
     currentPlayer: next,
@@ -160,16 +201,25 @@ function advancePlayer(state) {
  * @returns {GameState}
  */
 function finishRound(state, winnerIndex, reason) {
-  const points = calculateRoundPoints({
-    winnerIndex,
-    players: state.players,
-    byId: state.byId,
-  });
+  const ruleset = rulesetOf(state);
+  let points = 0;
+  if (ruleset.roundScoreMode === "sumOpponentPips") {
+    points = ruleset.policies.calculateRoundPoints({
+      winnerIndex,
+      players: state.players,
+      byId: state.byId,
+    });
+  } else {
+    throw new Error(`Unsupported roundScoreMode: ${ruleset.roundScoreMode}`);
+  }
 
   const scores = state.scores.slice();
   scores[winnerIndex] += points;
 
-  const reached = scores.findIndex((score) => score >= state.targetScore);
+  const reached =
+    ruleset.matchWinMode === "firstToReach"
+      ? scores.findIndex((score) => score >= state.targetScore)
+      : -1;
   const matchOver = reached !== -1;
 
   return {
@@ -203,16 +253,26 @@ export function isBoardBlocked(state) {
 }
 
 /**
- * When blocked, lowest remaining pip total wins (tie → current player loses tie-break to lower index).
+ * When blocked, lowest remaining pip total wins (tie → lower seat index).
  * @param {GameState} state
  */
 function resolveBlockedWinner(state) {
+  const ruleset = rulesetOf(state);
+  if (ruleset.blockedWinnerMode !== "lowestPips") {
+    throw new Error(`Unsupported blockedWinnerMode: ${ruleset.blockedWinnerMode}`);
+  }
+
   let winnerIndex = 0;
   let best = Infinity;
 
   for (let i = 0; i < state.players.length; i += 1) {
     const total = handPipTotal(state.players[i].hand, state.byId);
-    if (total < best || (total === best && i < winnerIndex)) {
+    const better =
+      total < best ||
+      (total === best &&
+        ruleset.blockedTieBreak === "lowerSeatIndex" &&
+        i < winnerIndex);
+    if (better) {
       best = total;
       winnerIndex = i;
     }
@@ -256,6 +316,7 @@ export function playTile(state, tileId, end = END.RIGHT) {
     scores: state.scores,
     round: state.round,
     targetScore: state.targetScore,
+    rulesetId: state.rulesetId,
     mustPlayTileId: null,
     consecutivePasses: 0,
     roundResult: null,
@@ -299,6 +360,7 @@ export function drawTile(state) {
     scores: state.scores,
     round: state.round,
     targetScore: state.targetScore,
+    rulesetId: state.rulesetId,
     mustPlayTileId: state.mustPlayTileId,
     consecutivePasses: 0,
     roundResult: null,
@@ -323,6 +385,7 @@ export function passTurn(state) {
     throw new Error("Pass is not allowed now");
   }
 
+  const ruleset = rulesetOf(state);
   const passer = state.currentPlayer;
   let next = {
     ...state,
@@ -334,7 +397,12 @@ export function passTurn(state) {
   next = advancePlayer(next);
   next.consecutivePasses = state.consecutivePasses + 1;
 
-  if (isBoardBlocked(next) || next.consecutivePasses >= next.players.length) {
+  const blockedByStuck = isBoardBlocked(next);
+  const blockedByPasses =
+    ruleset.blockedDetection === "allStuckOrConsecutivePasses" &&
+    next.consecutivePasses >= next.players.length;
+
+  if (blockedByStuck || blockedByPasses) {
     const winnerIndex = resolveBlockedWinner(next);
     return finishRound(
       { ...next, statusKey: "rules.roundBlocked", statusVars: null },
@@ -362,11 +430,17 @@ export function startNextRound(state, dealOptions = {}) {
     throw new Error("Cannot start next round without a round winner");
   }
 
+  const rulesetId = normalizeRulesetId(state.rulesetId);
+  const ruleset = resolveRuleset(rulesetId);
+  const handSize =
+    dealOptions.handSize ?? resolveHandSize(ruleset, state.players.length);
+
   const base = createMatch({
     seed: dealOptions.seed ?? Date.now(),
     playerCount: state.players.length,
     playerIds: state.players.map((p) => p.id),
-    handSize: dealOptions.handSize,
+    handSize,
+    rulesetId,
   });
 
   return beginRound(base, {
@@ -374,6 +448,7 @@ export function startNextRound(state, dealOptions = {}) {
     round: state.round + 1,
     targetScore: state.targetScore,
     starterIndex: state.roundResult.winnerIndex,
+    rulesetId,
   });
 }
 

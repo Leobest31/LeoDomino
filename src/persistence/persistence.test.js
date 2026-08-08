@@ -9,6 +9,7 @@ import { startMatch } from "../game/index.js";
 import {
   isValidSavedMatch,
   MATCH_SAVE_VERSION,
+  normalizeStateRuleset,
   sanitizeMatchState,
   sanitizeSelectedId,
 } from "./matchSave.js";
@@ -293,6 +294,29 @@ assert.equal(
   const badScore = structuredClone(live);
   badScore.scores[0] = Number.NaN;
   assert.equal(isValidSavedMatch(wrap(badScore)), false);
+}
+
+// --- rulesetId migration / validation ---
+{
+  const noRuleset = baseState();
+  assert.equal(isValidSavedMatch(wrap(noRuleset)), true, "missing rulesetId ok");
+  const migrated = normalizeStateRuleset(noRuleset);
+  assert.equal(migrated.rulesetId, "legacy");
+
+  assert.equal(
+    isValidSavedMatch(wrap(baseState({ rulesetId: "legacy" }))),
+    true
+  );
+  assert.equal(
+    isValidSavedMatch(wrap(baseState({ rulesetId: "not-real" }))),
+    false,
+    "unknown ruleset rejected"
+  );
+  assert.equal(normalizeStateRuleset(baseState({ rulesetId: "not-real" })), null);
+
+  const live = startMatch({ seed: 77, playerCount: 2, targetScore: 100 });
+  assert.equal(live.rulesetId, "legacy");
+  assert.equal(isValidSavedMatch(wrap(live)), true);
 }
 
 assert.equal(

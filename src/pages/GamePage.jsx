@@ -22,19 +22,10 @@ import {
   isAutoPlaceable,
   legalEndsForTile,
   resolvePlayChoice,
+  opponentFeltPosition,
 } from "../game/index.js";
 import { MOTION, wait } from "../utils/motion.js";
 import "./GamePage.css";
-
-// Where each non-human seat sits around the felt, keyed by opponent count.
-// 2 players → 1 opponent (top). 3 players → 2 opponents (top, left).
-// 4 players → 3 opponents (top, left, right).
-const OPPONENT_SEAT_LAYOUT = {
-  1: ["top"],
-  2: ["top", "left"],
-  3: ["top", "left", "right"],
-};
-const OPPONENT_SEAT_LAYOUT_MAX = 3;
 
 function seatDisplayName(t, seatOrder, opponentCount) {
   if (opponentCount <= 1) return t("game.rival");
@@ -59,8 +50,9 @@ function hitDropEnd(clientX, clientY) {
 
 /**
  * Match screen — natural auto-place, drag-when-both, sequential draw.
+ * @param {{ onMainMenu?: () => void, matchOptions?: object }} props
  */
-function GamePage({ onMainMenu }) {
+function GamePage({ onMainMenu, matchOptions = null }) {
   const { t } = useI18n();
   const { play } = useAudio();
   const { vibrate } = usePrefs();
@@ -86,7 +78,7 @@ function GamePage({ onMainMenu }) {
     restart,
     setMotionLock,
     HUMAN_INDEX,
-  } = useMatch();
+  } = useMatch(matchOptions ?? {});
 
   const { flight, hiddenIds, runFlight, hideTile, showTile } = useFlightDirector();
   const [newestId, setNewestId] = useState(null);
@@ -661,16 +653,14 @@ function GamePage({ onMainMenu }) {
     .map((player, index) => ({ player, index }))
     .filter(({ index }) => index !== HUMAN_INDEX)
     .map(({ player, index }, seatOrder, seats) => {
-      const layout =
-        OPPONENT_SEAT_LAYOUT[seats.length] ??
-        OPPONENT_SEAT_LAYOUT[OPPONENT_SEAT_LAYOUT_MAX];
+      const position = opponentFeltPosition(index, state.players.length) ?? "top";
       const thinking = thinkingSeat === index;
       const isTurn = state.currentPlayer === index && state.phase === PHASE.PLAYING;
       return {
         index,
-        position: layout[seatOrder] ?? "top",
+        position,
         name: seatDisplayName(t, seatOrder, seats.length),
-        status: thinking ? t("game.thinking") : t("game.waiting"),
+        status: thinking || isTurn ? t("game.thinking") : t("game.waiting"),
         tileCount: player.hand.length,
         thinking,
         isTurn,

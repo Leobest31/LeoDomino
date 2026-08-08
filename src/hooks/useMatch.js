@@ -15,6 +15,9 @@ import {
   startMatch,
   startNextRound,
   resolvePlayChoice,
+  DEFAULT_RULESET_ID,
+  RULESET_STORAGE_KEY,
+  normalizeRulesetId,
 } from "../game/index.js";
 import {
   HUMAN_INDEX,
@@ -42,23 +45,44 @@ function readStoredPlayerCount() {
   return normalizePlayerCount(readStorage(PLAYER_COUNT_STORAGE_KEY, 2));
 }
 
+function readStoredRulesetId() {
+  try {
+    return normalizeRulesetId(readStorage(RULESET_STORAGE_KEY, DEFAULT_RULESET_ID));
+  } catch {
+    return DEFAULT_RULESET_ID;
+  }
+}
+
 function createMatchState(options) {
   const playerCount = normalizePlayerCount(
     options.playerCount ?? readStoredPlayerCount()
+  );
+  const rulesetId = normalizeRulesetId(
+    options.rulesetId ?? readStoredRulesetId()
   );
   return startMatch({
     seed: options.seed,
     targetScore: options.targetScore,
     playerCount,
     playerIds: buildOfflinePlayerIds(playerCount),
+    rulesetId,
   });
 }
 
 function createInitialState(options) {
+  if (options.skipResume) {
+    // Fresh start from Game Setup — drop prior save so it cannot resurrect.
+    clearMatchSave();
+  }
+
   const saved = options.skipResume ? null : loadMatch();
   if (saved?.state) {
-    // Resume integrity: table size comes from the saved match, not prefs.
+    // Resume integrity: table size + ruleset come from the saved match, not prefs.
     const resumedCount = normalizePlayerCount(saved.state.players?.length);
+    const resumedRulesetId =
+      typeof saved.state.rulesetId === "string" && saved.state.rulesetId
+        ? saved.state.rulesetId
+        : saved.rulesetId ?? DEFAULT_RULESET_ID;
     return {
       state: saved.state,
       difficulty:
@@ -69,21 +93,40 @@ function createInitialState(options) {
       resumed: true,
       matchStartedAt: saved.matchStartedAt || Date.now(),
       playerCount: resumedCount,
+      rulesetId: resumedRulesetId,
     };
   }
   const preferredCount = normalizePlayerCount(
     options.playerCount ?? readStoredPlayerCount()
   );
+  const preferredDifficulty =
+    options.difficulty != null
+      ? normalizeDifficulty(options.difficulty)
+      : readStoredDifficulty();
+  const preferredRulesetId = normalizeRulesetId(
+    options.rulesetId ?? readStoredRulesetId()
+  );
+  if (options.playerCount != null) {
+    writeStorage(PLAYER_COUNT_STORAGE_KEY, preferredCount);
+  }
+  if (options.difficulty != null) {
+    writeStorage(AI_DIFFICULTY_STORAGE_KEY, preferredDifficulty);
+  }
+  if (options.rulesetId != null) {
+    writeStorage(RULESET_STORAGE_KEY, preferredRulesetId);
+  }
   return {
-    state: createMatchState({ ...options, playerCount: preferredCount }),
-    difficulty:
-      options.difficulty != null
-        ? normalizeDifficulty(options.difficulty)
-        : readStoredDifficulty(),
+    state: createMatchState({
+      ...options,
+      playerCount: preferredCount,
+      rulesetId: preferredRulesetId,
+    }),
+    difficulty: preferredDifficulty,
     selectedId: null,
     resumed: false,
     matchStartedAt: Date.now(),
     playerCount: preferredCount,
+    rulesetId: preferredRulesetId,
   };
 }
 
@@ -96,6 +139,7 @@ export function useMatch(options = {}) {
   const [boot] = useState(() => createInitialState(options));
   const [difficulty, setDifficultyState] = useState(() => boot.difficulty);
   const [playerCount, setPlayerCountState] = useState(() => boot.playerCount);
+  const [rulesetId] = useState(() => boot.rulesetId);
   const [state, setState] = useState(() => boot.state);
   const [selectedId, setSelectedId] = useState(() => boot.selectedId);
   const [matchStartedAt, setMatchStartedAt] = useState(() => boot.matchStartedAt);
@@ -111,6 +155,8 @@ export function useMatch(options = {}) {
   difficultyRef.current = difficulty;
   const playerCountRef = useRef(playerCount);
   playerCountRef.current = playerCount;
+  const rulesetIdRef = useRef(rulesetId);
+  rulesetIdRef.current = rulesetId;
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
   const matchStartedAtRef = useRef(matchStartedAt);
@@ -155,10 +201,15 @@ export function useMatch(options = {}) {
     matchStartedAtRef.current = startedAt;
     setMatchEndedAt(null);
     const count = normalizePlayerCount(playerCountRef.current);
+    // Match keeps its ruleset until the player returns to Setup.
+    const matchRulesetId = normalizeRulesetId(
+      stateRef.current?.rulesetId ?? rulesetIdRef.current
+    );
     const next = createMatchState({
       seed: Date.now(),
       targetScore,
       playerCount: count,
+      rulesetId: matchRulesetId,
     });
     stateRef.current = next;
     setState(next);
@@ -413,6 +464,7 @@ export function useMatch(options = {}) {
     setDifficulty,
     playerCount,
     setPlayerCount,
+    rulesetId: state.rulesetId ?? rulesetId,
     boardTiles,
     humanHand,
     opponentHands,

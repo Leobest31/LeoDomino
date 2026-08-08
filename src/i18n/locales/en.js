@@ -27,6 +27,32 @@ export default {
     aria: "LeoDomino opening screen",
     tagline: "Classic table",
   },
+  setup: {
+    aria: "LeoDomino game setup",
+    title: "Game setup",
+    difficulty: "AI difficulty",
+    difficultyAdvanced: "Advanced",
+    soundOn: "On",
+    soundOff: "Off",
+    resumeMatch: "Resume match",
+    comingSoonLegend: "Coming later",
+    onlineLabel: "Online Multiplayer",
+    onlineSubtitle: "Play with players on their own phones/tablets",
+    onlineComingSoon: "Online Multiplayer — Coming Soon",
+    leagueLabel: "League",
+    leagueSubtitle: "Rankings • Championships • Seasons",
+    leagueSoon: "Coming Soon",
+    leagueComingSoon: "League — Coming Soon",
+    gameStyle: {
+      label: "Game style",
+      aria: "Choose game style",
+      classic: "Classic",
+      classicDescription:
+        "Draw until you can play. Pass when the boneyard is empty. First to 100.",
+      classicSummary:
+        "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
+    },
+  },
   game: {
     play: "Play",
     draw: "Draw",

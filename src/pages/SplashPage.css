@@ -181,7 +181,9 @@
     transparent 100%
   );
   transform: skewX(-16deg);
-  animation: splash-sweep 1.1s var(--ease-out) 1.05s both;
+  animation:
+    splash-sweep 1.1s var(--ease-out) 1.05s both,
+    splash-sweep 1.1s var(--ease-out) 7.2s both;
 }
 
 .splash--reduced .splash__rays,

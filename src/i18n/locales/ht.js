@@ -30,6 +30,32 @@ export default {
     aria: "Ekran ouvèti LeoDomino",
     tagline: "Mesa klasik",
   },
+  setup: {
+    aria: "Konfigirasyon jwèt LeoDomino",
+    title: "Konfigirasyon",
+    difficulty: "Nivo AI",
+    difficultyAdvanced: "Avanse",
+    soundOn: "Aktive",
+    soundOff: "Fèmen",
+    resumeMatch: "Kontinye match la",
+    comingSoonLegend: "Byento",
+    onlineLabel: "Multijwè sou entènèt",
+    onlineSubtitle: "Jwe ak moun sou pwòp telefòn oswa tablèt yo",
+    onlineComingSoon: "Multijwè sou entènèt — Byento",
+    leagueLabel: "Lig",
+    leagueSubtitle: "Klasman • Chanpyona • Sezon",
+    leagueSoon: "Byento",
+    leagueComingSoon: "Lig — Byento",
+    gameStyle: {
+      label: "Stil jwèt",
+      aria: "Chwazi stil jwèt la",
+      classic: "Klasik",
+      classicDescription:
+        "Tire jiskaske ou ka jwe. Pase lè rezèv la vid. Premye ki rive 100.",
+      classicSummary:
+        "Doub-sis · 7 donmino · de bout ouvè · tire jiskaske ou ka jwe · pase lè vid · jwe jiska 100",
+    },
+  },
   game: {
     play: "Jwe",
     draw: "Tire",
