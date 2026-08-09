@@ -27,6 +27,30 @@ export {
 } from "./haitianScoring.js";
 
 export {
+  DOMINICAN_OPENING_TILE_ID,
+  chooseDominicanRound1Starter,
+  chooseDominicanBlockedStarter,
+  chooseDominicanNextRoundStarter,
+} from "./dominicanStart.js";
+export {
+  getDominicanTeams,
+  partnerSeat,
+  teamIdForSeat,
+  teamPipTotal,
+  arePartners,
+  seatsOnTeam,
+  teamLeadSeat,
+} from "./dominicanTeams.js";
+export {
+  DOMINICAN_MATCH_TARGET,
+  calculateDominicanRoundPoints,
+  applyDominicanAfterRoundScoreUpdate,
+  isDominicanMatchWon,
+  isCapicua,
+  resolveDominicanMatchWinner,
+} from "./dominicanScoring.js";
+
+export {
   startMatch,
   getCurrentLegalMoves,
   getAvailableActions,

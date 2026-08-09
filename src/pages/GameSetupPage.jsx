@@ -211,7 +211,12 @@ function GameSetupPage({ onPlay, onResume, onOpenGameStyle }) {
             </button>
             {!styleCompatible ? (
               <p className="game-setup__style-warn" role="status">
-                {t("setup.gameStyle.unsupportedPlayerCount", { n: playerCount })}
+                {t("setup.gameStyle.unsupportedPlayerCount", {
+                  n: playerCount,
+                  style: selectedStyle
+                    ? t(selectedStyle.nameKey)
+                    : t("setup.gameStyle.classic"),
+                })}
               </p>
             ) : null}
           </fieldset>

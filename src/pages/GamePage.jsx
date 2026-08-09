@@ -593,6 +593,18 @@ function GamePage({ onMainMenu, matchOptions = null }) {
 
     if (state.phase === PHASE.ROUND_OVER && state.roundResult) {
       const winnerIndex = state.roundResult.winnerIndex;
+      const tied = Boolean(state.roundResult.tied) || winnerIndex == null;
+      if (tied) {
+        play("defeat");
+        vibrate(30);
+        setBanner({
+          variant: "round",
+          title: t("dialog.roundOver"),
+          subtitle: t("rules.roundTied"),
+        });
+        const timer = window.setTimeout(() => setBanner(null), MOTION.bannerMs);
+        return () => window.clearTimeout(timer);
+      }
       const humanWon = winnerIndex === HUMAN_INDEX;
       play(humanWon ? "roundWin" : "defeat");
       if (humanWon) vibrate([12, 30, 12]);

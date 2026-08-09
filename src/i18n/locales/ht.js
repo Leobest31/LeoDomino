@@ -67,8 +67,13 @@ export default {
         "Draw Domino Ameriken. Matche nenpòt bout, tire jiskaske ou ka jwe, pase lè rezèv la vid. Premye ki rive 100.",
       americanSummary:
         "Doub-sis · 7 donmino · de bout ouvè · tire jiskaske ou ka jwe · pase lè vid · jwe jiska 100",
+      dominican: "Dominiken",
+      dominicanDescription:
+        "Estanda Dominiken. Patnè yo chita anfas. Pa gen tire — pase lè ou pa ka jwe. Ekip yo jwe jiska 100.",
+      dominicanSummary:
+        "Doub-sis · 4 jwè · patnè anfas · 7 chak · pa gen rezèv · pase lè bloke · pwen ekip jiska 100 · 6-6 louvri premye wo a",
       unsupportedPlayerCount:
-        "Stil Ayisyen pa disponib pou {{n}} jwè pou kounye a. Chwazi 2 oswa 4 jwè, oswa Klasik.",
+        "{{style}} pa disponib pou {{n}} jwè. Chwazi yon kantite jwè ki sipòte oswa yon lòt stil.",
     },
   },
   game: {
@@ -115,6 +120,7 @@ export default {
   rules: {
     roundWon: "{{name}} genyen wo a",
     roundBlocked: "Jwèt la bloke",
+    roundTied: "Bloke egal — pa gen pwen",
     matchWon: "{{name}} genyen match la",
     pointsAwarded: "+{{points}} pwen",
     dekabes: "Dekabès!",

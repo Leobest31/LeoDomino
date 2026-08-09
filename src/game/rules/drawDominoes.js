@@ -21,6 +21,8 @@ import {
   resolveRuleset,
 } from "../rulesets/index.js";
 import { PHASE, ROUND_END_REASON } from "./constants.js";
+import { chooseDominicanBlockedStarter } from "./dominicanStart.js";
+import { teamPipTotal } from "./dominicanTeams.js";
 import { handPipTotal } from "./scoring.js";
 
 /**
@@ -38,6 +40,7 @@ import { handPipTotal } from "./scoring.js";
  * @property {string} rulesetId
  * @property {string|null} mustPlayTileId
  * @property {number} consecutivePasses
+ * @property {number|null} [roundStarterIndex]
  * @property {object|null} roundResult
  * @property {number|null} matchWinner
  * @property {string|null} statusKey
@@ -160,6 +163,7 @@ function beginRound(base, meta) {
     targetScore: meta.targetScore,
     mustPlayTileId: tileId,
     consecutivePasses: 0,
+    roundStarterIndex: playerIndex,
     roundResult: null,
     matchWinner: null,
     statusKey: tileId ? "rules.starter" : "rules.starterFree",
@@ -207,10 +211,14 @@ export function getAvailableActions(state) {
 
   if (ruleset.drawPolicy === "drawUntilPlayable") {
     canDraw = !hasMove && !reserveEmpty && !lockedOpen;
+  } else if (ruleset.drawPolicy === "none") {
+    canDraw = false;
   }
 
   if (ruleset.passPolicy === "passWhenReserveEmpty") {
     canPass = !hasMove && reserveEmpty && !lockedOpen;
+  } else if (ruleset.passPolicy === "passWhenNoMove") {
+    canPass = !hasMove && !lockedOpen;
   }
 
   return {
@@ -235,9 +243,11 @@ function advancePlayer(state) {
  * @param {GameState} state
  * @param {number} winnerIndex
  * @param {string} reason
+ * @param {object} [extras]
+ * @param {number} [extras.nextStarterIndex]
  * @returns {GameState}
  */
-function finishRound(state, winnerIndex, reason) {
+function finishRound(state, winnerIndex, reason, extras = {}) {
   const ruleset = rulesetOf(state);
   const isDekabes = reason === ROUND_END_REASON.DEKABES;
   let points = 0;
@@ -270,6 +280,9 @@ function finishRound(state, winnerIndex, reason) {
     scores[winnerIndex] += points;
   }
 
+  const nextStarterIndex =
+    extras.nextStarterIndex != null ? extras.nextStarterIndex : winnerIndex;
+
   /** @type {number|null} */
   let matchWinner = null;
   if (typeof ruleset.policies.isMatchWon === "function") {
@@ -280,7 +293,14 @@ function finishRound(state, winnerIndex, reason) {
         targetScore: state.targetScore,
       })
     ) {
-      matchWinner = winnerIndex;
+      matchWinner =
+        typeof ruleset.policies.resolveMatchWinner === "function"
+          ? ruleset.policies.resolveMatchWinner({
+              scores,
+              winnerIndex,
+              targetScore: state.targetScore,
+            })
+          : winnerIndex;
     }
   } else if (ruleset.matchWinMode === "firstToReach") {
     const reached = scores.findIndex((score) => score >= state.targetScore);
@@ -305,6 +325,7 @@ function finishRound(state, winnerIndex, reason) {
       reason,
       winnerIndex,
       points,
+      nextStarterIndex,
       ...(isDekabes ? { dekabes: true } : {}),
     },
     statusKey,
@@ -312,6 +333,37 @@ function finishRound(state, winnerIndex, reason) {
       name: state.players[winnerIndex].id,
       points,
     },
+  };
+}
+
+/**
+ * Blocked equal-pip / equal-team tie — zero points, no fabricated winner.
+ * Next round reuses the previous round starter.
+ *
+ * @param {GameState} state
+ * @returns {GameState}
+ */
+function finishTiedRound(state) {
+  const starter =
+    state.roundStarterIndex != null
+      ? state.roundStarterIndex
+      : state.currentPlayer;
+
+  return {
+    ...state,
+    phase: PHASE.ROUND_OVER,
+    matchWinner: null,
+    mustPlayTileId: null,
+    consecutivePasses: 0,
+    roundResult: {
+      reason: ROUND_END_REASON.BLOCKED,
+      winnerIndex: null,
+      points: 0,
+      tied: true,
+      nextStarterIndex: starter,
+    },
+    statusKey: "rules.roundTied",
+    statusVars: null,
   };
 }
 
@@ -328,13 +380,10 @@ export function isBoardBlocked(state) {
 /**
  * When blocked, lowest remaining pip total wins (tie → lower seat index).
  * @param {GameState} state
+ * @returns {number}
  */
-function resolveBlockedWinner(state) {
+function resolveBlockedWinnerLowestPips(state) {
   const ruleset = rulesetOf(state);
-  if (ruleset.blockedWinnerMode !== "lowestPips") {
-    throw new Error(`Unsupported blockedWinnerMode: ${ruleset.blockedWinnerMode}`);
-  }
-
   let winnerIndex = 0;
   let best = Infinity;
 
@@ -352,6 +401,49 @@ function resolveBlockedWinner(state) {
   }
 
   return winnerIndex;
+}
+
+/**
+ * Resolve a blocked table into a scoring outcome.
+ *
+ * @param {GameState} state
+ * @param {number|null} [blockCauserIndex] - seat that passed into the block
+ * @returns {{ tied: boolean, winnerIndex: number|null, nextStarterIndex: number|null }}
+ */
+function resolveBlockedOutcome(state, blockCauserIndex = null) {
+  const ruleset = rulesetOf(state);
+
+  if (ruleset.blockedWinnerMode === "lowestPips") {
+    const winnerIndex = resolveBlockedWinnerLowestPips(state);
+    return { tied: false, winnerIndex, nextStarterIndex: winnerIndex };
+  }
+
+  if (ruleset.blockedWinnerMode === "lowestTeamPips") {
+    const team0 = teamPipTotal(0, state.players, state.byId);
+    const team1 = teamPipTotal(1, state.players, state.byId);
+    if (team0 === team1) {
+      if (ruleset.blockedTieBreak === "noScore") {
+        return {
+          tied: true,
+          winnerIndex: null,
+          nextStarterIndex: state.roundStarterIndex ?? null,
+        };
+      }
+      throw new Error(
+        `Unsupported blockedTieBreak for team pips: ${ruleset.blockedTieBreak}`
+      );
+    }
+    const winningTeamId = team0 < team1 ? 0 : 1;
+    const nextStarterIndex = chooseDominicanBlockedStarter({
+      winningTeamId,
+      blockCauserIndex,
+    });
+    // Scoring seat: any member of the winning team (mirrored afterward).
+    const winnerIndex = nextStarterIndex;
+    return { tied: false, winnerIndex, nextStarterIndex };
+  }
+
+  throw new Error(`Unsupported blockedWinnerMode: ${ruleset.blockedWinnerMode}`);
 }
 
 /**
@@ -403,6 +495,7 @@ export function playTile(state, tileId, end = END.RIGHT) {
     rulesetId: state.rulesetId,
     mustPlayTileId: null,
     consecutivePasses: 0,
+    roundStarterIndex: state.roundStarterIndex ?? null,
     roundResult: null,
     matchWinner: null,
     statusKey: null,
@@ -412,7 +505,9 @@ export function playTile(state, tileId, end = END.RIGHT) {
   // Domino out?
   if (next.players[state.currentPlayer].hand.length === 0) {
     const reason = dekabes ? ROUND_END_REASON.DEKABES : ROUND_END_REASON.DOMINO;
-    return finishRound(next, state.currentPlayer, reason);
+    return finishRound(next, state.currentPlayer, reason, {
+      nextStarterIndex: state.currentPlayer,
+    });
   }
 
   return advancePlayer(next);
@@ -448,6 +543,7 @@ export function drawTile(state) {
     rulesetId: state.rulesetId,
     mustPlayTileId: state.mustPlayTileId,
     consecutivePasses: 0,
+    roundStarterIndex: state.roundStarterIndex ?? null,
     roundResult: null,
     matchWinner: null,
     statusKey: "notification.drewTile",
@@ -456,7 +552,7 @@ export function drawTile(state) {
 }
 
 /**
- * Pass turn — only when reserve empty and no legal moves.
+ * Pass turn — when ruleset pass policy allows (reserve empty / no-move).
  * @param {GameState} state
  * @returns {GameState}
  */
@@ -488,11 +584,19 @@ export function passTurn(state) {
     next.consecutivePasses >= next.players.length;
 
   if (blockedByStuck || blockedByPasses) {
-    const winnerIndex = resolveBlockedWinner(next);
+    const outcome = resolveBlockedOutcome(next, passer);
+    if (outcome.tied) {
+      return finishTiedRound({
+        ...next,
+        statusKey: "rules.roundTied",
+        statusVars: null,
+      });
+    }
     return finishRound(
       { ...next, statusKey: "rules.roundBlocked", statusVars: null },
-      winnerIndex,
-      ROUND_END_REASON.BLOCKED
+      outcome.winnerIndex,
+      ROUND_END_REASON.BLOCKED,
+      { nextStarterIndex: outcome.nextStarterIndex }
     );
   }
 
@@ -501,7 +605,8 @@ export function passTurn(state) {
 
 /**
  * Start the next round after roundOver (keeps match scores).
- * Previous round winner always opens and may play any tile.
+ * Default: previous round winner opens freely.
+ * Dominican: blocked-aware / tied-tranque starter policies via ruleset hooks.
  *
  * @param {GameState} state
  * @param {object} [dealOptions] - optional seed override for next deal
@@ -511,7 +616,11 @@ export function startNextRound(state, dealOptions = {}) {
   if (state.phase !== PHASE.ROUND_OVER) {
     throw new Error("Next round only after a finished round");
   }
-  if (!state.roundResult || state.roundResult.winnerIndex == null) {
+  if (!state.roundResult) {
+    throw new Error("Cannot start next round without a round result");
+  }
+  const tied = Boolean(state.roundResult.tied);
+  if (state.roundResult.winnerIndex == null && !tied) {
     throw new Error("Cannot start next round without a round winner");
   }
 
@@ -525,6 +634,24 @@ export function startNextRound(state, dealOptions = {}) {
   const handSize =
     dealOptions.handSize ?? resolveHandSize(ruleset, state.players.length);
 
+  /** @type {number} */
+  let starterIndex;
+  if (typeof ruleset.policies.chooseNextRoundStarter === "function") {
+    starterIndex = ruleset.policies.chooseNextRoundStarter({
+      roundResult: state.roundResult,
+      roundStarterIndex: state.roundStarterIndex,
+    });
+  } else if (tied) {
+    starterIndex =
+      state.roundResult.nextStarterIndex ?? state.roundStarterIndex;
+  } else {
+    starterIndex =
+      state.roundResult.nextStarterIndex ?? state.roundResult.winnerIndex;
+  }
+  if (starterIndex == null || starterIndex < 0) {
+    throw new Error("Cannot start next round without a starter");
+  }
+
   const base = createMatch({
     seed: dealOptions.seed ?? Date.now(),
     playerCount: state.players.length,
@@ -537,7 +664,7 @@ export function startNextRound(state, dealOptions = {}) {
     scores: state.scores,
     round: state.round + 1,
     targetScore: state.targetScore,
-    starterIndex: state.roundResult.winnerIndex,
+    starterIndex,
     rulesetId,
   });
 }

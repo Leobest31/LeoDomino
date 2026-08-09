@@ -64,8 +64,13 @@ export default {
         "American Draw Dominoes. Match either end, draw until you can play, pass when empty. First to 100.",
       americanSummary:
         "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
+      dominican: "Dominican",
+      dominicanDescription:
+        "Dominican Standard. Partners sit opposite. No draws — pass when you cannot play. Team scores to 100.",
+      dominicanSummary:
+        "Double-six · 4 players · opposite partners · 7 each · no reserve · pass when stuck · team pips to 100 · 6-6 opens round 1",
       unsupportedPlayerCount:
-        "Haitian is not available for {{n}} players yet. Choose 2 or 4 players, or Classic.",
+        "{{style}} is not available for {{n}} players. Choose a supported player count or another style.",
     },
   },
   game: {
@@ -112,6 +117,7 @@ export default {
   rules: {
     roundWon: "{{name}} wins the round",
     roundBlocked: "The game is blocked",
+    roundTied: "Blocked tie — no points",
     matchWon: "{{name}} wins the match",
     pointsAwarded: "+{{points}} points",
     dekabes: "Dekabès!",

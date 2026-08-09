@@ -64,8 +64,13 @@ export default {
         "Draw Domino americano. Encaja en cualquiera de los extremos, roba hasta poder jugar, pasa si vacío. Primero a 100.",
       americanSummary:
         "Doble seis · 7 fichas · dos extremos abiertos · robar hasta poder jugar · pasar si vacío · jugar a 100",
+      dominican: "Dominicano",
+      dominicanDescription:
+        "Estándar dominicano. Parejas frente a frente. Sin robar — pasa si no puedes jugar. Las parejas juegan a 100.",
+      dominicanSummary:
+        "Doble seis · 4 jugadores · parejas opuestas · 7 cada uno · sin reserva · pasar si bloqueado · puntos de pareja a 100 · 6-6 abre la ronda 1",
       unsupportedPlayerCount:
-        "El estilo haitiano aún no está disponible para {{n}} jugadores. Elige 2 o 4 jugadores, o Clásico.",
+        "{{style}} no está disponible para {{n}} jugadores. Elige un número de jugadores compatible u otro estilo.",
     },
   },
   game: {
@@ -112,6 +117,7 @@ export default {
   rules: {
     roundWon: "{{name}} gana la ronda",
     roundBlocked: "La partida está bloqueada",
+    roundTied: "Bloqueo empatado — sin puntos",
     matchWon: "{{name}} gana la partida",
     pointsAwarded: "+{{points}} puntos",
     dekabes: "¡Dekabès!",

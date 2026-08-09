@@ -64,8 +64,13 @@ export default {
         "Draw Domino américain. Jouez sur l’un des deux bouts, piochez jusqu’à pouvoir jouer, passez si vide. Premier à 100.",
       americanSummary:
         "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
+      dominican: "Dominicain",
+      dominicanDescription:
+        "Standard dominicain. Partenaires en face. Pas de pioche — passez si vous ne pouvez pas jouer. Les équipes jouent à 100.",
+      dominicanSummary:
+        "Double-six · 4 joueurs · partenaires opposés · 7 chacun · pas de réserve · passer si bloqué · pips d’équipe à 100 · 6-6 ouvre la manche 1",
       unsupportedPlayerCount:
-        "Le style haïtien n’est pas encore disponible pour {{n}} joueurs. Choisissez 2 ou 4 joueurs, ou Classique.",
+        "{{style}} n’est pas disponible pour {{n}} joueurs. Choisissez un nombre de joueurs pris en charge ou un autre style.",
     },
   },
   game: {
@@ -112,6 +117,7 @@ export default {
   rules: {
     roundWon: "{{name}} gagne la manche",
     roundBlocked: "La partie est bloquée",
+    roundTied: "Blocage égalité — aucun point",
     matchWon: "{{name}} gagne la partie",
     pointsAwarded: "+{{points}} points",
     dekabes: "Dekabès !",

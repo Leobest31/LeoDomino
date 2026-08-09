@@ -6,6 +6,7 @@
 import { LEGACY_RULESET_ID, legacyRuleset } from "./legacy.js";
 import { HAITIAN_RULESET_ID, haitianRuleset } from "./haitian.js";
 import { AMERICAN_RULESET_ID, americanRuleset } from "./american.js";
+import { DOMINICAN_RULESET_ID, dominicanRuleset } from "./dominican.js";
 
 /** @type {Map<string, object>} */
 const REGISTRY = new Map();
@@ -55,6 +56,15 @@ export const GAME_STYLES = Object.freeze([
     nameKey: "setup.gameStyle.american",
     descriptionKey: "setup.gameStyle.americanDescription",
     countryCode: "US",
+    enabled: true,
+    available: true,
+  }),
+  Object.freeze({
+    id: "dominican",
+    rulesetId: DOMINICAN_RULESET_ID,
+    nameKey: "setup.gameStyle.dominican",
+    descriptionKey: "setup.gameStyle.dominicanDescription",
+    countryCode: "DO",
     enabled: true,
     available: true,
   }),
@@ -244,3 +254,4 @@ export function isGameStyleCompatibleWithPlayerCount(styleId, playerCount) {
 registerRuleset(legacyRuleset);
 registerRuleset(haitianRuleset);
 registerRuleset(americanRuleset);
+registerRuleset(dominicanRuleset);

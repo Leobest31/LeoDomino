@@ -1,5 +1,5 @@
 /**
- * Ruleset public API — config registry + Classic / Haitian / American UI catalog.
+ * Ruleset public API — config registry + Classic / Haitian / American / Dominican UI catalog.
  */
 
 export {
@@ -17,6 +17,13 @@ export {
   AMERICAN_RULESET_ID,
   americanRuleset,
 } from "./american.js";
+
+export {
+  DOMINICAN_RULESET_ID,
+  DOMINICAN_MATCH_TARGET,
+  DOMINICAN_OPENING_TILE_ID,
+  dominicanRuleset,
+} from "./dominican.js";
 
 export {
   DEFAULT_RULESET_ID,
