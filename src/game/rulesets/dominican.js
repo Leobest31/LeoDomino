@@ -19,6 +19,7 @@ import {
   chooseDominicanNextRoundStarter,
   chooseDominicanRound1Starter,
   DOMINICAN_OPENING_TILE_ID,
+  resolveDominicanTeamBlockedOutcome,
 } from "../rules/dominicanStart.js";
 import { getDominicanTeams } from "../rules/dominicanTeams.js";
 
@@ -102,6 +103,7 @@ export const dominicanRuleset = Object.freeze({
     afterRoundScoreUpdate: applyDominicanAfterRoundScoreUpdate,
     isMatchWon: isDominicanMatchWon,
     resolveMatchWinner: resolveDominicanMatchWinner,
+    resolveTeamBlockedOutcome: resolveDominicanTeamBlockedOutcome,
     isCapicua,
   }),
 });

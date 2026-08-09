@@ -378,6 +378,47 @@ function playingState({
   section("Blocked starter: causer if on team else lowest seat");
 }
 
+// --- Dominican blocked golden outcomes (regression lock for shared engine path) ---
+{
+  // Causer on losing team → starter falls back to lowest seat on winning team.
+  // Team 0 = 4 pips, team 1 = 22; passer seat 2 is NOT on winning team.
+  const causerOffTeam = playingState({
+    hands: [["0-1"], ["1-2"], ["4-6"], ["6-6"]],
+    boardTiles: ["3-3"],
+    currentPlayer: 2,
+    consecutivePasses: 3,
+    roundStarterIndex: 1,
+    scores: [5, 5, 0, 0],
+  });
+  const afterOff = passTurn(causerOffTeam);
+  assert.equal(afterOff.roundResult.reason, ROUND_END_REASON.BLOCKED);
+  assert.equal(afterOff.roundResult.tied, undefined);
+  // Difference scoring (22 - 4 = 18), NOT opposing total alone.
+  assert.equal(afterOff.roundResult.points, 18);
+  assert.notEqual(afterOff.roundResult.points, 22);
+  assert.equal(teamIdForSeat(afterOff.roundResult.winnerIndex), 0);
+  assert.equal(afterOff.roundResult.nextStarterIndex, 0);
+  assert.equal(afterOff.roundResult.winnerIndex, 0);
+  assert.deepEqual(afterOff.scores, [23, 23, 0, 0]);
+
+  // Causer on winning team but not min seat → causer still starts (Dominican-only).
+  // Seat 1 passes into block; team 0 wins; starter must be causer seat 1 (not 0).
+  const causerOnTeam = playingState({
+    hands: [["0-1"], ["1-2"], ["4-6"], ["6-6"]],
+    boardTiles: ["3-3"],
+    currentPlayer: 1,
+    consecutivePasses: 3,
+    roundStarterIndex: 3,
+    scores: [0, 0, 0, 0],
+  });
+  const afterOn = passTurn(causerOnTeam);
+  assert.equal(afterOn.roundResult.points, 18);
+  assert.equal(afterOn.roundResult.nextStarterIndex, 1);
+  assert.equal(afterOn.roundResult.winnerIndex, 1);
+  assert.deepEqual(afterOn.scores, [18, 18, 0, 0]);
+  section("Dominican blocked golden lock: difference + causer starter semantics");
+}
+
 // --- Blocked equal-pip TIE: no score; same starter again ---
 {
   // Team 0: 4+2=6; team 1: 3+3=6

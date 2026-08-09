@@ -69,6 +69,11 @@ export default {
         "Estándar dominicano. Parejas frente a frente. Sin robar — pasa si no puedes jugar. Las parejas juegan a 100.",
       dominicanSummary:
         "Doble seis · 4 jugadores · parejas opuestas · 7 cada uno · sin reserva · pasar si bloqueado · puntos de pareja a 100 · 6-6 abre la ronda 1",
+      puertorican: "Puertorriqueño",
+      puertoricanDescription:
+        "Estándar puertorriqueño. Parejas frente a frente. Sin robar — pasa si no puedes jugar. Las parejas juegan a 200.",
+      puertoricanSummary:
+        "Doble seis · 4 jugadores · parejas opuestas · 7 cada uno · sin reserva · pasar si bloqueado · puntos de pareja a 200 · 6-6 abre la ronda 1",
       unsupportedPlayerCount:
         "{{style}} no está disponible para {{n}} jugadores. Elige un número de jugadores compatible u otro estilo.",
     },

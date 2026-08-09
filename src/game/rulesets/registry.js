@@ -7,6 +7,7 @@ import { LEGACY_RULESET_ID, legacyRuleset } from "./legacy.js";
 import { HAITIAN_RULESET_ID, haitianRuleset } from "./haitian.js";
 import { AMERICAN_RULESET_ID, americanRuleset } from "./american.js";
 import { DOMINICAN_RULESET_ID, dominicanRuleset } from "./dominican.js";
+import { PUERTO_RICAN_RULESET_ID, puertoRicanRuleset } from "./puertoRican.js";
 
 /** @type {Map<string, object>} */
 const REGISTRY = new Map();
@@ -65,6 +66,15 @@ export const GAME_STYLES = Object.freeze([
     nameKey: "setup.gameStyle.dominican",
     descriptionKey: "setup.gameStyle.dominicanDescription",
     countryCode: "DO",
+    enabled: true,
+    available: true,
+  }),
+  Object.freeze({
+    id: "puertorican",
+    rulesetId: PUERTO_RICAN_RULESET_ID,
+    nameKey: "setup.gameStyle.puertorican",
+    descriptionKey: "setup.gameStyle.puertoricanDescription",
+    countryCode: "PR",
     enabled: true,
     available: true,
   }),
@@ -255,3 +265,4 @@ registerRuleset(legacyRuleset);
 registerRuleset(haitianRuleset);
 registerRuleset(americanRuleset);
 registerRuleset(dominicanRuleset);
+registerRuleset(puertoRicanRuleset);

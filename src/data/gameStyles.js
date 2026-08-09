@@ -1,7 +1,7 @@
 /**
  * UI game-style catalog — single import path for Setup / Game Style screens.
  * Source of truth remains `game/rulesets`
- * (classic→legacy, haitian→haitian, american→american, dominican→dominican).
+ * (classic→legacy, haitian→haitian, american→american, dominican→dominican, puertorican→puertorican).
  * Add future regional variants in the registry only; Configuration stays a single row.
  */
 
@@ -29,6 +29,7 @@ const COUNTRY_FLAG_SVG = Object.freeze({
   HT: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24"><rect width="36" height="12" fill="#00209F"/><rect y="12" width="36" height="12" fill="#D21034"/><rect x="13" y="7" width="10" height="10" fill="#fff"/></svg>`,
   US: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24"><rect width="36" height="24" fill="#B22234"/><rect y="1.85" width="36" height="1.85" fill="#fff"/><rect y="5.54" width="36" height="1.85" fill="#fff"/><rect y="9.23" width="36" height="1.85" fill="#fff"/><rect y="12.92" width="36" height="1.85" fill="#fff"/><rect y="16.62" width="36" height="1.85" fill="#fff"/><rect y="20.31" width="36" height="1.85" fill="#fff"/><rect width="14.4" height="12.92" fill="#3C3B6E"/></svg>`,
   DO: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24"><rect width="36" height="24" fill="#fff"/><rect width="14.4" height="9.6" fill="#002D62"/><rect x="21.6" width="14.4" height="9.6" fill="#CE1126"/><rect y="14.4" width="14.4" height="9.6" fill="#CE1126"/><rect x="21.6" y="14.4" width="14.4" height="9.6" fill="#002D62"/><circle cx="18" cy="12" r="3.2" fill="#fff"/><circle cx="18" cy="12" r="2.2" fill="#006300"/></svg>`,
+  PR: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24"><rect width="36" height="24" fill="#EDE016"/><rect width="36" height="4.8" fill="#ED0000"/><rect y="9.6" width="36" height="4.8" fill="#ED0000"/><rect y="19.2" width="36" height="4.8" fill="#ED0000"/><polygon points="0,0 14.4,12 0,24" fill="#0050F0"/><polygon points="4.8,12 6.6,17.2 2.1,14 7.5,14 3,17.2" fill="#fff"/></svg>`,
 });
 
 /**

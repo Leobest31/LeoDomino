@@ -14,6 +14,7 @@ import {
   partnerSeat,
   seatsOnTeam,
   teamIdForSeat,
+  teamPipTotal,
 } from "./dominicanTeams.js";
 
 export const DOMINICAN_OPENING_TILE_ID = tileId(6, 6);
@@ -43,6 +44,44 @@ export function chooseDominicanBlockedStarter({
   }
   // Explicit fallback: smallest seat index on the winning team.
   return Math.min(...seats);
+}
+
+/**
+ * Dominican team-block outcome (engine policy).
+ * Lower team pips win; equal pips → noScore tie when configured.
+ * Starter: block causer if on winning team, else lowest seat on that team.
+ *
+ * @param {object} options
+ * @param {object} options.state
+ * @param {number|null|undefined} options.blockCauserIndex
+ * @param {string} [options.blockedTieBreak]
+ * @returns {{ tied: boolean, winnerIndex: number|null, nextStarterIndex: number|null }}
+ */
+export function resolveDominicanTeamBlockedOutcome({
+  state,
+  blockCauserIndex = null,
+  blockedTieBreak,
+}) {
+  const team0 = teamPipTotal(0, state.players, state.byId);
+  const team1 = teamPipTotal(1, state.players, state.byId);
+  if (team0 === team1) {
+    if (blockedTieBreak === "noScore") {
+      return {
+        tied: true,
+        winnerIndex: null,
+        nextStarterIndex: state.roundStarterIndex ?? null,
+      };
+    }
+    throw new Error(
+      `Unsupported blockedTieBreak for Dominican team pips: ${blockedTieBreak}`
+    );
+  }
+  const winningTeamId = team0 < team1 ? 0 : 1;
+  const nextStarterIndex = chooseDominicanBlockedStarter({
+    winningTeamId,
+    blockCauserIndex,
+  });
+  return { tied: false, winnerIndex: nextStarterIndex, nextStarterIndex };
 }
 
 /**

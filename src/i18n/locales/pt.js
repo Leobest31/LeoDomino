@@ -69,6 +69,11 @@ export default {
         "Padrão dominicano. Parceiros sentam-se em frente. Sem comprar — passe se não puder jogar. Equipas jogam até 100.",
       dominicanSummary:
         "Duplo-seis · 4 jogadores · parceiros opostos · 7 cada · sem reserva · passar se bloqueado · pontos de equipa até 100 · 6-6 abre a ronda 1",
+      puertorican: "Porto-riquenho",
+      puertoricanDescription:
+        "Padrão porto-riquenho. Parceiros sentam-se em frente. Sem comprar — passe se não puder jogar. Equipas jogam até 200.",
+      puertoricanSummary:
+        "Duplo-seis · 4 jogadores · parceiros opostos · 7 cada · sem reserva · passar se bloqueado · pontos de equipa até 200 · 6-6 abre a ronda 1",
       unsupportedPlayerCount:
         "{{style}} não está disponível para {{n}} jogadores. Escolha um número de jogadores suportado ou outro estilo.",
     },

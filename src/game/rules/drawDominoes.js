@@ -21,8 +21,6 @@ import {
   resolveRuleset,
 } from "../rulesets/index.js";
 import { PHASE, ROUND_END_REASON } from "./constants.js";
-import { chooseDominicanBlockedStarter } from "./dominicanStart.js";
-import { teamPipTotal } from "./dominicanTeams.js";
 import { handPipTotal } from "./scoring.js";
 
 /**
@@ -419,28 +417,16 @@ function resolveBlockedOutcome(state, blockCauserIndex = null) {
   }
 
   if (ruleset.blockedWinnerMode === "lowestTeamPips") {
-    const team0 = teamPipTotal(0, state.players, state.byId);
-    const team1 = teamPipTotal(1, state.players, state.byId);
-    if (team0 === team1) {
-      if (ruleset.blockedTieBreak === "noScore") {
-        return {
-          tied: true,
-          winnerIndex: null,
-          nextStarterIndex: state.roundStarterIndex ?? null,
-        };
-      }
+    if (typeof ruleset.policies.resolveTeamBlockedOutcome !== "function") {
       throw new Error(
-        `Unsupported blockedTieBreak for team pips: ${ruleset.blockedTieBreak}`
+        `Ruleset ${ruleset.id} requires policies.resolveTeamBlockedOutcome for lowestTeamPips`
       );
     }
-    const winningTeamId = team0 < team1 ? 0 : 1;
-    const nextStarterIndex = chooseDominicanBlockedStarter({
-      winningTeamId,
+    return ruleset.policies.resolveTeamBlockedOutcome({
+      state,
       blockCauserIndex,
+      blockedTieBreak: ruleset.blockedTieBreak,
     });
-    // Scoring seat: any member of the winning team (mirrored afterward).
-    const winnerIndex = nextStarterIndex;
-    return { tied: false, winnerIndex, nextStarterIndex };
   }
 
   throw new Error(`Unsupported blockedWinnerMode: ${ruleset.blockedWinnerMode}`);

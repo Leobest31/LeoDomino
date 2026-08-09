@@ -31,6 +31,7 @@ export {
   chooseDominicanRound1Starter,
   chooseDominicanBlockedStarter,
   chooseDominicanNextRoundStarter,
+  resolveDominicanTeamBlockedOutcome,
 } from "./dominicanStart.js";
 export {
   getDominicanTeams,
@@ -49,6 +50,32 @@ export {
   isCapicua,
   resolveDominicanMatchWinner,
 } from "./dominicanScoring.js";
+
+export {
+  PUERTO_RICAN_OPENING_TILE_ID,
+  choosePuertoRicanRound1Starter,
+  choosePuertoRicanBlockedStarter,
+  choosePuertoRicanNextRoundStarter,
+  resolvePuertoRicanTeamBlockedOutcome,
+} from "./puertoRicanStart.js";
+export {
+  getPuertoRicanTeams,
+  puertoRicanPartnerSeat,
+  puertoRicanTeamIdForSeat,
+  puertoRicanTeamPipTotal,
+  puertoRicanArePartners,
+  puertoRicanSeatsOnTeam,
+  puertoRicanTeamLeadSeat,
+} from "./puertoRicanTeams.js";
+export {
+  PUERTO_RICAN_MATCH_TARGET,
+  calculatePuertoRicanRoundPoints,
+  applyPuertoRicanAfterRoundScoreUpdate,
+  isPuertoRicanMatchWon,
+  isPuertoRicanCapicua,
+  isChuchazo,
+  resolvePuertoRicanMatchWinner,
+} from "./puertoRicanScoring.js";
 
 export {
   startMatch,

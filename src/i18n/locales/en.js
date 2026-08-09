@@ -69,6 +69,11 @@ export default {
         "Dominican Standard. Partners sit opposite. No draws — pass when you cannot play. Team scores to 100.",
       dominicanSummary:
         "Double-six · 4 players · opposite partners · 7 each · no reserve · pass when stuck · team pips to 100 · 6-6 opens round 1",
+      puertorican: "Puerto Rican",
+      puertoricanDescription:
+        "Puerto Rican Standard. Partners sit opposite. No draws — pass when you cannot play. Team scores to 200.",
+      puertoricanSummary:
+        "Double-six · 4 players · opposite partners · 7 each · no reserve · pass when stuck · team pips to 200 · 6-6 opens round 1",
       unsupportedPlayerCount:
         "{{style}} is not available for {{n}} players. Choose a supported player count or another style.",
     },

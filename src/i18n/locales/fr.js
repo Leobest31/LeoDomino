@@ -69,6 +69,11 @@ export default {
         "Standard dominicain. Partenaires en face. Pas de pioche — passez si vous ne pouvez pas jouer. Les équipes jouent à 100.",
       dominicanSummary:
         "Double-six · 4 joueurs · partenaires opposés · 7 chacun · pas de réserve · passer si bloqué · pips d’équipe à 100 · 6-6 ouvre la manche 1",
+      puertorican: "Portoricain",
+      puertoricanDescription:
+        "Standard portoricain. Partenaires en face. Pas de pioche — passez si vous ne pouvez pas jouer. Les équipes jouent à 200.",
+      puertoricanSummary:
+        "Double-six · 4 joueurs · partenaires opposés · 7 chacun · pas de réserve · passer si bloqué · pips d’équipe à 200 · 6-6 ouvre la manche 1",
       unsupportedPlayerCount:
         "{{style}} n’est pas disponible pour {{n}} joueurs. Choisissez un nombre de joueurs pris en charge ou un autre style.",
     },

@@ -72,6 +72,11 @@ export default {
         "Estanda Dominiken. Patnè yo chita anfas. Pa gen tire — pase lè ou pa ka jwe. Ekip yo jwe jiska 100.",
       dominicanSummary:
         "Doub-sis · 4 jwè · patnè anfas · 7 chak · pa gen rezèv · pase lè bloke · pwen ekip jiska 100 · 6-6 louvri premye wo a",
+      puertorican: "Pòtoriken",
+      puertoricanDescription:
+        "Estanda Pòtoriken. Patnè yo chita anfas. Pa gen tire — pase lè ou pa ka jwe. Ekip yo jwe jiska 200.",
+      puertoricanSummary:
+        "Doub-sis · 4 jwè · patnè anfas · 7 chak · pa gen rezèv · pase lè bloke · pwen ekip jiska 200 · 6-6 louvri premye wo a",
       unsupportedPlayerCount:
         "{{style}} pa disponib pou {{n}} jwè. Chwazi yon kantite jwè ki sipòte oswa yon lòt stil.",
     },
