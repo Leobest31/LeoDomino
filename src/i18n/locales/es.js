@@ -16,6 +16,7 @@ export default {
     confirm: "Confirmar",
     cancel: "Cancelar",
     continue: "Continuar",
+    back: "Volver",
     ok: "OK",
   },
   home: {
@@ -46,11 +47,25 @@ export default {
     gameStyle: {
       label: "Estilo de juego",
       aria: "Elegir estilo de juego",
+      openAria: "Abrir pantalla de estilo de juego",
+      screenAria: "Pantalla de estilo de juego LeoDomino",
       classic: "Clásico",
       classicDescription:
         "Roba hasta poder jugar. Pasa cuando el pozo está vacío. Primero a 100.",
       classicSummary:
         "Doble seis · 7 fichas · dos extremos abiertos · robar hasta poder jugar · pasar si vacío · jugar a 100",
+      haitian: "Haitiano",
+      haitianDescription:
+        "Primero a 4 puntos de partida. Victoria +1, bloqueo +1, Dekabès +2. La ronda 1 abre con 6-6.",
+      haitianSummary:
+        "Doble seis · 7 fichas · dos extremos · primero a 4 puntos de partida · victoria +1 · bloqueo +1 · Dekabès +2 · 6-6 abre la ronda 1",
+      american: "Americano",
+      americanDescription:
+        "Draw Domino americano. Encaja en cualquiera de los extremos, roba hasta poder jugar, pasa si vacío. Primero a 100.",
+      americanSummary:
+        "Doble seis · 7 fichas · dos extremos abiertos · robar hasta poder jugar · pasar si vacío · jugar a 100",
+      unsupportedPlayerCount:
+        "El estilo haitiano aún no está disponible para {{n}} jugadores. Elige 2 o 4 jugadores, o Clásico.",
     },
   },
   game: {
@@ -60,6 +75,7 @@ export default {
     newMatch: "Nueva partida",
     round: "Ronda",
     playToLabel: "Hasta",
+    matchPointsLabel: "Puntos de partida",
     yourHand: "Tu mano",
     scoreboard: "Marcador",
     table: "Mesa de dominó",
@@ -98,6 +114,8 @@ export default {
     roundBlocked: "La partida está bloqueada",
     matchWon: "{{name}} gana la partida",
     pointsAwarded: "+{{points}} puntos",
+    dekabes: "¡Dekabès!",
+    dekabesAwarded: "DEKABÈS +{{points}}",
     nextRound: "Siguiente ronda",
     starter: "{{name}} empieza con {{tile}}",
     starterFree: "{{name}} empieza",

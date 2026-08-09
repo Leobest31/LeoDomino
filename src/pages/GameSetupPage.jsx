@@ -20,17 +20,19 @@ import {
   DEFAULT_GAME_STYLE_ID,
   DEFAULT_RULESET_ID,
   RULESET_STORAGE_KEY,
+  gameStyleFlagDataUrl,
+  gameStyleFlagEmoji,
   gameStyleToRulesetId,
-  listAvailableGameStyles,
+  getGameStyle,
+  isGameStyleCompatibleWithPlayerCount,
   normalizeGameStyleId,
   normalizeRulesetId,
-} from "../game/rulesets/index.js";
+} from "../data/gameStyles.js";
 import { loadMatch } from "../persistence/index.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import "./GameSetupPage.css";
 
 const PLAYER_COUNTS = Object.freeze([2, 3, 4]);
-const GAME_STYLES = listAvailableGameStyles();
 
 /** Shorter native labels for the setup language row (codes unchanged). */
 const SETUP_LOCALE_LABEL = Object.freeze({
@@ -45,7 +47,7 @@ const SETUP_LOCALE_LABEL = Object.freeze({
  * Pre-game configuration — language, seats, sound, AI.
  * Table composition is always 1 human + (N−1) AI.
  */
-function GameSetupPage({ onPlay, onResume }) {
+function GameSetupPage({ onPlay, onResume, onOpenGameStyle }) {
   const { t, locale, setLocale, locales } = useI18n();
   const { muted, setMuted, play, unlock } = useAudio();
 
@@ -55,17 +57,22 @@ function GameSetupPage({ onPlay, onResume }) {
   const [difficulty, setDifficulty] = useState(() =>
     toSetupDifficulty(readStorage(AI_DIFFICULTY_STORAGE_KEY, DEFAULT_DIFFICULTY))
   );
-  const [gameStyleId, setGameStyleId] = useState(() =>
+  // Re-read on mount (including return from Game Style screen).
+  const [gameStyleId] = useState(() =>
     normalizeGameStyleId(readStorage(RULESET_STORAGE_KEY, DEFAULT_GAME_STYLE_ID))
   );
 
   const canResume = useMemo(() => Boolean(loadMatch()?.state), []);
-  const selectedStyle = useMemo(
-    () => GAME_STYLES.find((style) => style.id === gameStyleId) ?? GAME_STYLES[0],
-    [gameStyleId]
+  const selectedStyle = getGameStyle(gameStyleId);
+  const selectedStyleFlagImg = gameStyleFlagDataUrl(selectedStyle);
+  const selectedStyleFlag = gameStyleFlagEmoji(selectedStyle);
+  const styleCompatible = isGameStyleCompatibleWithPlayerCount(
+    gameStyleId,
+    playerCount
   );
 
   const setPlayerCount = (count) => {
+    // Never silently rewrite the selected game style when seats change.
     setPlayerCountState(normalizePlayerCount(count));
   };
 
@@ -76,10 +83,12 @@ function GameSetupPage({ onPlay, onResume }) {
   };
 
   const handlePlay = () => {
+    if (!styleCompatible) return;
     tap(() => {
       const count = normalizePlayerCount(playerCount);
       const level = normalizeDifficulty(difficulty);
       const styleId = normalizeGameStyleId(gameStyleId);
+      if (!isGameStyleCompatibleWithPlayerCount(styleId, count)) return;
       const rulesetId = normalizeRulesetId(
         gameStyleToRulesetId(styleId) ?? DEFAULT_RULESET_ID
       );
@@ -174,28 +183,36 @@ function GameSetupPage({ onPlay, onResume }) {
 
           <fieldset className="game-setup__field">
             <legend className="game-setup__legend">{t("setup.gameStyle.label")}</legend>
-            <div
-              className="game-setup__segment game-setup__segment--styles"
-              role="group"
-              aria-label={t("setup.gameStyle.aria")}
+            <button
+              type="button"
+              className="game-setup__style-row"
+              onClick={() => tap(() => onOpenGameStyle?.())}
+              aria-label={t("setup.gameStyle.openAria")}
             >
-              {GAME_STYLES.map((style) => {
-                const selected = style.id === gameStyleId;
-                return (
-                  <button
-                    key={style.id}
-                    type="button"
-                    className={`game-setup__chip${selected ? " game-setup__chip--on" : ""}`}
-                    aria-pressed={selected}
-                    onClick={() => tap(() => setGameStyleId(style.id))}
-                  >
-                    {t(style.nameKey)}
-                  </button>
-                );
-              })}
-            </div>
-            {selectedStyle ? (
-              <p className="game-setup__style-desc">{t(selectedStyle.descriptionKey)}</p>
+              <span className="game-setup__style-row-value">
+                {selectedStyleFlagImg ? (
+                  <img
+                    className="game-setup__style-flag"
+                    src={selectedStyleFlagImg}
+                    alt=""
+                    draggable={false}
+                    aria-hidden="true"
+                  />
+                ) : selectedStyleFlag ? (
+                  <span className="game-setup__style-flag" aria-hidden="true">
+                    {selectedStyleFlag}
+                  </span>
+                ) : null}
+                <span className="game-setup__style-row-name">
+                  {selectedStyle ? t(selectedStyle.nameKey) : t("setup.gameStyle.classic")}
+                </span>
+              </span>
+              <span className="game-setup__style-row-chevron" aria-hidden="true" />
+            </button>
+            {!styleCompatible ? (
+              <p className="game-setup__style-warn" role="status">
+                {t("setup.gameStyle.unsupportedPlayerCount", { n: playerCount })}
+              </p>
             ) : null}
           </fieldset>
 
@@ -280,7 +297,13 @@ function GameSetupPage({ onPlay, onResume }) {
         </section>
 
         <div className="game-setup__actions">
-          <button type="button" className="game-setup__play" onClick={handlePlay}>
+          <button
+            type="button"
+            className="game-setup__play"
+            onClick={handlePlay}
+            disabled={!styleCompatible}
+            aria-disabled={!styleCompatible}
+          >
             {t("game.play")}
           </button>
           {canResume ? (

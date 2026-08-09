@@ -10,12 +10,16 @@
   background: #05070c;
 }
 
-/* Intro/setup: keep the shell a bounded flex column so Setup can scroll
+/* Intro / setup / game-style: bounded flex column so pages scroll inside
    instead of growing past the viewport and being clipped by overflow:hidden. */
 .app--game.app--booting {
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  height: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 /* Match is not mounted during intro/setup — avoids table flash under brand. */

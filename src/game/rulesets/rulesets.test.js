@@ -36,6 +36,10 @@ import {
   isValidSavedMatch,
   normalizeStateRuleset,
 } from "../../persistence/matchSave.js";
+import {
+  gameStyleFlagDataUrl,
+  gameStyleFlagEmoji,
+} from "../../data/gameStyles.js";
 
 function section(title) {
   console.log(`✓ ${title}`);
@@ -60,11 +64,15 @@ function section(title) {
   assert.equal(normalizeRulesetId(null), "legacy");
   assert.equal(normalizeRulesetId(""), "legacy");
   assert.equal(isKnownRulesetId("legacy"), true);
-  assert.equal(isKnownRulesetId("haitian"), false);
+  assert.equal(isKnownRulesetId("haitian"), true);
+  assert.equal(isKnownRulesetId("american"), true);
   assert.equal(tryResolveRuleset("nope"), null);
+  assert.equal(tryResolveRuleset("haitian")?.id, "haitian");
+  assert.equal(tryResolveRuleset("american")?.id, "american");
   assert.equal(coerceRulesetId(undefined), "legacy");
   assert.equal(coerceRulesetId("legacy"), "legacy");
-  assert.equal(coerceRulesetId("american"), null);
+  assert.equal(coerceRulesetId("haitian"), "haitian");
+  assert.equal(coerceRulesetId("american"), "american");
   assert.throws(() => normalizeRulesetId("unknown-style"), /Unknown ruleset/);
   assert.throws(() => resolveRuleset("unknown-style"), /Unknown ruleset/);
   section("legacy registry resolution + unknown fails safely");
@@ -77,6 +85,8 @@ function section(title) {
   assert.ok(classic);
   assert.equal(classic.rulesetId, "legacy");
   assert.equal(classic.available, true);
+  assert.equal(classic.enabled, true);
+  assert.equal(classic.countryCode, null);
   assert.equal(classic.nameKey, "setup.gameStyle.classic");
   assert.equal(classic.descriptionKey, "setup.gameStyle.classicDescription");
   assert.equal(gameStyleToRulesetId("classic"), "legacy");
@@ -84,13 +94,32 @@ function section(title) {
   assert.equal(normalizeGameStyleId("legacy"), "classic");
   assert.equal(normalizeGameStyleId("classic"), "classic");
   const available = listAvailableGameStyles();
-  assert.equal(available.length, 1);
+  assert.equal(available.length, 3);
   assert.equal(available[0].id, "classic");
+  assert.equal(available[1].id, "haitian");
+  assert.equal(available[2].id, "american");
+  assert.equal(available[1].countryCode, "HT");
+  assert.equal(available[1].enabled, true);
+  assert.equal(available[2].countryCode, "US");
+  assert.equal(available[2].enabled, true);
   assert.ok(
-    !JSON.stringify(GAME_STYLES).includes("Haitian") &&
-      !JSON.stringify(GAME_STYLES).includes("American")
+    gameStyleFlagDataUrl(available[1]).startsWith("data:image/svg+xml"),
+    "Haitian style exposes SVG flag data URL (not letter fallback)"
   );
-  section("Classic UI metadata maps to legacy");
+  assert.equal(gameStyleFlagEmoji(available[1]), "🇭🇹");
+  assert.ok(
+    gameStyleFlagDataUrl(available[2]).startsWith("data:image/svg+xml"),
+    "American style exposes SVG flag data URL"
+  );
+  assert.equal(gameStyleFlagEmoji(available[2]), "🇺🇸");
+  assert.equal(gameStyleToRulesetId("haitian"), "haitian");
+  assert.equal(gameStyleForRulesetId("haitian")?.id, "haitian");
+  assert.equal(normalizeGameStyleId("haitian"), "haitian");
+  assert.equal(gameStyleToRulesetId("american"), "american");
+  assert.equal(gameStyleForRulesetId("american")?.id, "american");
+  assert.equal(normalizeGameStyleId("american"), "american");
+  assert.ok(GAME_STYLES.some((s) => s.id === "american"));
+  section("Classic UI metadata maps to legacy; Haitian + American selectable");
 }
 
 // --- createMatch / startMatch stores rulesetId ---
@@ -192,6 +221,18 @@ function section(title) {
   const preserved = normalizeStateRuleset(stamped);
   assert.equal(preserved.rulesetId, "legacy");
   assert.equal(isValidSavedMatch({ version: MATCH_SAVE_VERSION, state: stamped }), true);
+
+  // Haitian save is preserved (never normalized to legacy).
+  const haitianState = startMatch({
+    seed: 77,
+    playerIds: ["you", "rival"],
+    rulesetId: "haitian",
+  });
+  assert.equal(normalizeStateRuleset(haitianState).rulesetId, "haitian");
+  assert.equal(
+    isValidSavedMatch({ version: MATCH_SAVE_VERSION, state: haitianState }),
+    true
+  );
 
   // Unknown ruleset id fails safely
   assert.equal(

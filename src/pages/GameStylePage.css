@@ -1,0 +1,299 @@
+.game-style {
+  --style-navy: #0c121c;
+  --style-navy-chip: #121a28;
+  --style-gold: rgba(201, 162, 39, 0.55);
+  --style-ink: #f2ede5;
+  --style-muted: rgba(169, 183, 195, 0.78);
+  --style-radius: 18px;
+  --style-radius-sm: 12px;
+
+  position: relative;
+  z-index: 40;
+  box-sizing: border-box;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding:
+    max(1.1rem, env(safe-area-inset-top))
+    max(1.1rem, env(safe-area-inset-right))
+    max(1.25rem, env(safe-area-inset-bottom))
+    max(1.1rem, env(safe-area-inset-left));
+  background: #05070c;
+  color: var(--style-ink);
+  -webkit-overflow-scrolling: touch;
+}
+
+.game-style__atmosphere {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.game-style__wood {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 68% 46% at 50% 14%, rgba(28, 48, 88, 0.28), transparent 58%),
+    radial-gradient(ellipse 50% 36% at 50% 78%, rgba(58, 40, 18, 0.14), transparent 64%),
+    linear-gradient(168deg, #0b1018 0%, #07090e 46%, #040508 100%);
+}
+
+.game-style__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 32%, transparent 18%, rgba(0, 0, 0, 0.66) 100%);
+}
+
+.game-style__shell {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 26.5rem);
+  margin-block: auto;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 2.8vh, 1.5rem);
+  padding-bottom: 0.35rem;
+}
+
+.game-style__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+}
+
+.game-style__back {
+  appearance: none;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.55rem 0.35rem 0.2rem;
+  border: 0;
+  background: transparent;
+  color: var(--style-muted);
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.game-style__back:hover {
+  color: var(--style-ink);
+}
+
+.game-style__back:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.game-style__back-chevron {
+  display: block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-inline-end: 0.15rem;
+}
+
+.game-style__back-label {
+  text-transform: uppercase;
+}
+
+.game-style__title {
+  margin: 0;
+  justify-self: center;
+  grid-column: 2;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: clamp(0.88rem, 2.6vw, 1rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--style-ink);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.game-style__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: clamp(1rem, 3vw, 1.35rem);
+  border: 1px solid var(--style-gold);
+  border-radius: var(--style-radius);
+  background:
+    linear-gradient(165deg, rgba(16, 24, 38, 0.94) 0%, rgba(10, 14, 22, 0.96) 100%);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+}
+
+.game-style__card {
+  appearance: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  width: 100%;
+  min-height: 4.25rem;
+  padding: 0.95rem 1rem;
+  text-align: left;
+  border: 1px solid rgba(120, 140, 168, 0.28);
+  border-radius: var(--style-radius-sm);
+  background: var(--style-navy-chip);
+  color: var(--style-ink);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.game-style__card:hover {
+  border-color: rgba(201, 162, 39, 0.42);
+}
+
+.game-style__card:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}
+
+.game-style__card--selected {
+  border-color: rgba(232, 197, 71, 0.72);
+  background: linear-gradient(180deg, rgba(212, 178, 74, 0.28) 0%, rgba(168, 132, 34, 0.22) 100%);
+  box-shadow: inset 0 0 0 1px rgba(232, 197, 71, 0.12);
+}
+
+.game-style__card--disabled,
+.game-style__card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.game-style__card-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.game-style__card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.game-style__flag {
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+img.game-style__flag {
+  display: block;
+  width: 1.3rem;
+  height: 0.88rem;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.game-style__card-name {
+  font-size: clamp(0.95rem, 2.8vw, 1.05rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--style-ink);
+}
+
+.game-style__card--selected .game-style__card-name {
+  color: #f3e2a4;
+}
+
+.game-style__card-desc {
+  margin: 0;
+  font-size: clamp(0.78rem, 2.2vw, 0.88rem);
+  line-height: 1.4;
+  color: var(--style-muted);
+}
+
+.game-style__card--selected .game-style__card-desc {
+  color: rgba(232, 210, 140, 0.82);
+}
+
+.game-style__mark {
+  flex-shrink: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.15rem;
+  border-radius: 50%;
+  border: 1.5px solid rgba(120, 140, 168, 0.4);
+  background: transparent;
+  box-shadow: none;
+}
+
+.game-style__mark--on {
+  border-color: rgba(232, 197, 71, 0.85);
+  background:
+    radial-gradient(circle at 50% 50%, #ebc84a 0 38%, transparent 40%),
+    rgba(201, 162, 39, 0.18);
+  box-shadow: 0 0 0 1px rgba(232, 197, 71, 0.2);
+}
+
+@media (min-width: 600px) {
+  .game-style__shell {
+    width: min(100%, 28.5rem);
+  }
+}
+
+@media (max-height: 720px) {
+  .game-style {
+    padding-block:
+      max(0.55rem, env(safe-area-inset-top))
+      max(0.7rem, env(safe-area-inset-bottom));
+  }
+
+  .game-style__shell {
+    gap: 0.75rem;
+  }
+
+  .game-style__panel {
+    gap: 0.55rem;
+    padding: 0.85rem;
+  }
+
+  .game-style__card {
+    min-height: 3.75rem;
+    padding: 0.8rem 0.9rem;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .game-style__shell {
+    width: min(100%, 34rem);
+    margin-block: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-style__card {
+    transition: none;
+  }
+}

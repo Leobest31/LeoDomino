@@ -16,6 +16,7 @@ export default {
     confirm: "Confirmer",
     cancel: "Annuler",
     continue: "Continuer",
+    back: "Retour",
     ok: "OK",
   },
   home: {
@@ -46,11 +47,25 @@ export default {
     gameStyle: {
       label: "Style de jeu",
       aria: "Choisir le style de jeu",
+      openAria: "Ouvrir l’écran du style de jeu",
+      screenAria: "Écran de style de jeu LeoDomino",
       classic: "Classique",
       classicDescription:
         "Piochez jusqu’à pouvoir jouer. Passez quand la réserve est vide. Premier à 100.",
       classicSummary:
         "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
+      haitian: "Haïtien",
+      haitianDescription:
+        "Premier à 4 points de match. Victoire +1, bloqué +1, Dekabès +2. La manche 1 s’ouvre avec 6-6.",
+      haitianSummary:
+        "Double-six · 7 tuiles · deux bouts ouverts · premier à 4 points de match · victoire +1 · bloqué +1 · Dekabès +2 · 6-6 ouvre la manche 1",
+      american: "Américain",
+      americanDescription:
+        "Draw Domino américain. Jouez sur l’un des deux bouts, piochez jusqu’à pouvoir jouer, passez si vide. Premier à 100.",
+      americanSummary:
+        "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
+      unsupportedPlayerCount:
+        "Le style haïtien n’est pas encore disponible pour {{n}} joueurs. Choisissez 2 ou 4 joueurs, ou Classique.",
     },
   },
   game: {
@@ -60,6 +75,7 @@ export default {
     newMatch: "Nouvelle partie",
     round: "Manche",
     playToLabel: "Jusqu’à",
+    matchPointsLabel: "Points de match",
     yourHand: "Votre main",
     scoreboard: "Score",
     table: "Table de dominos",
@@ -98,6 +114,8 @@ export default {
     roundBlocked: "La partie est bloquée",
     matchWon: "{{name}} gagne la partie",
     pointsAwarded: "+{{points}} points",
+    dekabes: "Dekabès !",
+    dekabesAwarded: "DEKABÈS +{{points}}",
     nextRound: "Manche suivante",
     starter: "{{name}} commence avec {{tile}}",
     starterFree: "{{name}} commence",

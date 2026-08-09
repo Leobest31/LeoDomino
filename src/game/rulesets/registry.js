@@ -4,6 +4,8 @@
  */
 
 import { LEGACY_RULESET_ID, legacyRuleset } from "./legacy.js";
+import { HAITIAN_RULESET_ID, haitianRuleset } from "./haitian.js";
+import { AMERICAN_RULESET_ID, americanRuleset } from "./american.js";
 
 /** @type {Map<string, object>} */
 const REGISTRY = new Map();
@@ -14,9 +16,19 @@ export const DEFAULT_RULESET_ID = LEGACY_RULESET_ID;
 export const RULESET_STORAGE_KEY = "leodomino.rulesetId";
 
 /**
- * UI-facing game style catalog.
- * `id` is the Setup chip id; `rulesetId` is what the match engine stores.
- * Only Classic is exposed for V1 — architecture supports more later.
+ * UI-facing game style catalog (single registry for Setup / Game Style screens).
+ * `id` is the UI style id; `rulesetId` is what the match engine stores.
+ * Add future variants here (countryCode, enabled, available) — do not hard-code lists in pages.
+ *
+ * @typedef {{
+ *   id: string,
+ *   rulesetId: string,
+ *   nameKey: string,
+ *   descriptionKey?: string,
+ *   countryCode?: string|null,
+ *   enabled: boolean,
+ *   available: boolean,
+ * }} GameStyleEntry
  */
 export const GAME_STYLES = Object.freeze([
   Object.freeze({
@@ -24,6 +36,26 @@ export const GAME_STYLES = Object.freeze([
     rulesetId: LEGACY_RULESET_ID,
     nameKey: "setup.gameStyle.classic",
     descriptionKey: "setup.gameStyle.classicDescription",
+    countryCode: null,
+    enabled: true,
+    available: true,
+  }),
+  Object.freeze({
+    id: "haitian",
+    rulesetId: HAITIAN_RULESET_ID,
+    nameKey: "setup.gameStyle.haitian",
+    descriptionKey: "setup.gameStyle.haitianDescription",
+    countryCode: "HT",
+    enabled: true,
+    available: true,
+  }),
+  Object.freeze({
+    id: "american",
+    rulesetId: AMERICAN_RULESET_ID,
+    nameKey: "setup.gameStyle.american",
+    descriptionKey: "setup.gameStyle.americanDescription",
+    countryCode: "US",
+    enabled: true,
     available: true,
   }),
 ]);
@@ -116,11 +148,29 @@ export function resolveHandSize(ruleset, playerCount) {
 }
 
 /**
- * Game styles available for Setup selection (available !== false).
+ * Whether a player count is supported by the ruleset.
+ * Uses `supportedPlayerCounts` when present; otherwise min/max inclusive.
+ * @param {object} ruleset
+ * @param {number} playerCount
+ * @returns {boolean}
+ */
+export function isPlayerCountSupported(ruleset, playerCount) {
+  const n = Number(playerCount);
+  if (!Number.isFinite(n)) return false;
+  if (Array.isArray(ruleset.supportedPlayerCounts)) {
+    return ruleset.supportedPlayerCounts.includes(n);
+  }
+  const min = ruleset.playerCount?.min ?? 2;
+  const max = ruleset.playerCount?.max ?? 4;
+  return n >= min && n <= max;
+}
+
+/**
+ * Game styles available for selection (enabled + available).
  * @returns {ReadonlyArray<object>}
  */
 export function listAvailableGameStyles() {
-  return GAME_STYLES.filter((style) => style.available);
+  return GAME_STYLES.filter((style) => style.enabled !== false && style.available);
 }
 
 /**
@@ -146,7 +196,7 @@ export function getGameStyle(styleId) {
  */
 export function gameStyleToRulesetId(styleId) {
   const style = getGameStyle(styleId);
-  if (!style || !style.available) return null;
+  if (!style || !style.available || style.enabled === false) return null;
   return style.rulesetId;
 }
 
@@ -167,11 +217,30 @@ export function gameStyleForRulesetId(rulesetId) {
 export function normalizeGameStyleId(rulesetIdOrStyleId) {
   if (rulesetIdOrStyleId === DEFAULT_GAME_STYLE_ID) return DEFAULT_GAME_STYLE_ID;
   const byStyle = getGameStyle(/** @type {string} */ (rulesetIdOrStyleId));
-  if (byStyle?.available) return byStyle.id;
+  if (byStyle?.available && byStyle.enabled !== false) return byStyle.id;
   const byRuleset = gameStyleForRulesetId(/** @type {string} */ (rulesetIdOrStyleId));
-  if (byRuleset?.available) return byRuleset.id;
+  if (byRuleset?.available && byRuleset.enabled !== false) return byRuleset.id;
   return DEFAULT_GAME_STYLE_ID;
 }
 
-// Boot: register the sole V1 engine ruleset.
+/**
+ * Setup compatibility: style available AND ruleset supports the seat count.
+ * @param {string} styleId
+ * @param {number} playerCount
+ * @returns {boolean}
+ */
+export function isGameStyleCompatibleWithPlayerCount(styleId, playerCount) {
+  const style = getGameStyle(styleId);
+  if (!style?.available || style.enabled === false) return false;
+  try {
+    const ruleset = resolveRuleset(style.rulesetId);
+    return isPlayerCountSupported(ruleset, playerCount);
+  } catch {
+    return false;
+  }
+}
+
+// Boot: register engine rulesets.
 registerRuleset(legacyRuleset);
+registerRuleset(haitianRuleset);
+registerRuleset(americanRuleset);

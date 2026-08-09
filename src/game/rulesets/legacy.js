@@ -52,6 +52,9 @@ export const legacyRuleset = Object.freeze({
   // —— Legal placement ——
   boardModel: "linearTwoEnds",
 
+  // —— Turn order (felt CCW via nextPlayerIndex; unchanged) ——
+  turnOrder: "counterClockwise",
+
   // —— Draw / pass / blocked ——
   drawPolicy: "drawUntilPlayable",
   passPolicy: "passWhenReserveEmpty",
@@ -63,6 +66,7 @@ export const legacyRuleset = Object.freeze({
   roundScoreMode: "sumOpponentPips",
   defaultTargetScore: DEFAULT_TARGET_SCORE,
   matchWinMode: "firstToReach",
+  hudScoreFormat: "absolute",
 
   /**
    * Strategy hooks — used only where enum config is insufficient.

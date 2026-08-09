@@ -58,6 +58,7 @@ function AnimatedValue({ value }) {
 
 /**
  * Table HUD scores — one row per seat (2 / 3 / 4 players).
+ * scoreFormat "ofTarget" shows Haitian-style "X / 4" per seat.
  */
 function ScoreBoard({
   scores = [],
@@ -65,8 +66,10 @@ function ScoreBoard({
   humanIndex = 0,
   target = 100,
   round = 1,
+  scoreFormat = "absolute",
 }) {
   const { t, formatNumber } = useI18n();
+  const ofTarget = scoreFormat === "ofTarget";
   const rows =
     scores.length > 0
       ? scores.map((score, index) => ({
@@ -100,7 +103,20 @@ function ScoreBoard({
             </span>
             {row.name}
           </span>
-          <AnimatedValue value={row.score} />
+          {ofTarget ? (
+            <span
+              className="scoreboard__of-target"
+              aria-label={`${formatNumber(row.score)} / ${formatNumber(target)}`}
+            >
+              <AnimatedValue value={row.score} />
+              <span className="scoreboard__of-target-sep" aria-hidden="true">
+                {" "}
+                / {formatNumber(target)}
+              </span>
+            </span>
+          ) : (
+            <AnimatedValue value={row.score} />
+          )}
         </div>
       ))}
 
@@ -109,7 +125,7 @@ function ScoreBoard({
           <span className="scoreboard__icon" aria-hidden="true">
             🎯
           </span>
-          {t("game.playToLabel")}
+          {ofTarget ? t("game.matchPointsLabel") : t("game.playToLabel")}
         </span>
         <span className="scoreboard__value scoreboard__value--target">{formatNumber(target)}</span>
       </div>

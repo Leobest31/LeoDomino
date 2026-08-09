@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import SplashPage from "./pages/SplashPage";
 import GameSetupPage from "./pages/GameSetupPage";
+import GameStylePage from "./pages/GameStylePage";
 import GamePage from "./pages/GamePage";
 import "./App.css";
 
-/** @typedef {"intro" | "setup" | "game"} AppPhase */
+/** @typedef {"intro" | "setup" | "gameStyle" | "game"} AppPhase */
 
 /**
  * Startup: brand intro → game setup → table.
+ * Game Style is a setup sub-screen (preference only; does not start a match).
  * Match mounts only after PLAY (or Resume). Main Menu returns to setup.
  */
 function App() {
@@ -54,12 +56,11 @@ function App() {
     setPhase("setup");
   };
 
+  const bootShell =
+    phase === "intro" || phase === "setup" || phase === "gameStyle";
+
   return (
-    <div
-      className={`app app--game${
-        phase === "intro" || phase === "setup" ? " app--booting" : ""
-      }`}
-    >
+    <div className={`app app--game${bootShell ? " app--booting" : ""}`}>
       {phase === "intro" ? (
         <SplashPage
           exiting={splashExiting}
@@ -69,7 +70,15 @@ function App() {
       ) : null}
 
       {phase === "setup" ? (
-        <GameSetupPage onPlay={handlePlay} onResume={handleResume} />
+        <GameSetupPage
+          onPlay={handlePlay}
+          onResume={handleResume}
+          onOpenGameStyle={() => setPhase("gameStyle")}
+        />
+      ) : null}
+
+      {phase === "gameStyle" ? (
+        <GameStylePage onBack={() => setPhase("setup")} />
       ) : null}
 
       {phase === "game" ? (

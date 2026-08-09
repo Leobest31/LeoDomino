@@ -19,6 +19,7 @@ export default {
     confirm: "Konfime",
     cancel: "Anile",
     continue: "Kontinye",
+    back: "Retounen",
     ok: "OK",
   },
   home: {
@@ -49,11 +50,25 @@ export default {
     gameStyle: {
       label: "Stil jwèt",
       aria: "Chwazi stil jwèt la",
+      openAria: "Louvri ekran stil jwèt",
+      screenAria: "Ekran stil jwèt LeoDomino",
       classic: "Klasik",
       classicDescription:
         "Tire jiskaske ou ka jwe. Pase lè rezèv la vid. Premye ki rive 100.",
       classicSummary:
         "Doub-sis · 7 donmino · de bout ouvè · tire jiskaske ou ka jwe · pase lè vid · jwe jiska 100",
+      haitian: "Ayisyen",
+      haitianDescription:
+        "Premye ki rive 4 pwen match. Genyen +1, bloke +1, Dekabès +2. Premye wo a louvri ak 6-6.",
+      haitianSummary:
+        "Doub-sis · 7 donmino · de bout ouvè · premye ki rive 4 pwen match · genyen +1 · bloke +1 · Dekabès +2 · 6-6 louvri premye wo a",
+      american: "Ameriken",
+      americanDescription:
+        "Draw Domino Ameriken. Matche nenpòt bout, tire jiskaske ou ka jwe, pase lè rezèv la vid. Premye ki rive 100.",
+      americanSummary:
+        "Doub-sis · 7 donmino · de bout ouvè · tire jiskaske ou ka jwe · pase lè vid · jwe jiska 100",
+      unsupportedPlayerCount:
+        "Stil Ayisyen pa disponib pou {{n}} jwè pou kounye a. Chwazi 2 oswa 4 jwè, oswa Klasik.",
     },
   },
   game: {
@@ -63,6 +78,7 @@ export default {
     newMatch: "Nouvo match",
     round: "Wo",
     playToLabel: "Jouk",
+    matchPointsLabel: "Pwen match",
     yourHand: "Men ou",
     scoreboard: "Nòt",
     table: "Tab domino",
@@ -101,6 +117,8 @@ export default {
     roundBlocked: "Jwèt la bloke",
     matchWon: "{{name}} genyen match la",
     pointsAwarded: "+{{points}} pwen",
+    dekabes: "Dekabès!",
+    dekabesAwarded: "DEKABÈS +{{points}}",
     nextRound: "Pwochen wo",
     starter: "{{name}} kòmanse ak {{tile}}",
     starterFree: "{{name}} kòmanse",

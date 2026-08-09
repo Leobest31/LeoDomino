@@ -15,6 +15,7 @@ import {
 import { nextPlayerIndex } from "../players.js";
 import {
   DEFAULT_RULESET_ID,
+  isPlayerCountSupported,
   normalizeRulesetId,
   resolveHandSize,
   resolveRuleset,
@@ -43,6 +44,9 @@ import { handPipTotal } from "./scoring.js";
  * @property {Record<string, string|number>|null} statusVars
  */
 
+const OPENING_TILE_MISSING = "OPENING_TILE_MISSING";
+const MAX_OPENING_REDEALS = 256;
+
 /**
  * @param {GameState|object} state
  */
@@ -58,25 +62,50 @@ export function startMatch(options = {}) {
   const rulesetId = normalizeRulesetId(options.rulesetId);
   const ruleset = resolveRuleset(rulesetId);
   const targetScore = options.targetScore ?? ruleset.defaultTargetScore;
-  const playerCount = options.playerCount;
+  const playerCount = options.playerCount ?? options.playerIds?.length ?? 2;
+  if (!isPlayerCountSupported(ruleset, playerCount)) {
+    throw new Error(
+      `Ruleset ${rulesetId} does not support ${playerCount}-player matches`
+    );
+  }
   const handSize = options.handSize ?? resolveHandSize(ruleset, playerCount);
-  const base = createMatch({
-    ...options,
-    handSize,
-    rulesetId,
-  });
-  return beginRound(base, {
-    scores: Array.from({ length: base.players.length }, () => 0),
-    round: 1,
-    targetScore,
-    rulesetId,
-  });
+  const seed0 = options.seed ?? Date.now();
+  const allowRedeal = Boolean(ruleset.redealUntilOpeningTile);
+  const maxAttempts = allowRedeal ? MAX_OPENING_REDEALS : 1;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const seed =
+      typeof seed0 === "number" && Number.isFinite(seed0) ? seed0 + attempt : seed0;
+    const base = createMatch({
+      ...options,
+      seed,
+      handSize,
+      rulesetId,
+      playerCount,
+    });
+    try {
+      return beginRound(base, {
+        scores: Array.from({ length: base.players.length }, () => 0),
+        round: 1,
+        targetScore,
+        rulesetId,
+      });
+    } catch (err) {
+      const code = /** @type {{ code?: string }} */ (err)?.code;
+      if (code === OPENING_TILE_MISSING && attempt + 1 < maxAttempts) {
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw new Error("Unable to deal a legal Round 1 opening");
 }
 
 /**
  * Deal is already done on `base`; attach round fields + starter.
  *
- * Round 1: highest double (else highest tile) starts and must open with that tile.
+ * Round 1: ruleset round1Starter policy (legacy highest double / Haitian 6-6).
  * Later rounds: previous round winner starts and may open with any tile.
  *
  * @param {object} base - createMatch result
@@ -105,8 +134,16 @@ function beginRound(base, meta) {
       throw new Error("Later rounds require the previous round winner as starter");
     }
     playerIndex = meta.starterIndex;
-  } else if (ruleset.round1Starter === "highestDoubleElseHighest") {
+  } else if (
+    ruleset.round1Starter === "highestDoubleElseHighest" ||
+    ruleset.round1Starter === "doubleSix"
+  ) {
     const chosen = ruleset.policies.chooseStartingPlayer(base.players, base.byId);
+    if (!chosen) {
+      const err = new Error("Opening tile not dealt");
+      /** @type {{ code?: string }} */ (err).code = OPENING_TILE_MISSING;
+      throw err;
+    }
     playerIndex = chosen.playerIndex;
     tileId = ruleset.forceOpeningTile ? chosen.tileId : null;
   } else {
@@ -202,39 +239,75 @@ function advancePlayer(state) {
  */
 function finishRound(state, winnerIndex, reason) {
   const ruleset = rulesetOf(state);
+  const isDekabes = reason === ROUND_END_REASON.DEKABES;
   let points = 0;
-  if (ruleset.roundScoreMode === "sumOpponentPips") {
+  if (
+    ruleset.roundScoreMode === "sumOpponentPips" ||
+    ruleset.roundScoreMode === "matchPoints"
+  ) {
     points = ruleset.policies.calculateRoundPoints({
       winnerIndex,
       players: state.players,
       byId: state.byId,
+      reason,
+      isDekabes,
     });
   } else {
     throw new Error(`Unsupported roundScoreMode: ${ruleset.roundScoreMode}`);
   }
 
-  const scores = state.scores.slice();
-  scores[winnerIndex] += points;
+  /** @type {number[]} */
+  let scores;
+  if (typeof ruleset.policies.afterRoundScoreUpdate === "function") {
+    scores = ruleset.policies.afterRoundScoreUpdate({
+      scores: state.scores,
+      winnerIndex,
+      points,
+      targetScore: state.targetScore,
+    });
+  } else {
+    scores = state.scores.slice();
+    scores[winnerIndex] += points;
+  }
 
-  const reached =
-    ruleset.matchWinMode === "firstToReach"
-      ? scores.findIndex((score) => score >= state.targetScore)
-      : -1;
-  const matchOver = reached !== -1;
+  /** @type {number|null} */
+  let matchWinner = null;
+  if (typeof ruleset.policies.isMatchWon === "function") {
+    if (
+      ruleset.policies.isMatchWon({
+        scores,
+        winnerIndex,
+        targetScore: state.targetScore,
+      })
+    ) {
+      matchWinner = winnerIndex;
+    }
+  } else if (ruleset.matchWinMode === "firstToReach") {
+    const reached = scores.findIndex((score) => score >= state.targetScore);
+    if (reached !== -1) matchWinner = reached;
+  }
+  const matchOver = matchWinner != null;
+
+  /** @type {string} */
+  let statusKey = matchOver ? "rules.matchWon" : "rules.roundWon";
+  if (!matchOver && isDekabes) {
+    statusKey = "rules.dekabes";
+  }
 
   return {
     ...state,
     scores,
     phase: matchOver ? PHASE.MATCH_OVER : PHASE.ROUND_OVER,
-    matchWinner: matchOver ? reached : null,
+    matchWinner,
     mustPlayTileId: null,
     consecutivePasses: 0,
     roundResult: {
       reason,
       winnerIndex,
       points,
+      ...(isDekabes ? { dekabes: true } : {}),
     },
-    statusKey: matchOver ? "rules.matchWon" : "rules.roundWon",
+    statusKey,
     statusVars: {
       name: state.players[winnerIndex].id,
       points,
@@ -309,6 +382,17 @@ export function playTile(state, tileId, end = END.RIGHT) {
     throw new Error(`Illegal placement: ${tileId} on ${end}`);
   }
 
+  const ruleset = rulesetOf(state);
+  const handBefore = state.players[state.currentPlayer].hand;
+  const dekabes =
+    typeof ruleset.policies.isDekabes === "function" &&
+    ruleset.policies.isDekabes({
+      tileId,
+      hand: handBefore,
+      board: state.board,
+      byId: state.byId,
+    });
+
   let next = /** @type {GameState} */ ({
     ...applyPlace(state, state.currentPlayer, tileId, chosen.end),
     phase: state.phase,
@@ -327,7 +411,8 @@ export function playTile(state, tileId, end = END.RIGHT) {
 
   // Domino out?
   if (next.players[state.currentPlayer].hand.length === 0) {
-    return finishRound(next, state.currentPlayer, ROUND_END_REASON.DOMINO);
+    const reason = dekabes ? ROUND_END_REASON.DEKABES : ROUND_END_REASON.DOMINO;
+    return finishRound(next, state.currentPlayer, reason);
   }
 
   return advancePlayer(next);
@@ -432,6 +517,11 @@ export function startNextRound(state, dealOptions = {}) {
 
   const rulesetId = normalizeRulesetId(state.rulesetId);
   const ruleset = resolveRuleset(rulesetId);
+  if (!isPlayerCountSupported(ruleset, state.players.length)) {
+    throw new Error(
+      `Ruleset ${rulesetId} does not support ${state.players.length}-player matches`
+    );
+  }
   const handSize =
     dealOptions.handSize ?? resolveHandSize(ruleset, state.players.length);
 

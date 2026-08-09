@@ -14,4 +14,6 @@ export const PHASE = Object.freeze({
 export const ROUND_END_REASON = Object.freeze({
   DOMINO: "domino",
   BLOCKED: "blocked",
+  /** Haitian: final non-double playable on both open ends. */
+  DEKABES: "dekabes",
 });

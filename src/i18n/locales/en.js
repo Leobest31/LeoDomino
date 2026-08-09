@@ -16,6 +16,7 @@ export default {
     confirm: "Confirm",
     cancel: "Cancel",
     continue: "Continue",
+    back: "Back",
     ok: "OK",
   },
   home: {
@@ -46,11 +47,25 @@ export default {
     gameStyle: {
       label: "Game style",
       aria: "Choose game style",
+      openAria: "Open game style screen",
+      screenAria: "LeoDomino game style screen",
       classic: "Classic",
       classicDescription:
         "Draw until you can play. Pass when the boneyard is empty. First to 100.",
       classicSummary:
         "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
+      haitian: "Haitian",
+      haitianDescription:
+        "First to 4 match points. Win +1, blocked +1, Dekabès +2. Round 1 opens with 6-6.",
+      haitianSummary:
+        "Double-six · 7 tiles · two open ends · first to 4 match points · win +1 · blocked +1 · Dekabès +2 · 6-6 opens round 1",
+      american: "American",
+      americanDescription:
+        "American Draw Dominoes. Match either end, draw until you can play, pass when empty. First to 100.",
+      americanSummary:
+        "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
+      unsupportedPlayerCount:
+        "Haitian is not available for {{n}} players yet. Choose 2 or 4 players, or Classic.",
     },
   },
   game: {
@@ -60,6 +75,7 @@ export default {
     newMatch: "New Match",
     round: "Round",
     playToLabel: "Play to",
+    matchPointsLabel: "Match points",
     yourHand: "Your hand",
     scoreboard: "Scoreboard",
     table: "Domino table",
@@ -98,6 +114,8 @@ export default {
     roundBlocked: "The game is blocked",
     matchWon: "{{name}} wins the match",
     pointsAwarded: "+{{points}} points",
+    dekabes: "Dekabès!",
+    dekabesAwarded: "DEKABÈS +{{points}}",
     nextRound: "Next round",
     starter: "{{name}} starts with {{tile}}",
     starterFree: "{{name}} starts",

@@ -19,11 +19,33 @@
 
 .scoreboard__line {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.75rem;
+  grid-template-columns: minmax(0, 1fr) minmax(2.75rem, auto);
   align-items: center;
   column-gap: 0.55rem;
   min-height: 1.45rem;
   padding: 0.22rem 0;
+}
+
+.scoreboard__of-target {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.scoreboard__of-target .scoreboard__points {
+  width: auto;
+}
+
+.scoreboard__of-target-sep {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .scoreboard__label {

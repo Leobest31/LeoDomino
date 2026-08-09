@@ -17,12 +17,14 @@ import { useFlightDirector } from "../hooks/useFlightDirector";
 import { usePrefs } from "../hooks/usePrefs.js";
 import {
   PHASE,
+  ROUND_END_REASON,
   getAvailableActions,
   isAmbiguousPlacement,
   isAutoPlaceable,
   legalEndsForTile,
   resolvePlayChoice,
   opponentFeltPosition,
+  resolveRuleset,
 } from "../game/index.js";
 import { MOTION, wait } from "../utils/motion.js";
 import "./GamePage.css";
@@ -602,12 +604,17 @@ function GamePage({ onMainMenu, matchOptions = null }) {
             Math.max(0, winnerIndex - 1),
             Math.max(1, state.players.length - 1)
           );
+      const pointsLabel =
+        state.roundResult.reason === ROUND_END_REASON.DEKABES
+          ? t("rules.dekabesAwarded", { points: state.roundResult.points })
+          : t("rules.pointsAwarded", { points: state.roundResult.points });
       setBanner({
         variant: "round",
-        title: t("dialog.roundOver"),
-        subtitle: `${winnerName} · ${t("rules.pointsAwarded", {
-          points: state.roundResult.points,
-        })}`,
+        title:
+          state.roundResult.reason === ROUND_END_REASON.DEKABES
+            ? t("rules.dekabes")
+            : t("dialog.roundOver"),
+        subtitle: `${winnerName} · ${pointsLabel}`,
       });
       const timer = window.setTimeout(() => setBanner(null), MOTION.bannerMs);
       return () => window.clearTimeout(timer);
@@ -761,6 +768,9 @@ function GamePage({ onMainMenu, matchOptions = null }) {
                   humanIndex={HUMAN_INDEX}
                   target={state.targetScore}
                   round={state.round}
+                  scoreFormat={
+                    resolveRuleset(state.rulesetId).hudScoreFormat ?? "absolute"
+                  }
                 />
               </div>
 

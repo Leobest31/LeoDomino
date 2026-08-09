@@ -15,6 +15,17 @@ export {
 
 export { chooseStartingPlayer } from "./start.js";
 
+export { isDekabes } from "./dekabes.js";
+export {
+  HAITIAN_OPENING_TILE_ID,
+  chooseDoubleSixStarter,
+} from "./haitianStart.js";
+export {
+  calculateHaitianRoundPoints,
+  applyHaitianAfterRoundScoreUpdate,
+  isHaitianMatchWon,
+} from "./haitianScoring.js";
+
 export {
   startMatch,
   getCurrentLegalMoves,
