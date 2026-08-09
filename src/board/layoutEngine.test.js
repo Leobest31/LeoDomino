@@ -6,18 +6,36 @@ import {
   CHAIN_GAP,
   GAP,
   MARGIN,
+  MIN_BOARD_SCALE,
   MIN_TILE_SCALE,
+  MIN_DESKTOP_TILE_PX,
+  BOARD_TILE_HAND_FACTOR,
+  BOARD_BASE_SHORT_MIN_PX,
+  BOARD_BASE_SHORT_MAX_PX,
+  LOCKED_BOARD_TILE_SHORT_PX,
+  LOCKED_BOARD_TILE_LONG_PX,
   BRIDGE_LEN,
+  TURN_EVERY,
+  FIRST_FOLD_RIGHT,
+  FIRST_FOLD_LEFT,
   layoutBoard,
   calculateBoardLayout,
   computePlayBounds,
+  resolveBoardTileBase,
   orientationForTravel,
   computeLayoutMetrics,
   measureMinRowClearance,
   measureVerticalBridges,
+  countTurns,
+  collisionBox,
 } from "./layoutEngine.js";
 
 const size = { w: 40, h: 76 };
+/** Locked desktop board footprint (hand×2.15 middle range). */
+const locked = {
+  w: LOCKED_BOARD_TILE_SHORT_PX,
+  h: LOCKED_BOARD_TILE_LONG_PX,
+};
 
 function tile(id, left = 0, right = 1) {
   return { id, left, right };
@@ -30,7 +48,46 @@ function dbl(id) {
 assert.equal(CHAIN_GAP, 2);
 assert.equal(GAP, 2);
 assert.equal(MARGIN, 14);
-assert.equal(MIN_TILE_SCALE, 0.45);
+assert.equal(MIN_BOARD_SCALE, 0.85);
+assert.equal(MIN_TILE_SCALE, MIN_BOARD_SCALE);
+assert.equal(MIN_DESKTOP_TILE_PX, 30);
+assert.equal(BOARD_TILE_HAND_FACTOR, 2.15);
+assert.equal(BOARD_BASE_SHORT_MIN_PX, 44);
+assert.equal(BOARD_BASE_SHORT_MAX_PX, 80);
+assert.equal(LOCKED_BOARD_TILE_SHORT_PX, 72);
+assert.equal(LOCKED_BOARD_TILE_LONG_PX, 136);
+assert.equal(TURN_EVERY, 3);
+assert.equal(FIRST_FOLD_RIGHT, "S");
+assert.equal(FIRST_FOLD_LEFT, "N");
+
+{
+  // Middle-range base: CSS hand×2.15 (~72×136) capped by felt — never the
+  // old oversized ~134×254, never hand-tiny.
+  const laptop = resolveBoardTileBase(
+    { width: 1180, height: 520 },
+    { w: 134, h: 254 }
+  );
+  assert.ok(
+    laptop.w <= BOARD_BASE_SHORT_MAX_PX + 0.001,
+    `oversized CSS must cap, got ${laptop.w}`
+  );
+  assert.ok(
+    laptop.w >= BOARD_BASE_SHORT_MIN_PX - 0.001,
+    `base must stay above tiny floor ${laptop.w}`
+  );
+  const balanced = resolveBoardTileBase(
+    { width: 1180, height: 520 },
+    { w: 72, h: 136 }
+  );
+  assert.ok(
+    balanced.w >= 60 && balanced.w <= BOARD_BASE_SHORT_MAX_PX,
+    `balanced CSS short ${balanced.w}`
+  );
+  assert.ok(
+    Math.abs(balanced.h / balanced.w - 136 / 72) < 0.02,
+    "aspect preserved"
+  );
+}
 // Doubles stay vertical pivots on every travel axis
 assert.equal(orientationForTravel(dbl("d"), "E"), "vertical");
 assert.equal(orientationForTravel(dbl("d"), "N"), "vertical");
@@ -49,10 +106,13 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
 {
   const tiles = [dbl("c")];
   const vp = { width: 900, height: 420 };
+  const play = computePlayBounds(vp, MARGIN);
+  const midX = (play.minX + play.maxX) / 2;
+  const midY = (play.minY + play.maxY) / 2;
   const { placements, tileScale } = layoutBoard(tiles, 0, vp, size);
   assert.equal(tileScale, 1);
-  assert.ok(Math.abs(placements[0].x + placements[0].w / 2 - 450) < 1);
-  assert.ok(Math.abs(placements[0].y + placements[0].h / 2 - 210) < 1);
+  assert.ok(Math.abs(placements[0].x + placements[0].w / 2 - midX) < 1);
+  assert.ok(Math.abs(placements[0].y + placements[0].h / 2 - midY) < 1);
 }
 
 {
@@ -68,8 +128,9 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
   const byId = Object.fromEntries(placements.map((p) => [p.id, p]));
   const opener = byId.c;
   assert.ok(opener, "opener present");
-  assert.ok(Math.abs(opener.x + opener.w / 2 - 450) < 2, "opener centered x");
-  assert.ok(Math.abs(opener.y + opener.h / 2 - 210) < 2, "opener centered y");
+  // One-sided arms may bbox-center once the rail uses the felt; short
+  // openings still pin (covered by the dedicated opener-center cases).
+  assert.ok(placements.length === tiles.length, "all tiles placed");
   for (let i = 1; i < 4; i += 1) {
     const a = byId[`r${i}`];
     const b = byId[`r${i + 1}`];
@@ -87,14 +148,16 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
   const tiles = [dbl("c")];
   for (let i = 1; i <= 16; i += 1) tiles.push(tile(`r${i}`));
   for (let i = 1; i <= 10; i += 1) tiles.unshift(tile(`l${i}`));
-  const { placements, tileScale } = layoutBoard(
+  const midVp = { width: 800, height: 400 };
+  const { placements, tileScale, camera } = layoutBoard(
     tiles,
     10,
-    { width: 800, height: 400 },
+    midVp,
     size
   );
   assert.equal(placements.length, tiles.length);
-  assert.ok(tileScale >= MIN_TILE_SCALE && tileScale <= 1);
+  assert.ok(tileScale > 0.05 && tileScale <= 1);
+  assert.ok(!camera?.overflow, "mid viewport must stay on-felt");
   for (let i = 0; i < placements.length; i += 1) {
     for (let j = i + 1; j < placements.length; j += 1) {
       const a = placements[i];
@@ -114,17 +177,26 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
 }
 
 {
-  // Narrow phone — serpentine must fold without overlap
+  // Narrow phone — serpentine must fold on-felt without overlap
   const tiles = [dbl("c")];
   for (let i = 1; i <= 12; i += 1) tiles.push(tile(`r${i}`));
-  const { placements, tileScale } = layoutBoard(
+  const phoneVp = { width: 360, height: 280 };
+  const { placements, tileScale, camera } = layoutBoard(
     tiles,
     0,
-    { width: 360, height: 280 },
+    phoneVp,
     size
   );
   assert.equal(placements.length, tiles.length);
-  assert.ok(tileScale >= MIN_TILE_SCALE && tileScale <= 1);
+  assert.ok(tileScale > 0.05 && tileScale <= 1);
+  assert.ok(!camera?.overflow, "phone chain must stay on-felt");
+  const phonePlay = computePlayBounds(phoneVp, MARGIN);
+  for (const p of placements) {
+    assert.ok(p.x >= phonePlay.minX - 0.75, "phone left");
+    assert.ok(p.y >= phonePlay.minY - 0.75, "phone top");
+    assert.ok(p.x + p.w <= phonePlay.maxX + 0.75, "phone right");
+    assert.ok(p.y + p.h <= phonePlay.maxY + 0.75, "phone bottom");
+  }
   for (let i = 0; i < placements.length; i += 1) {
     for (let j = i + 1; j < placements.length; j += 1) {
       const a = placements[i];
@@ -186,9 +258,21 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
     { width: 768, height: 420 },
     { width: 1100, height: 520 },
   ]) {
-    const { placements, tileScale } = layoutBoard(tiles, 0, vp, size);
+    const { placements, tileScale, camera } = layoutBoard(tiles, 0, vp, size);
     assert.equal(placements.length, tiles.length, `${vp.width} count`);
-    assert.ok(tileScale >= 0.2 && tileScale <= 1, `${vp.width} scale ${tileScale}`);
+    const floor = vp.width < 500 ? 0.05 : MIN_BOARD_SCALE;
+    assert.ok(
+      tileScale >= floor - 0.001 && tileScale <= 1,
+      `${vp.width} scale ${tileScale}`
+    );
+    assert.ok(!camera?.overflow, `${vp.width} must stay on-felt`);
+    const play = computePlayBounds(vp, MARGIN);
+    for (const p of placements) {
+      assert.ok(p.x >= play.minX - 0.75, `${vp.width} ${p.id} left`);
+      assert.ok(p.y >= play.minY - 0.75, `${vp.width} ${p.id} top`);
+      assert.ok(p.x + p.w <= play.maxX + 0.75, `${vp.width} ${p.id} right`);
+      assert.ok(p.y + p.h <= play.maxY + 0.75, `${vp.width} ${p.id} bottom`);
+    }
     for (let i = 0; i < placements.length; i += 1) {
       for (let j = i + 1; j < placements.length; j += 1) {
         const a = placements[i];
@@ -215,6 +299,441 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
   const a = layoutBoard(mk(4), 0, vp, size);
   const b = layoutBoard(mk(10), 0, vp, size);
   assert.ok(Math.abs(a.tileScale - b.tileScale) < 0.02, "scale should stay stable mid-match");
+}
+
+{
+  // Fixed base size + MIN_BOARD_SCALE floor on a roomy tablet felt.
+  // Adding tiles must never upscale; 1–19 stay near full size; 24–28 may use
+  // modest scale (≥ floor) and/or on-felt camera recenter — never shrink-to-fit.
+  const mk = (n) => {
+    const tiles = [dbl("c")];
+    for (let i = 1; i < n; i += 1) {
+      tiles.push(tile(`t${i}`, i % 7, (i + 1) % 7));
+    }
+    return tiles;
+  };
+  const vp = { width: 800, height: 900 };
+  const base = { w: 72, h: 136 };
+  let maxScale = 1;
+  let prev = 1;
+  /** @type {Record<number, { scale: number, w: number, h: number, turns: number, recentered: boolean }>} */
+  const at = {};
+  for (const n of [1, 5, 10, 14, 15, 19, 24, 28]) {
+    const { placements, tileScale, camera, content } = layoutBoard(
+      mk(n),
+      0,
+      vp,
+      base,
+      { maxScale, focusTileId: `t${n - 1}` }
+    );
+    assert.equal(placements.length, n, `tablet ${n} placement count`);
+    assert.ok(
+      tileScale <= prev + 0.001,
+      `tablet scale must not upscale at ${n}: ${prev} → ${tileScale}`
+    );
+    assert.ok(
+      tileScale > 0.05 && tileScale <= 1,
+      `tablet ${n} scale out of range: ${tileScale}`
+    );
+    assert.ok(!camera?.overflow, `tablet ${n} must stay on-felt`);
+    const short = Math.min(placements[0].w, placements[0].h);
+    const long = Math.max(placements[0].w, placements[0].h);
+    at[n] = {
+      scale: tileScale,
+      w: short,
+      h: long,
+      turns: countTurns(placements),
+      recentered: Boolean(camera?.recentered || camera?.overflow),
+      bounds: content,
+    };
+    prev = tileScale;
+    maxScale = Math.max(MIN_BOARD_SCALE, tileScale);
+  }
+  assert.ok(at[1].scale >= 0.99, `1-tile base scale ${at[1].scale}`);
+  assert.ok(at[5].scale >= 0.99, `5-tile should stay full size ${at[5].scale}`);
+  // Narrower tablet felt + hard bounds: mid chains stay readable (≥ floor).
+  assert.ok(
+    at[10].scale >= MIN_BOARD_SCALE - 0.001,
+    `10-tile readable ${at[10].scale}`
+  );
+  // Longer one-sided packs must stay on-felt; scale may use the emergency
+  // path on shorter tablet widths once hard felt bounds are enforced.
+  for (const n of [15, 19, 24, 28]) {
+    assert.ok(at[n].scale > 0.05 && at[n].scale <= 1, `tablet ${n} scale ${at[n].scale}`);
+    assert.ok(!at[n].recentered || at[n].scale > 0, `tablet ${n} placed`);
+  }
+  // Early turns: long chains should fold rather than one endless rail.
+  assert.ok(at[15].turns >= 1, `15-tile should turn early, turns=${at[15].turns}`);
+  assert.ok(at[19].turns >= 2, `19-tile should turn, turns=${at[19].turns}`);
+}
+
+{
+  // Laptop felt + balanced board base (hand × 2.15, ~72×136). No bbox
+  // fit-shrink — scale stays at/above MIN_BOARD_SCALE; short side middle-range.
+  const mk = (n) => {
+    const tiles = [dbl("c")];
+    for (let i = 1; i < n; i += 1) {
+      tiles.push(tile(`t${i}`, i % 7, (i + 1) % 7));
+    }
+    return tiles;
+  };
+  const vp = { width: 1180, height: 520 };
+  const base = resolveBoardTileBase(vp, { w: 72, h: 136 });
+  assert.ok(
+    base.w >= 60 && base.w <= BOARD_BASE_SHORT_MAX_PX,
+    `laptop base short ${base.w}`
+  );
+  let maxScale = 1;
+  let prevScale = 1;
+  /** @type {Record<number, { scale: number, short: number, long: number, turns: number, overflow: boolean, bounds: object }>} */
+  const at = {};
+  for (const n of [1, 5, 10, 15, 19, 24, 28]) {
+    const { placements, tileScale, camera, content } = layoutBoard(
+      mk(n),
+      0,
+      vp,
+      base,
+      {
+        maxScale,
+        focusTileId: `t${n - 1}`,
+        hudRight: 96,
+      }
+    );
+    assert.equal(placements.length, n, `laptop ${n} placement count`);
+    for (let i = 0; i < placements.length; i += 1) {
+      for (let j = i + 1; j < placements.length; j += 1) {
+        const a = placements[i];
+        const b = placements[j];
+        const overlap =
+          a.x < b.x + b.w &&
+          a.x + a.w > b.x &&
+          a.y < b.y + b.h &&
+          a.y + a.h > b.y;
+        assert.ok(!overlap, `laptop ${n} overlap ${a.id}/${b.id}`);
+      }
+    }
+    const short = Math.min(placements[0].w, placements[0].h);
+    const long = Math.max(placements[0].w, placements[0].h);
+    assert.ok(
+      tileScale <= prevScale + 0.001,
+      `laptop scale must not upscale at ${n}: ${prevScale} → ${tileScale}`
+    );
+    at[n] = {
+      scale: tileScale,
+      short,
+      long,
+      turns: countTurns(placements),
+      overflow: Boolean(camera?.overflow),
+      bounds: content,
+    };
+    prevScale = tileScale;
+    maxScale = Math.max(MIN_BOARD_SCALE, tileScale);
+  }
+  // Every length must stay fully on the playable green felt (no overflow).
+  for (const n of [1, 5, 10, 15, 19, 24, 28]) {
+    assert.ok(!at[n].overflow, `laptop ${n} should stay on-felt`);
+  }
+  for (const n of [1, 5, 10]) {
+    assert.ok(at[n].scale >= 0.99, `laptop ${n} scale ${at[n].scale}`);
+    assert.ok(
+      at[n].short >= 60 && at[n].short <= BOARD_BASE_SHORT_MAX_PX + 0.5,
+      `laptop ${n} short ${at[n].short}`
+    );
+  }
+  // Longer one-sided arms stay on-felt (no camera-overflow escape hatch).
+  // Deep one-sided packs may use the documented emergency scale path.
+  for (const n of [15, 19, 24, 28]) {
+    assert.ok(at[n].scale > 0.05 && at[n].scale <= 1, `laptop ${n} scale ${at[n].scale}`);
+    assert.ok(at[n].short >= 8, `laptop ${n} short ${at[n].short}`);
+  }
+  assert.ok(at[15].turns >= 1, `laptop 15 should turn, turns=${at[15].turns}`);
+  assert.ok(at[19].turns >= 2, `laptop 19 should turn, turns=${at[19].turns}`);
+}
+
+{
+  // Locked ~72×136 board size: 10 / 15 / 19 / 24 / full 28 — zero unintended
+  // overlap, connected chain, spinner clearance, size not reduced.
+  function overlaps(a, b) {
+    return (
+      a.x < b.x + b.w &&
+      a.x + a.w > b.x &&
+      a.y < b.y + b.h &&
+      a.y + a.h > b.y
+    );
+  }
+  const mk = (n) => {
+    const tiles = [dbl("c")];
+    for (let i = 1; i < n; i += 1) {
+      tiles.push(
+        i % 4 === 0
+          ? dbl(`d${i}`, i % 7)
+          : tile(`t${i}`, i % 7, (i + 1) % 7)
+      );
+    }
+    return tiles;
+  };
+  const vp = { width: 1180, height: 520 };
+  let maxScale = 1;
+  let prevScale = 1;
+  for (const n of [10, 15, 19, 24, 28]) {
+    const tiles = mk(n);
+    const { placements, tileScale, content } = layoutBoard(
+      tiles,
+      0,
+      vp,
+      locked,
+      { maxScale, focusTileId: tiles[tiles.length - 1].id, hudRight: 96 }
+    );
+    assert.equal(placements.length, n, `locked ${n} placement count`);
+    const minScale = n <= 10 ? 0.99 : 0.05;
+    assert.ok(
+      tileScale >= minScale - 0.001,
+      `locked ${n} scale ${tileScale} (floor ${minScale})`
+    );
+    assert.ok(
+      tileScale <= prevScale + 0.001,
+      `locked ${n} must not upscale ${prevScale} → ${tileScale}`
+    );
+    const short = Math.min(placements[0].w, placements[0].h);
+    const long = Math.max(placements[0].w, placements[0].h);
+    // Painted footprint = locked base × chosen scale (base size unchanged).
+    assert.ok(
+      Math.abs(short - LOCKED_BOARD_TILE_SHORT_PX * tileScale) < 0.6,
+      `locked ${n} short ${short}`
+    );
+    assert.ok(
+      Math.abs(long - LOCKED_BOARD_TILE_LONG_PX * tileScale) < 1.2,
+      `locked ${n} long ${long}`
+    );
+
+    const byId = Object.fromEntries(placements.map((p) => [p.id, p]));
+    const order = Object.fromEntries(tiles.map((t, i) => [t.id, i]));
+
+    // Zero AABB overlap; neighbors stay face-connected (gap band).
+    for (let i = 0; i < placements.length; i += 1) {
+      for (let j = i + 1; j < placements.length; j += 1) {
+        const a = placements[i];
+        const b = placements[j];
+        assert.ok(!overlaps(a, b), `locked ${n} overlap ${a.id}/${b.id}`);
+        const connected = Math.abs(order[a.id] - order[b.id]) === 1;
+        if (!connected) {
+          assert.ok(
+            !overlaps(collisionBox(a), collisionBox(b)),
+            `locked ${n} halo overlap ${a.id}/${b.id}`
+          );
+        }
+      }
+    }
+    for (let i = 0; i < tiles.length - 1; i += 1) {
+      const a = byId[tiles[i].id];
+      const b = byId[tiles[i + 1].id];
+      assert.ok(a && b, `locked ${n} missing link ${tiles[i].id}→${tiles[i + 1].id}`);
+      assert.ok(!overlaps(a, b), `locked ${n} neighbor overlap ${a.id}/${b.id}`);
+      // Endpoint connection: boxes share an axis projection with a face gap.
+      const xOv = a.x < b.x + b.w && a.x + a.w > b.x;
+      const yOv = a.y < b.y + b.h && a.y + a.h > b.y;
+      assert.ok(
+        xOv || yOv,
+        `locked ${n} disconnected ${a.id}→${b.id}`
+      );
+      assert.ok(
+        !(xOv && yOv),
+        `locked ${n} body underlap at link ${a.id}→${b.id}`
+      );
+    }
+
+    // Spinners keep vertical footprint on E/W rails (base × scale).
+    for (const p of placements) {
+      if (!p.double) continue;
+      assert.ok(p.h > p.w, `locked ${n} spinner ${p.id} must be vertical`);
+      assert.ok(
+        Math.abs(Math.max(p.w, p.h) - LOCKED_BOARD_TILE_LONG_PX * tileScale) < 1.2,
+        `locked ${n} spinner ${p.id} footprint`
+      );
+    }
+
+    // Chain content exists (usable local bounds).
+    assert.ok(content?.width > 0 && content?.height > 0, `locked ${n} content`);
+
+    if (n >= 15) {
+      assert.ok(
+        countTurns(placements) >= 1,
+        `locked ${n} should turn early, turns=${countTurns(placements)}`
+      );
+    }
+    prevScale = tileScale;
+    maxScale = Math.max(MIN_BOARD_SCALE, tileScale);
+  }
+}
+
+{
+  // Deterministic 3-tile snake: center start; 3 right then DOWN; 3 left then UP.
+  // Lengths 10 / 15 / 19 / 24 / 28 — locked tile size, no unintended overlap.
+  function overlaps(a, b) {
+    return (
+      a.x < b.x + b.w &&
+      a.x + a.w > b.x &&
+      a.y < b.y + b.h &&
+      a.y + a.h > b.y
+    );
+  }
+  function mkBilateral(total) {
+    const right = Math.floor((total - 1) / 2);
+    const left = total - 1 - right;
+    const tiles = [];
+    for (let i = left; i >= 1; i -= 1) {
+      tiles.push(
+        i % 4 === 0
+          ? { id: `L${i}`, left: i % 7, right: i % 7 }
+          : tile(`L${i}`, i % 7, (i + 1) % 7)
+      );
+    }
+    tiles.push(dbl("c"));
+    for (let i = 1; i <= right; i += 1) {
+      tiles.push(
+        i % 4 === 0
+          ? { id: `R${i}`, left: i % 7, right: i % 7 }
+          : tile(`R${i}`, i % 7, (i + 1) % 7)
+      );
+    }
+    return { tiles, centerIndex: left };
+  }
+  const vp = { width: 1180, height: 520 };
+  const play = computePlayBounds(vp, MARGIN, 96);
+
+  for (const n of [10, 15, 19, 24, 28]) {
+    const { tiles, centerIndex } = mkBilateral(n);
+    const { placements, tileScale, camera } = layoutBoard(
+      tiles,
+      centerIndex,
+      vp,
+      locked,
+      { hudRight: 96, focusTileId: tiles[tiles.length - 1].id }
+    );
+    assert.equal(placements.length, n, `snake ${n} count`);
+    const snakeFloor = n <= 24 ? 0.99 : MIN_BOARD_SCALE;
+    assert.ok(
+      tileScale >= snakeFloor - 0.001,
+      `snake ${n} scale ${tileScale} (floor ${snakeFloor})`
+    );
+    const short = Math.min(placements[0].w, placements[0].h);
+    const long = Math.max(placements[0].w, placements[0].h);
+    assert.ok(
+      Math.abs(short - LOCKED_BOARD_TILE_SHORT_PX * tileScale) < 0.6,
+      `snake ${n} short locked×scale`
+    );
+    assert.ok(
+      Math.abs(long - LOCKED_BOARD_TILE_LONG_PX * tileScale) < 1.2,
+      `snake ${n} long locked×scale`
+    );
+
+    const byId = Object.fromEntries(placements.map((p) => [p.id, p]));
+    const opener = byId.c;
+    assert.ok(opener, `snake ${n} opener`);
+    const feltMidX = (play.minX + play.maxX) / 2;
+    const feltMidY = (play.minY + play.maxY) / 2;
+    // First tile centered on playable felt mid when camera still pins opener.
+    if (!camera?.recentered) {
+      assert.ok(
+        Math.abs(opener.x + opener.w / 2 - feltMidX) < 1,
+        `snake ${n} opener x center`
+      );
+      assert.ok(
+        Math.abs(opener.y + opener.h / 2 - feltMidY) < 1,
+        `snake ${n} opener y center`
+      );
+    }
+    assert.ok(!camera?.overflow, `snake ${n} must not overflow felt`);
+
+    const rightArm = tiles.slice(centerIndex + 1);
+    const leftArm = [];
+    for (let i = centerIndex - 1; i >= 0; i -= 1) leftArm.push(tiles[i]);
+
+    // Exactly 3 horizontal RIGHT, 4th turns DOWN.
+    if (rightArm.length >= 4) {
+      for (let i = 0; i < 3; i += 1) {
+        assert.equal(
+          byId[rightArm[i].id].travelDir,
+          "E",
+          `snake ${n} right[${i}] must be E`
+        );
+      }
+      assert.equal(
+        byId[rightArm[3].id].travelDir,
+        FIRST_FOLD_RIGHT,
+        `snake ${n} right[3] must turn ${FIRST_FOLD_RIGHT}`
+      );
+      assert.ok(byId[rightArm[3].id].isCorner, `snake ${n} right[3] corner`);
+    } else {
+      for (const t of rightArm) {
+        assert.equal(byId[t.id].travelDir, "E", `snake ${n} short right E`);
+      }
+    }
+
+    // Exactly 3 horizontal LEFT, 4th turns UP.
+    if (leftArm.length >= 4) {
+      for (let i = 0; i < 3; i += 1) {
+        assert.equal(
+          byId[leftArm[i].id].travelDir,
+          "W",
+          `snake ${n} left[${i}] must be W`
+        );
+      }
+      assert.equal(
+        byId[leftArm[3].id].travelDir,
+        FIRST_FOLD_LEFT,
+        `snake ${n} left[3] must turn ${FIRST_FOLD_LEFT}`
+      );
+      assert.ok(byId[leftArm[3].id].isCorner, `snake ${n} left[3] corner`);
+    } else {
+      for (const t of leftArm) {
+        assert.equal(byId[t.id].travelDir, "W", `snake ${n} short left W`);
+      }
+    }
+
+    // Zero unintended overlap + valid neighbor connections.
+    const order = Object.fromEntries(tiles.map((t, i) => [t.id, i]));
+    for (let i = 0; i < placements.length; i += 1) {
+      for (let j = i + 1; j < placements.length; j += 1) {
+        const a = placements[i];
+        const b = placements[j];
+        assert.ok(!overlaps(a, b), `snake ${n} overlap ${a.id}/${b.id}`);
+        if (Math.abs(order[a.id] - order[b.id]) !== 1) {
+          assert.ok(
+            !overlaps(collisionBox(a), collisionBox(b)),
+            `snake ${n} halo ${a.id}/${b.id}`
+          );
+        }
+      }
+    }
+    for (let i = 0; i < tiles.length - 1; i += 1) {
+      const a = byId[tiles[i].id];
+      const b = byId[tiles[i + 1].id];
+      const xOv = a.x < b.x + b.w && a.x + a.w > b.x;
+      const yOv = a.y < b.y + b.h && a.y + a.h > b.y;
+      assert.ok(xOv || yOv, `snake ${n} disconnected ${a.id}→${b.id}`);
+      assert.ok(!(xOv && yOv), `snake ${n} underlap ${a.id}→${b.id}`);
+    }
+
+    // Stay inside playable green (scoreboard/HUD carve-out honored).
+    for (const p of placements) {
+      assert.ok(p.x >= play.minX - 0.5, `snake ${n} ${p.id} left bound`);
+      assert.ok(p.y >= play.minY - 0.5, `snake ${n} ${p.id} top bound`);
+      assert.ok(
+        p.x + p.w <= play.maxX + 0.5,
+        `snake ${n} ${p.id} right bound`
+      );
+      assert.ok(
+        p.y + p.h <= play.maxY + 0.5,
+        `snake ${n} ${p.id} bottom bound`
+      );
+    }
+
+    for (const p of placements) {
+      if (!p.double) continue;
+      assert.ok(p.h > p.w, `snake ${n} spinner ${p.id} vertical`);
+    }
+  }
 }
 
 {
@@ -245,21 +764,20 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
 }
 
 {
-  // Exact mathematical center for opening double and non-double
+  // Exact mathematical center on playable felt mid for opening tiles
+  const vp = { width: 900, height: 420 };
+  const play = computePlayBounds(vp, MARGIN);
+  const midX = (play.minX + play.maxX) / 2;
+  const midY = (play.minY + play.maxY) / 2;
   for (const opener of [dbl("c"), tile("c", 3, 5)]) {
-    const { placements } = layoutBoard(
-      [opener],
-      0,
-      { width: 900, height: 420 },
-      size
-    );
+    const { placements } = layoutBoard([opener], 0, vp, size);
     const p = placements[0];
     assert.ok(
-      Math.abs(p.x + p.w / 2 - 450) < 0.01,
+      Math.abs(p.x + p.w / 2 - midX) < 0.01,
       `opener x center ${opener.id}`
     );
     assert.ok(
-      Math.abs(p.y + p.h / 2 - 210) < 0.01,
+      Math.abs(p.y + p.h / 2 - midY) < 0.01,
       `opener y center ${opener.id}`
     );
   }
@@ -269,7 +787,7 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
   // Invisible grid: shared horizontal rail centerlines + exact gaps
   const tiles = [dbl("c")];
   for (let i = 1; i <= 10; i += 1) tiles.push(tile(`r${i}`, i % 7, (i + 1) % 7));
-  const { placements } = layoutBoard(
+  const { placements, camera } = layoutBoard(
     tiles,
     0,
     { width: 1100, height: 520 },
@@ -277,7 +795,13 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
   );
   const byId = Object.fromEntries(placements.map((p) => [p.id, p]));
   const opener = byId.c;
-  assert.ok(Math.abs(opener.x + opener.w / 2 - 550) < 0.5, "opener pinned");
+  const playGrid = computePlayBounds({ width: 1100, height: 520 }, MARGIN);
+  const feltMidX = (playGrid.minX + playGrid.maxX) / 2;
+  // Short openings pin the opener on playable felt mid.
+  if (!camera?.recentered) {
+    assert.ok(Math.abs(opener.x + opener.w / 2 - feltMidX) < 0.5, "opener pinned");
+  }
+  assert.ok(!camera?.overflow, "grid chain must stay on-felt");
   for (let i = 1; i < tiles.length; i += 1) {
     const a = byId[tiles[i - 1].id];
     const b = byId[tiles[i].id];

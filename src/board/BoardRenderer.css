@@ -1,11 +1,12 @@
 /* Board — adaptive tile scale, readable gaps, tip emphasis */
 
 .board-renderer {
+  /* Keep in sync with BoardContainer.css / BOARD_TILE_HAND_FACTOR. */
+  --board-tile-hand-factor: 2.15;
   --board-tile-scale: 1;
-  /* Table tiles ~+6.5% abs; hand is smaller so factor rises */
-  --domino-w: calc(var(--domino-hand-w) * 3.96 * var(--board-tile-scale));
-  --domino-h: calc(var(--domino-hand-h) * 3.96 * var(--board-tile-scale));
-  --domino-pip: calc(var(--domino-hand-pip) * 3.96 * var(--board-tile-scale));
+  --domino-w: calc(var(--domino-hand-w) * var(--board-tile-hand-factor) * var(--board-tile-scale));
+  --domino-h: calc(var(--domino-hand-h) * var(--board-tile-hand-factor) * var(--board-tile-scale));
+  --domino-pip: calc(var(--domino-hand-pip) * var(--board-tile-hand-factor) * var(--board-tile-scale));
 
   position: relative;
   z-index: 3;

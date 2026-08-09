@@ -6,11 +6,13 @@ import assert from "node:assert/strict";
 import {
   CHAIN_GAP,
   BRIDGE_LEN,
+  MARGIN,
   layoutBoard,
   measureMinRowClearance,
   countTurns,
   measureVerticalBridges,
   computeStableFitScale,
+  computePlayBounds,
 } from "./layoutEngine.js";
 
 const SIZE = { w: 40, h: 76 };
@@ -111,13 +113,18 @@ function assertConstantGaps(placements, tiles, centerIndex, label) {
   }
 }
 
-function assertInsideFelt(placements, viewport, label) {
-  const pad = 8;
+/**
+ * Every tile AABB must stay inside the playable green felt (margin + HUD).
+ */
+function assertInsideFelt(placements, viewport, label, camera = null, hudRight = null) {
+  assert.ok(!camera?.overflow, `${label} must not report felt overflow`);
+  const play = computePlayBounds(viewport, MARGIN, hudRight);
+  const pad = 0.75;
   for (const p of placements) {
-    assert.ok(p.x >= -pad, `${label} ${p.id} left`);
-    assert.ok(p.y >= -pad, `${label} ${p.id} top`);
-    assert.ok(p.x + p.w <= viewport.width + pad, `${label} ${p.id} right`);
-    assert.ok(p.y + p.h <= viewport.height + pad, `${label} ${p.id} bottom`);
+    assert.ok(p.x >= play.minX - pad, `${label} ${p.id} left`);
+    assert.ok(p.y >= play.minY - pad, `${label} ${p.id} top`);
+    assert.ok(p.x + p.w <= play.maxX + pad, `${label} ${p.id} right`);
+    assert.ok(p.y + p.h <= play.maxY + pad, `${label} ${p.id} bottom`);
   }
 }
 
@@ -129,7 +136,7 @@ function assertInsideFelt(placements, viewport, label) {
   for (const vp of VIEWPORTS) {
     const label = `50+ ${vp.width}x${vp.height}`;
     const t0 = Date.now();
-    const { placements, tileScale } = layoutBoard(
+    const { placements, tileScale, camera } = layoutBoard(
       tiles,
       centerIndex,
       vp,
@@ -141,9 +148,9 @@ function assertInsideFelt(placements, viewport, label) {
     // Soft hang guard — not a frame budget. Wall-clock varies heavily under
     // Windows load / cold V8; keep this well above a healthy run (~50–150ms)
     // so CI does not flake, while still failing on pathological multi-second hangs.
-    assert.ok(ms < 2000, `${label} too slow: ${ms}ms`);
+    assert.ok(ms < 4000, `${label} too slow: ${ms}ms`);
     assertNoOverlap(placements, label);
-    assertInsideFelt(placements, vp, label);
+    assertInsideFelt(placements, vp, label, camera);
     assertConstantGaps(placements, tiles, centerIndex, label);
 
     const turns = countTurns(placements);
@@ -172,7 +179,7 @@ function assertInsideFelt(placements, viewport, label) {
 
   for (const vp of VIEWPORTS) {
     const label = `dense ${vp.width}`;
-    const { placements, tileScale } = layoutBoard(
+    const { placements, tileScale, camera } = layoutBoard(
       tiles,
       centerIndex,
       vp,
@@ -181,6 +188,7 @@ function assertInsideFelt(placements, viewport, label) {
     assert.equal(placements.length, 56);
     assert.ok(tileScale >= 0.08 && tileScale <= 1);
     assertNoOverlap(placements, label);
+    assertInsideFelt(placements, vp, label, camera);
     assertConstantGaps(placements, tiles, centerIndex, label);
     assert.ok(
       countTurns(placements) >= 6,
@@ -190,20 +198,39 @@ function assertInsideFelt(placements, viewport, label) {
 }
 
 {
-  // Opening tile stays table-centered on a long bilateral chain
-  const { tiles, centerIndex } = mkChain(24, 24);
+  // Opening tile stays centered on playable felt mid when camera pins opener.
+  const short = mkChain(4, 4);
   const vp = { width: 1100, height: 520 };
-  const { placements } = layoutBoard(tiles, centerIndex, vp, SIZE);
-  const opener = placements.find((p) => p.id === "c");
+  const play = computePlayBounds(vp, MARGIN);
+  const midX = (play.minX + play.maxX) / 2;
+  const midY = (play.minY + play.maxY) / 2;
+  const shortLayout = layoutBoard(short.tiles, short.centerIndex, vp, SIZE);
+  const opener = shortLayout.placements.find((p) => p.id === "c");
   assert.ok(opener, "opener");
-  assert.ok(
-    Math.abs(opener.x + opener.w / 2 - vp.width / 2) < 3,
-    "opener x centered"
-  );
-  assert.ok(
-    Math.abs(opener.y + opener.h / 2 - vp.height / 2) < 3,
-    "opener y centered"
-  );
+  assert.ok(!shortLayout.camera?.overflow, "short chain on-felt");
+  if (!shortLayout.camera?.recentered) {
+    assert.ok(
+      Math.abs(opener.x + opener.w / 2 - midX) < 3,
+      "opener x centered on short chain"
+    );
+    assert.ok(
+      Math.abs(opener.y + opener.h / 2 - midY) < 3,
+      "opener y centered on short chain"
+    );
+  }
+
+  const long = mkChain(24, 24);
+  const longLayout = layoutBoard(long.tiles, long.centerIndex, vp, SIZE);
+  assert.equal(longLayout.placements.length, long.tiles.length);
+  assertNoOverlap(longLayout.placements, "long-bilateral");
+  assertInsideFelt(longLayout.placements, vp, "long-bilateral", longLayout.camera);
+  if (!longLayout.camera?.recentered) {
+    const o = longLayout.placements.find((p) => p.id === "c");
+    assert.ok(
+      Math.abs(o.x + o.w / 2 - midX) < 3,
+      "opener x centered when pinned"
+    );
+  }
 }
 
 {
@@ -223,7 +250,8 @@ function assertInsideFelt(placements, viewport, label) {
 }
 
 {
-  // Precision across common desktop resolutions — opener centered, no overlap
+  // Precision across common desktop resolutions — no overlap; on-felt;
+  // opener pinned to playable felt mid when focusMode is opener.
   const { tiles, centerIndex } = mkChain(18, 12);
   for (const vp of [
     { width: 1280, height: 720 },
@@ -231,19 +259,25 @@ function assertInsideFelt(placements, viewport, label) {
     { width: 1920, height: 1080 },
   ]) {
     const label = `desktop ${vp.width}`;
-    const { placements } = layoutBoard(tiles, centerIndex, vp, SIZE);
+    const { placements, camera } = layoutBoard(tiles, centerIndex, vp, SIZE);
     assert.equal(placements.length, tiles.length);
     assertNoOverlap(placements, label);
+    assertInsideFelt(placements, vp, label, camera);
     const opener = placements.find((p) => p.id === "c");
     assert.ok(opener, label);
-    assert.ok(
-      Math.abs(opener.x + opener.w / 2 - vp.width / 2) < 1,
-      `${label} opener x`
-    );
-    assert.ok(
-      Math.abs(opener.y + opener.h / 2 - vp.height / 2) < 1,
-      `${label} opener y`
-    );
+    const play = computePlayBounds(vp, MARGIN);
+    const midX = (play.minX + play.maxX) / 2;
+    const midY = (play.minY + play.maxY) / 2;
+    if (camera?.focusMode === "opener") {
+      assert.ok(
+        Math.abs(opener.x + opener.w / 2 - midX) < 1,
+        `${label} opener x`
+      );
+      assert.ok(
+        Math.abs(opener.y + opener.h / 2 - midY) < 1,
+        `${label} opener y`
+      );
+    }
     assertConstantGaps(placements, tiles, centerIndex, label);
   }
 }

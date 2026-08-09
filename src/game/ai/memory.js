@@ -5,6 +5,7 @@
 
 import { PIP_MAX } from "../constants.js";
 import { generateSet } from "../tiles.js";
+import { nextPlayerIndex } from "../players.js";
 
 /**
  * @param {object} state
@@ -26,7 +27,7 @@ export function buildMemory(state, aiIndex) {
   const opponentHandSize = otherHandSizes.length ? Math.min(...otherHandSizes) : 0;
 
   // Next seat in turn order (wraps); primary probability target.
-  const nextIndex = (aiIndex + 1) % Math.max(playerCount, 1);
+  const nextIndex = nextPlayerIndex(aiIndex, playerCount);
   const nextOpponentHandSize =
     nextIndex === aiIndex ? 0 : (state.players[nextIndex]?.hand.length ?? 0);
 

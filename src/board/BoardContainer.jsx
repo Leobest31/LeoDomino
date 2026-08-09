@@ -3,6 +3,8 @@ import DominoTile from "../components/DominoTile";
 import {
   calculateBoardLayout,
   layoutBoard,
+  MIN_BOARD_SCALE,
+  resolveBoardTileBase,
 } from "./DominoLayoutEngine.js";
 import {
   buildBoardDisplays,
@@ -17,6 +19,11 @@ import "./BoardContainer.css";
  *
  * Does NOT invent positions. Maps engine output to absolute
  * `transform: translate3d(x, y, 0)` slots. No flex/grid tile flow.
+ *
+ * Tile scale stays at/above MIN_BOARD_SCALE. Layout is a bounded snake
+ * inside the measured playable green felt (stage size + HUD carve-out).
+ * Optional drag-pan is available for long chains but must not be required
+ * to reveal off-table tiles — the engine keeps every tile on-felt.
  */
 function BoardContainer({
   tiles = [],
@@ -29,8 +36,18 @@ function BoardContainer({
   const stageRef = useRef(null);
   const probeRef = useRef(null);
   const [area, setArea] = useState({ w: 640, h: 320 });
-  const [tileSize, setTileSize] = useState({ w: 36, h: 68 });
+  const [tileSize, setTileSize] = useState({ w: 72, h: 136 });
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const panRef = useRef({ x: 0, y: 0 });
+  const panDragRef = useRef(null);
   const lastWarnKey = useRef("");
+  /** Monotonic scale cap across growing chains on a fixed felt size. */
+  const scaleStabilityRef = useRef({
+    scale: 1,
+    count: 0,
+    areaW: 0,
+    areaH: 0,
+  });
   const debugOn = debugProp ?? isBoardDebugEnabled();
 
   useLayoutEffect(() => {
@@ -38,15 +55,23 @@ function BoardContainer({
     if (!stage) return undefined;
 
     const read = () => {
-      setArea({
+      const nextArea = {
         w: Math.max(120, stage.clientWidth),
         h: Math.max(120, stage.clientHeight),
-      });
+      };
+      setArea(nextArea);
       const probe = probeRef.current?.querySelector(".domino, .leo-domino-premium");
       if (probe) {
         const r = probe.getBoundingClientRect();
         if (r.width > 2 && r.height > 2) {
-          setTileSize({ w: r.width, h: r.height });
+          // CSS probe uses the moderate hand×factor; viewport cap prevents
+          // rem/vw scaling from recreating the oversized ~134×254 base.
+          setTileSize(
+            resolveBoardTileBase(
+              { width: nextArea.w, height: nextArea.h },
+              { w: r.width, h: r.height }
+            )
+          );
         }
       }
     };
@@ -68,8 +93,34 @@ function BoardContainer({
 
   const layout = useMemo(() => {
     if (!tiles.length) {
-      return { tiles: [], scale: 1, gap: 2, debug: null, placements: [] };
+      scaleStabilityRef.current = {
+        scale: 1,
+        count: 0,
+        areaW: area.w,
+        areaH: area.h,
+      };
+      return {
+        tiles: [],
+        scale: 1,
+        gap: 2,
+        debug: null,
+        placements: [],
+        camera: null,
+      };
     }
+
+    const st = scaleStabilityRef.current;
+    const areaChanged =
+      Math.abs(area.w - st.areaW) > 12 || Math.abs(area.h - st.areaH) > 12;
+    // When the chain grows on a stable viewport, never allow scale to rise.
+    // Also never ratchet the cap below the Plan B/C readability floor.
+    const priorCap = Math.max(MIN_BOARD_SCALE, st.scale);
+    const maxScale =
+      !areaChanged && tiles.length > st.count
+        ? priorCap
+        : !areaChanged && tiles.length === st.count
+          ? priorCap
+          : 1;
 
     const build = (hudRight) => {
       const spatial = calculateBoardLayout(
@@ -80,6 +131,8 @@ function BoardContainer({
           tileWidth: tileSize.w,
           tileHeight: tileSize.h,
           hudRight,
+          maxScale,
+          focusTileId: newestId ?? tiles[tiles.length - 1]?.id,
         }
       );
 
@@ -110,11 +163,83 @@ function BoardContainer({
     // (empty placements for a non-empty chain), retry without the HUD carve-
     // out so the board never goes blank on narrow viewports.
     const preferred = build(hudReserve > 0 ? hudReserve : null);
-    if (preferred.tiles.length > 0 || hudReserve <= 0) return preferred;
-    return build(null);
-  }, [tiles, centerIndex, area, tileSize, hudReserve]);
+    const resolved =
+      preferred.tiles.length > 0 || hudReserve <= 0 ? preferred : build(null);
 
-  const { placements, tileScale, debug, gap } = layout;
+    st.scale = resolved.tileScale ?? 1;
+    st.count = tiles.length;
+    st.areaW = area.w;
+    st.areaH = area.h;
+    return resolved;
+  }, [tiles, centerIndex, area, tileSize, hudReserve, newestId]);
+
+  const { placements, tileScale, debug, gap, camera } = layout;
+  // Pan is exploratory UX only — engine must not rely on overflow+pan.
+  const panEnabled = tiles.length >= 24;
+
+  // Keep painted CSS tile box identical to the layout engine base×scale.
+  // resolveBoardTileBase may soft-cap rem-inflated probes; without this
+  // override CSS would still paint the larger hand×factor size and overlap.
+  const paintW = Math.max(1, tileSize.w * (tileScale || 1));
+  const paintH = Math.max(1, tileSize.h * (tileScale || 1));
+  const paintPip = Math.max(2, paintW * 0.132);
+
+  // Reset manual pan when the engine camera recenters on a new chain shape.
+  useLayoutEffect(() => {
+    panRef.current = { x: 0, y: 0 };
+    setPan({ x: 0, y: 0 });
+  }, [tiles.length, camera?.focusMode, camera?.localFocus?.x, camera?.localFocus?.y]);
+
+  useLayoutEffect(() => {
+    if (!panEnabled) return undefined;
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+
+    const onPointerDown = (event) => {
+      if (event.button != null && event.button !== 0) return;
+      // Don't steal taps meant for interactive chrome inside the stage.
+      if (event.target?.closest?.("button, a, input, select, textarea")) return;
+      panDragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: panRef.current.x,
+        originY: panRef.current.y,
+      };
+      stage.setPointerCapture?.(event.pointerId);
+    };
+    const onPointerMove = (event) => {
+      const drag = panDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const next = {
+        x: drag.originX + (event.clientX - drag.startX),
+        y: drag.originY + (event.clientY - drag.startY),
+      };
+      panRef.current = next;
+      setPan(next);
+    };
+    const onPointerUp = (event) => {
+      const drag = panDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      panDragRef.current = null;
+      try {
+        stage.releasePointerCapture?.(event.pointerId);
+      } catch {
+        /* ignore */
+      }
+    };
+
+    stage.addEventListener("pointerdown", onPointerDown);
+    stage.addEventListener("pointermove", onPointerMove);
+    stage.addEventListener("pointerup", onPointerUp);
+    stage.addEventListener("pointercancel", onPointerUp);
+    return () => {
+      stage.removeEventListener("pointerdown", onPointerDown);
+      stage.removeEventListener("pointermove", onPointerMove);
+      stage.removeEventListener("pointerup", onPointerUp);
+      stage.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [panEnabled]);
 
   const tipIds = useMemo(() => {
     if (tiles.length < 2) return new Set();
@@ -143,12 +268,19 @@ function BoardContainer({
 
   return (
     <div
-      className="board-container"
+      className={`board-container${panEnabled ? " board-container--pannable" : ""}`}
       ref={stageRef}
       data-board-root="true"
       data-board-debug={debugOn ? "1" : undefined}
+      data-board-camera={camera?.focusMode || undefined}
+      data-board-overflow={camera?.overflow ? "1" : undefined}
       role="list"
-      style={{ "--board-tile-scale": String(tileScale) }}
+      style={{
+        "--board-tile-scale": String(tileScale),
+        "--domino-w": `${paintW}px`,
+        "--domino-h": `${paintH}px`,
+        "--domino-pip": `${paintPip}px`,
+      }}
     >
       <div className="board-container__measure" ref={probeRef} aria-hidden="true">
         <DominoTile left={6} right={6} orientation="vertical" />
@@ -159,7 +291,14 @@ function BoardContainer({
       ) : (
         <div
           className="board-container__layer"
-          style={{ width: area.w, height: area.h }}
+          style={{
+            width: area.w,
+            height: area.h,
+            transform:
+              pan.x || pan.y
+                ? `translate3d(${pan.x}px, ${pan.y}px, 0)`
+                : undefined,
+          }}
         >
           {displays.map((entry) => {
             if (!entry?.pos || !entry.display) return null;

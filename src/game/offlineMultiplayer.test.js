@@ -82,7 +82,8 @@ section("startMatch deals 7 tiles for 2/3/4 players");
   assert.ok(p >= 0 && p <= 1);
 
   const memorySeat3 = buildMemory(state, 3);
-  assert.equal(memorySeat3.nextOpponentHandSize, state.players[0].hand.length);
+  // 4p CCW: seat 3 (right) is followed by seat 1 (top), not seat 0.
+  assert.equal(memorySeat3.nextOpponentHandSize, state.players[1].hand.length);
 }
 section("AI memory tracks all other seats (3+/4p)");
 
