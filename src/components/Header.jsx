@@ -13,6 +13,9 @@ function Header({
   onPlayerCountChange,
   settingsOpen: settingsOpenProp,
   onSettingsOpenChange,
+  startBelow = null,
+  centerBelow = null,
+  compact = false,
 }) {
   const { t } = useI18n();
   const { muted, toggleMute, play, unlock } = useAudio();
@@ -20,10 +23,11 @@ function Header({
   const controlled = typeof onSettingsOpenChange === "function";
   const settingsOpen = controlled ? Boolean(settingsOpenProp) : settingsOpenInternal;
   const setSettingsOpen = controlled ? onSettingsOpenChange : setSettingsOpenInternal;
+  const stacked = Boolean(startBelow || centerBelow || compact);
 
   return (
     <>
-      <header className="header">
+      <header className={`header${stacked ? " header--stacked" : ""}`}>
         <div className="header__inner">
           <div className="header__side header__side--start">
             <button
@@ -44,10 +48,12 @@ function Header({
               {muted ? <IconMute /> : <IconUnmute />}
               <span className="sr-only">{muted ? t("audio.unmute") : t("audio.mute")}</span>
             </button>
+            {startBelow}
           </div>
 
           <div className="header__brand">
             <BrandLogo size="md" title={t("common.brand")} />
+            {centerBelow}
           </div>
 
           <div className="header__side header__side--end">

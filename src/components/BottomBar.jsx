@@ -11,6 +11,7 @@ function BottomBar({
   onDraw,
   onPass,
   onNewGame,
+  endAbove = null,
 }) {
   const { t } = useI18n();
   const { play } = useAudio();
@@ -58,16 +59,19 @@ function BottomBar({
           </button>
         </div>
 
-        <button
-          type="button"
-          className="btn btn--new bottom-bar__new"
-          onClick={() => {
-            play("button");
-            onNewGame?.();
-          }}
-        >
-          {t("game.newMatch")}
-        </button>
+        <div className="bottom-bar__end">
+          {endAbove}
+          <button
+            type="button"
+            className="btn btn--new bottom-bar__new"
+            onClick={() => {
+              play("button");
+              onNewGame?.();
+            }}
+          >
+            {t("game.newMatch")}
+          </button>
+        </div>
       </div>
     </footer>
   );

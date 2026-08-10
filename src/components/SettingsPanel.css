@@ -201,6 +201,31 @@
   min-height: 2.5rem;
 }
 
+.settings-panel__legal {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-panel-border);
+}
+
+.settings-panel__legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  margin-top: 0.45rem;
+}
+
+.settings-panel__legal-links a {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.settings-panel__legal-links a:hover,
+.settings-panel__legal-links a:focus-visible {
+  color: var(--color-accent-strong);
+  outline: none;
+}
+
 :root[dir="rtl"] .settings-panel {
   right: auto;
   left: 0;

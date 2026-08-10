@@ -29,6 +29,7 @@ import {
   normalizeRulesetId,
 } from "../data/gameStyles.js";
 import { loadMatch } from "../persistence/index.js";
+import { LEGAL_URLS } from "../legal/urls.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import "./GameSetupPage.css";
 
@@ -321,6 +322,39 @@ function GameSetupPage({ onPlay, onResume, onOpenGameStyle }) {
             </button>
           ) : null}
         </div>
+
+        <nav className="game-setup__legal" aria-label={t("legal.navAria")}>
+          <a
+            className="game-setup__legal-link"
+            href={LEGAL_URLS.privacy}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t("legal.privacy")}
+          </a>
+          <span className="game-setup__legal-sep" aria-hidden="true">
+            ·
+          </span>
+          <a
+            className="game-setup__legal-link"
+            href={LEGAL_URLS.terms}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t("legal.terms")}
+          </a>
+          <span className="game-setup__legal-sep" aria-hidden="true">
+            ·
+          </span>
+          <a
+            className="game-setup__legal-link"
+            href={LEGAL_URLS.support}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t("legal.support")}
+          </a>
+        </nav>
       </div>
     </main>
   );

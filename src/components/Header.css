@@ -38,6 +38,10 @@
   justify-content: flex-end;
 }
 
+.header--stacked .header__side--end {
+  align-self: start;
+}
+
 .header__brand {
   display: flex;
   align-items: center;
@@ -82,13 +86,59 @@
   transform: scale(0.94);
 }
 
+/* Match HUD: mute+score and logo+opponent share one compact chrome height */
+.header--stacked {
+  height: auto;
+  min-height: 0;
+}
+
+.header--stacked .header__inner {
+  align-items: start;
+  height: auto;
+  padding-top: 0.16rem;
+  padding-bottom: 0.18rem;
+  column-gap: clamp(0.35rem, 1.2vw, 0.85rem);
+}
+
+.header--stacked .header__side--start {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.18rem;
+}
+
+.header--stacked .header__brand {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  max-width: min(72vw, 28rem);
+}
+
+.header--stacked .header__brand .brand-logo {
+  height: clamp(1.7rem, 4.2vw, 2.15rem);
+}
+
+.header--stacked .header__icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  min-width: 40px;
+  min-height: 40px;
+}
+
 @media (max-height: 520px) and (orientation: landscape) {
   .header {
     height: 2.45rem;
   }
 
+  .header--stacked {
+    height: auto;
+  }
+
   .header__brand .brand-logo {
     height: clamp(1.85rem, 5.2vw, 2.35rem);
+  }
+
+  .header--stacked .header__brand .brand-logo {
+    height: clamp(1.55rem, 4vw, 1.95rem);
   }
 
   .header__icon-btn {
@@ -96,5 +146,18 @@
     height: 2.45rem;
     min-width: 40px;
     min-height: 40px;
+  }
+
+  .header--stacked .header__inner {
+    padding-top: 0.1rem;
+    padding-bottom: 0.12rem;
+  }
+
+  .header--stacked .header__side--start {
+    gap: 0.12rem;
+  }
+
+  .header--stacked .header__brand {
+    gap: 0.06rem;
   }
 }

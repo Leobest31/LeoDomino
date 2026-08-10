@@ -16,7 +16,7 @@
 
 .bottom-bar__inner {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 0.65rem;
   max-width: var(--game-max);
@@ -60,9 +60,20 @@
   font-weight: 700;
 }
 
+.bottom-bar__end {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  min-width: min(11.5rem, 42vw);
+}
+
 .bottom-bar__new {
   flex-shrink: 0;
   box-sizing: border-box;
+  width: 100%;
   height: 2.85rem;
   min-height: 2.85rem;
   padding-inline: 1rem;
@@ -94,6 +105,12 @@
     padding-inline: 0.3rem;
   }
 
+  .bottom-bar__end {
+    width: 100%;
+    min-width: 0;
+    gap: 0.32rem;
+  }
+
   .bottom-bar__new {
     width: 100%;
   }
@@ -107,7 +124,7 @@
 
   .bottom-bar__inner {
     flex-direction: row;
-    align-items: center;
+    align-items: flex-end;
     padding:
       0.18rem
       clamp(0.4rem, 1.2vw, 0.85rem)
@@ -130,6 +147,15 @@
     max-width: none;
     height: 2.65rem;
     min-height: 2.65rem;
+  }
+
+  .bottom-bar__end {
+    min-width: min(9.5rem, 34vw);
+    gap: 0.22rem;
+  }
+
+  .bottom-bar__new {
+    width: 100%;
   }
 
   .bottom-bar__btn.btn--play {

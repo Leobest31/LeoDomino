@@ -31,7 +31,6 @@ function BoardContainer({
   centerTileId = null,
   emptyLabel = "",
   debug: debugProp = null,
-  hudReserve = 0,
 }) {
   const stageRef = useRef(null);
   const probeRef = useRef(null);
@@ -159,19 +158,19 @@ function BoardContainer({
       };
     };
 
-    // Prefer the measured HUD inset; if the engine still fails closed
-    // (empty placements for a non-empty chain), retry without the HUD carve-
-    // out so the board never goes blank on narrow viewports.
-    const preferred = build(hudReserve > 0 ? hudReserve : null);
+    // No live HUD carve-outs on the felt — scoreboard and reserve sit outside
+    // the green table. Pass 0 (not null) so the engine does not revive the
+    // legacy right-rail estimate.
+    const preferred = build(0);
     const resolved =
-      preferred.tiles.length > 0 || hudReserve <= 0 ? preferred : build(null);
+      preferred.tiles.length > 0 ? preferred : build(null);
 
     st.scale = resolved.tileScale ?? 1;
     st.count = tiles.length;
     st.areaW = area.w;
     st.areaH = area.h;
     return resolved;
-  }, [tiles, centerIndex, area, tileSize, hudReserve, newestId]);
+  }, [tiles, centerIndex, area, tileSize, newestId]);
 
   const { placements, tileScale, debug, gap, camera } = layout;
   // Pan is exploratory UX only — engine must not rely on overflow+pan.

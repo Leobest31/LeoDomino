@@ -2,11 +2,42 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+/** Map clean legal URLs to static HTML for Vite dev/preview (host rewrites cover production). */
+function legalPrettyPathsPlugin() {
+  const map = Object.freeze({
+    "/privacy": "/privacy/index.html",
+    "/terms": "/terms/index.html",
+    "/support": "/support/index.html",
+  });
+
+  const rewrite = (req, _res, next) => {
+    const raw = req.url ?? "";
+    const pathOnly = raw.split("?")[0];
+    const target = map[pathOnly];
+    if (target) {
+      const query = raw.includes("?") ? raw.slice(raw.indexOf("?")) : "";
+      req.url = `${target}${query}`;
+    }
+    next();
+  };
+
+  return {
+    name: "leodomino-legal-pretty-paths",
+    configureServer(server) {
+      server.middlewares.use(rewrite);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(rewrite);
+    },
+  };
+}
+
 export default defineConfig({
   // Relative base so Capacitor native WebViews can load bundled dist assets offline.
   // Also valid for the web/PWA deploy (absolute hosting still works with relative asset URLs).
   base: "./",
   plugins: [
+    legalPrettyPathsPlugin(),
     react(),
     VitePWA({
       registerType: "autoUpdate",
@@ -17,6 +48,10 @@ export default defineConfig({
         "brand/icon-512.png",
         "brand/apple-touch-icon.png",
         "brand/*.svg",
+        "legal/legal.css",
+        "privacy/index.html",
+        "terms/index.html",
+        "support/index.html",
       ],
       manifest: {
         name: "LeoDomino",
@@ -54,6 +89,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}"],
         navigateFallback: "/index.html",
+        // Keep public legal pages out of the SPA shell fallback.
+        navigateFallbackDenylist: [/^\/privacy(?:\/|$)/, /^\/terms(?:\/|$)/, /^\/support(?:\/|$)/],
         cleanupOutdatedCaches: true,
       },
       devOptions: {

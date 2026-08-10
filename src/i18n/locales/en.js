@@ -210,4 +210,11 @@ export default {
     bestStreak: "Longest win streak",
     avgRound: "Average round score",
   },
+  legal: {
+    section: "Legal",
+    navAria: "Legal and support links",
+    privacy: "Privacy",
+    terms: "Terms",
+    support: "Support",
+  },
 };

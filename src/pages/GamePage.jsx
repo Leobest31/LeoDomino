@@ -89,10 +89,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const [enteringIds, setEnteringIds] = useState(() => new Set());
   const [drag, setDrag] = useState(null);
   const [hotEnd, setHotEnd] = useState(null);
-  const [hudReserve, setHudReserve] = useState(0);
   const tableStageRef = useRef(null);
-  const hudScoreRef = useRef(null);
-  const hudReserveBoxRef = useRef(null);
   const prevBoardRef = useRef(boardTiles.map((tile) => tile.id));
   const prevPhaseRef = useRef(state.phase);
   const prevHandRef = useRef([]);
@@ -534,50 +531,6 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     return () => window.clearTimeout(timer);
   }, [humanHand]);
 
-  // Permanent safe gap between the domino chain and the scoreboard/reserve
-  // HUD: measure the HUD chrome's real on-screen footprint (accounts for
-  // every breakpoint/orientation rule in GamePage.css automatically) and
-  // feed it to the board so it never routes tiles underneath it.
-  useLayoutEffect(() => {
-    const stage = tableStageRef.current;
-    if (!stage) return undefined;
-
-    const HUD_SAFE_GAP = 48; // permanent visual clearance (40-60px target)
-
-    const measure = () => {
-      const stageRect = stage.getBoundingClientRect();
-      let minLeft = Infinity;
-      for (const ref of [hudScoreRef, hudReserveBoxRef]) {
-        const el = ref.current;
-        if (!el) continue;
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 0) minLeft = Math.min(minLeft, rect.left);
-      }
-      if (!Number.isFinite(minLeft)) {
-        setHudReserve(0);
-        return;
-      }
-      const raw = Math.max(0, stageRect.right - minLeft) + HUD_SAFE_GAP;
-      // On phone widths the scoreboard can claim ~38% of the felt; feeding that
-      // full footprint (+ safe gap) into the layout engine collapses play
-      // bounds until the board renders zero tiles. Cap the reserve so the
-      // chain always keeps a usable search region.
-      const reserve = Math.min(raw, stageRect.width * 0.3);
-      setHudReserve((current) => (Math.abs(current - reserve) > 1 ? reserve : current));
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(stage);
-    if (hudScoreRef.current) ro.observe(hudScoreRef.current);
-    if (hudReserveBoxRef.current) ro.observe(hudReserveBoxRef.current);
-    window.addEventListener("resize", measure);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
-
   useEffect(() => {
     const wasHuman = prevTurnRef.current;
     prevTurnRef.current = isHumanTurn;
@@ -721,29 +674,49 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       }${matchOver ? " game-page--match-over" : ""}`}
     >
       <div className="game-page__shell">
-        <Header
-          difficulty={difficulty}
-          onDifficultyChange={setDifficulty}
-          playerCount={playerCount}
-          onPlayerCountChange={handlePlayerCountChange}
-          settingsOpen={settingsOpen}
-          onSettingsOpenChange={setSettingsOpen}
-        />
+        <div className="game-page__chrome" {...(matchOver ? { inert: true } : {})}>
+          <Header
+            difficulty={difficulty}
+            onDifficultyChange={setDifficulty}
+            playerCount={playerCount}
+            onPlayerCountChange={handlePlayerCountChange}
+            settingsOpen={settingsOpen}
+            onSettingsOpenChange={setSettingsOpen}
+            compact
+            startBelow={
+              <div className="game-page__hud-score">
+                <ScoreBoard
+                  scores={state.scores}
+                  names={playerNames}
+                  humanIndex={HUMAN_INDEX}
+                  target={state.targetScore}
+                  round={state.round}
+                  scoreFormat={
+                    resolveRuleset(state.rulesetId).hudScoreFormat ?? "absolute"
+                  }
+                />
+              </div>
+            }
+            centerBelow={
+              <div className="game-page__top-hud-center">
+                {topSeats.map((seat) => (
+                  <OpponentPanel
+                    key={seat.index}
+                    position="top"
+                    seatIndex={seat.index}
+                    name={seat.name}
+                    status={seat.status}
+                    tileCount={seat.tileCount}
+                    thinking={seat.thinking}
+                    isTurn={seat.isTurn}
+                  />
+                ))}
+              </div>
+            }
+          />
+        </div>
 
         <div className="game-page__body" {...(matchOver ? { inert: true } : {})}>
-          {topSeats.map((seat) => (
-            <OpponentPanel
-              key={seat.index}
-              position="top"
-              seatIndex={seat.index}
-              name={seat.name}
-              status={seat.status}
-              tileCount={seat.tileCount}
-              thinking={seat.thinking}
-              isTurn={seat.isTurn}
-            />
-          ))}
-
           <div className="game-page__mid">
             {leftSeats.length > 0 ? (
               <div className="game-page__side-seats game-page__side-seats--left">
@@ -770,25 +743,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
                 dropActive={Boolean(drag) || ambiguousSelected}
                 hotEnd={hotEnd}
                 validEnds={dragValidEnds}
-                hudReserve={hudReserve}
               />
-
-              <div className="game-page__hud-score" ref={hudScoreRef}>
-                <ScoreBoard
-                  scores={state.scores}
-                  names={playerNames}
-                  humanIndex={HUMAN_INDEX}
-                  target={state.targetScore}
-                  round={state.round}
-                  scoreFormat={
-                    resolveRuleset(state.rulesetId).hudScoreFormat ?? "absolute"
-                  }
-                />
-              </div>
-
-              <div className="game-page__hud-reserve" ref={hudReserveBoxRef}>
-                <Reserve count={state.reserve.length} />
-              </div>
             </div>
 
             {rightSeats.length > 0 ? (
@@ -832,6 +787,11 @@ function GamePage({ onMainMenu, matchOptions = null }) {
             onDraw={handleDraw}
             onPass={pass}
             onNewGame={restart}
+            endAbove={
+              <div className="game-page__hud-reserve">
+                <Reserve count={state.reserve.length} />
+              </div>
+            }
           />
         </div>
       </div>

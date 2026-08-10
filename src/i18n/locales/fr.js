@@ -210,4 +210,11 @@ export default {
     bestStreak: "Plus longue série",
     avgRound: "Score moyen par manche",
   },
+  legal: {
+    section: "Mentions légales",
+    navAria: "Liens juridiques et assistance",
+    privacy: "Confidentialité",
+    terms: "Conditions",
+    support: "Assistance",
+  },
 };

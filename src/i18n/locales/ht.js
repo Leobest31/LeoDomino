@@ -213,4 +213,11 @@ export default {
     bestStreak: "Pi long seri viktwa",
     avgRound: "Mwayèn nòt wo",
   },
+  legal: {
+    section: "Legal",
+    navAria: "Lyen legal ak sipò",
+    privacy: "Vi prive",
+    terms: "Kondisyon",
+    support: "Sipò",
+  },
 };

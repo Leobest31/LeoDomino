@@ -8,6 +8,7 @@ import {
   resetStats,
   winPercentage,
 } from "../persistence/index.js";
+import { LEGAL_URLS } from "../legal/urls.js";
 import { IconClose } from "./Icon";
 import LanguageSwitcher from "./LanguageSwitcher";
 import DifficultySwitcher from "./DifficultySwitcher";
@@ -275,6 +276,33 @@ function SettingsPanel({
               {t("settings.resetStats")}
             </button>
           </section>
+
+          <nav className="settings-panel__legal" aria-label={t("legal.navAria")}>
+            <p className="settings-panel__label">{t("legal.section")}</p>
+            <div className="settings-panel__legal-links">
+              <a
+                href={LEGAL_URLS.privacy}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t("legal.privacy")}
+              </a>
+              <a
+                href={LEGAL_URLS.terms}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t("legal.terms")}
+              </a>
+              <a
+                href={LEGAL_URLS.support}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t("legal.support")}
+              </a>
+            </div>
+          </nav>
         </div>
       </aside>
     </>

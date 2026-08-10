@@ -210,4 +210,11 @@ export default {
     bestStreak: "Maior sequência",
     avgRound: "Média por ronda",
   },
+  legal: {
+    section: "Legal",
+    navAria: "Ligações legais e de suporte",
+    privacy: "Privacidade",
+    terms: "Termos",
+    support: "Suporte",
+  },
 };

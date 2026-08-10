@@ -7,6 +7,9 @@ import {
   GAP,
   MARGIN,
   MIN_BOARD_SCALE,
+  MIN_MATCH_SCALE,
+  MIN_MATCH_TILE_SHORT_PX,
+  MIN_READABLE_TILE_SHORT_PX,
   MIN_TILE_SCALE,
   MIN_DESKTOP_TILE_PX,
   BOARD_TILE_HAND_FACTOR,
@@ -347,7 +350,9 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
       bounds: content,
     };
     prev = tileScale;
-    maxScale = Math.max(MIN_BOARD_SCALE, tileScale);
+    // Match BoardContainer ratchet: never allow a later length to exceed the
+    // scale already chosen on this fixed viewport.
+    maxScale = tileScale;
   }
   assert.ok(at[1].scale >= 0.99, `1-tile base scale ${at[1].scale}`);
   assert.ok(at[5].scale >= 0.99, `5-tile should stay full size ${at[5].scale}`);
@@ -611,7 +616,7 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
       { hudRight: 96, focusTileId: tiles[tiles.length - 1].id }
     );
     assert.equal(placements.length, n, `snake ${n} count`);
-    const snakeFloor = n <= 24 ? 0.99 : MIN_BOARD_SCALE;
+    const snakeFloor = n <= 24 ? 0.99 : MIN_MATCH_SCALE;
     assert.ok(
       tileScale >= snakeFloor - 0.001,
       `snake ${n} scale ${tileScale} (floor ${snakeFloor})`
@@ -733,6 +738,297 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
       if (!p.double) continue;
       assert.ok(p.h > p.w, `snake ${n} spinner ${p.id} vertical`);
     }
+  }
+}
+
+{
+  // Mandatory V1 board-chain scenarios: 7/14/21/28 on three felts.
+  // Fail if the chain collapses to a thin horizontal strip, shrinks below
+  // the readable floors, leaves the felt, overlaps, or loses continuity.
+  function mkBi(total) {
+    const right = Math.floor((total - 1) / 2);
+    const left = total - 1 - right;
+    const tiles = [];
+    for (let i = left; i >= 1; i -= 1) {
+      tiles.push(
+        i % 4 === 0
+          ? { id: `L${i}`, left: i % 7, right: i % 7 }
+          : tile(`L${i}`, i % 7, (i + 1) % 7)
+      );
+    }
+    tiles.push(dbl("c"));
+    for (let i = 1; i <= right; i += 1) {
+      tiles.push(
+        i % 4 === 0
+          ? { id: `R${i}`, left: i % 7, right: i % 7 }
+          : tile(`R${i}`, i % 7, (i + 1) % 7)
+      );
+    }
+    return { tiles, centerIndex: left };
+  }
+
+  function chainTurns(placements, tiles) {
+    const byId = Object.fromEntries(placements.map((p) => [p.id, p]));
+    let n = 0;
+    for (let i = 1; i < tiles.length - 1; i += 1) {
+      const a = byId[tiles[i - 1].id];
+      const b = byId[tiles[i].id];
+      const c = byId[tiles[i + 1].id];
+      const d1x = b.x + b.w / 2 - (a.x + a.w / 2);
+      const d1y = b.y + b.h / 2 - (a.y + a.h / 2);
+      const d2x = c.x + c.w / 2 - (b.x + b.w / 2);
+      const d2y = c.y + c.h / 2 - (b.y + b.h / 2);
+      const aH = Math.abs(d1x) > Math.abs(d1y);
+      const bH = Math.abs(d2x) > Math.abs(d2y);
+      if (aH !== bH) n += 1;
+    }
+    return n;
+  }
+
+  const viewports = [
+    { name: "desktop", width: 1180, height: 520 },
+    { name: "tablet-landscape", width: 940, height: 480 },
+    { name: "tablet-portrait", width: 700, height: 620 },
+  ];
+  const lengths = [7, 14, 21, 28];
+
+  for (const vp of viewports) {
+    let prevScale = null;
+    let prevN = null;
+    for (const n of lengths) {
+      const { tiles, centerIndex } = mkBi(n);
+      const play = computePlayBounds(vp, MARGIN, 0, 0);
+      const { placements, tileScale } = layoutBoard(
+        tiles,
+        centerIndex,
+        vp,
+        locked,
+        { hudRight: 0, hudLeft: 0, maxScale: 1 }
+      );
+      assert.equal(placements.length, n, `${vp.name} n=${n} count`);
+
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const p of placements) {
+        assert.ok(p.x >= play.minX - 0.75, `${vp.name} n=${n} left felt`);
+        assert.ok(p.y >= play.minY - 0.75, `${vp.name} n=${n} top felt`);
+        assert.ok(
+          p.x + p.w <= play.maxX + 0.75,
+          `${vp.name} n=${n} right felt`
+        );
+        assert.ok(
+          p.y + p.h <= play.maxY + 0.75,
+          `${vp.name} n=${n} bottom felt`
+        );
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x + p.w);
+        maxY = Math.max(maxY, p.y + p.h);
+      }
+
+      function overlaps(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+      }
+      const order = Object.fromEntries(tiles.map((t, i) => [t.id, i]));
+      for (let i = 0; i < placements.length; i += 1) {
+        for (let j = i + 1; j < placements.length; j += 1) {
+          const a = placements[i];
+          const b = placements[j];
+          assert.ok(!overlaps(a, b), `${vp.name} n=${n} overlap ${a.id}/${b.id}`);
+          if (Math.abs(order[a.id] - order[b.id]) !== 1) {
+            assert.ok(
+              !overlaps(collisionBox(a), collisionBox(b)),
+              `${vp.name} n=${n} halo ${a.id}/${b.id}`
+            );
+          }
+        }
+      }
+
+      const byId = Object.fromEntries(placements.map((p) => [p.id, p]));
+      for (let i = 0; i < tiles.length - 1; i += 1) {
+        const a = byId[tiles[i].id];
+        const b = byId[tiles[i + 1].id];
+        const xOv = a.x < b.x + b.w && a.x + a.w > b.x;
+        const yOv = a.y < b.y + b.h && a.y + a.h > b.y;
+        assert.ok(xOv || yOv, `${vp.name} n=${n} disconnected ${a.id}→${b.id}`);
+        assert.ok(!(xOv && yOv), `${vp.name} n=${n} underlap ${a.id}→${b.id}`);
+      }
+
+      const opener = byId.c;
+      const midX = (play.minX + play.maxX) / 2;
+      const midY = (play.minY + play.maxY) / 2;
+      assert.ok(
+        Math.abs(opener.x + opener.w / 2 - midX) < 1.5,
+        `${vp.name} n=${n} opener not centered X`
+      );
+      assert.ok(
+        Math.abs(opener.y + opener.h / 2 - midY) < 1.5,
+        `${vp.name} n=${n} opener not centered Y`
+      );
+
+      const short = Math.min(placements[0].w, placements[0].h);
+      const long = Math.max(placements[0].w, placements[0].h);
+      const bboxW = maxX - minX;
+      const bboxH = maxY - minY;
+      const playH = play.maxY - play.minY;
+      const heightUse = bboxH / playH;
+      const aspect = bboxW / Math.max(1, bboxH);
+      const turns = chainTurns(placements, tiles);
+
+      if (n <= 21) {
+        assert.ok(
+          tileScale >= MIN_BOARD_SCALE - 0.001,
+          `${vp.name} n=${n} scale ${tileScale} < MIN_BOARD_SCALE`
+        );
+        assert.ok(
+          short + 0.75 >= MIN_READABLE_TILE_SHORT_PX,
+          `${vp.name} n=${n} short ${short} < readable ${MIN_READABLE_TILE_SHORT_PX}`
+        );
+      } else {
+        assert.ok(
+          tileScale >= MIN_MATCH_SCALE - 0.001,
+          `${vp.name} n=${n} scale ${tileScale} < MIN_MATCH_SCALE`
+        );
+        assert.ok(
+          short + 0.75 >= MIN_MATCH_TILE_SHORT_PX,
+          `${vp.name} n=${n} short ${short} < match floor ${MIN_MATCH_TILE_SHORT_PX}`
+        );
+      }
+
+      // Multi-turn path: after the first three-per-side, the chain must bend
+      // and use table height — not collapse to a single horizontal strip.
+      if (n >= 14) {
+        assert.ok(
+          turns >= 2,
+          `${vp.name} n=${n} expected multi-turn path, turns=${turns}`
+        );
+        assert.ok(
+          heightUse >= 0.55,
+          `${vp.name} n=${n} wastes height hUse=${heightUse.toFixed(2)} while packing`
+        );
+        assert.ok(
+          aspect < 3.4,
+          `${vp.name} n=${n} horizontal strip aspect=${aspect.toFixed(2)}`
+        );
+      }
+
+      for (const p of placements) {
+        if (!p.double) continue;
+        assert.ok(p.h > p.w, `${vp.name} n=${n} spinner ${p.id}`);
+      }
+
+      if (prevScale != null && prevN != null) {
+        const drop = prevScale - tileScale;
+        // 21→28 may step from preferred floor toward match floor on mid felts.
+        const maxDrop = prevN <= 14 ? 0.16 : prevN <= 21 ? 0.28 : 0.25;
+        assert.ok(
+          drop <= maxDrop + 0.001,
+          `${vp.name} scale jump ${prevN}→${n}: ${prevScale} → ${tileScale}`
+        );
+      }
+      prevScale = tileScale;
+      prevN = n;
+
+      // Keep tile dimensions in the report for the mandatory matrix.
+      assert.ok(short > 0 && long > short, `${vp.name} n=${n} tile ${short}x${long}`);
+    }
+  }
+}
+
+{
+  // Uneven / one-sided arms must also stay readable at 21 (live play bias).
+  function mkOne(n) {
+    const tiles = [dbl("c")];
+    for (let i = 1; i < n; i += 1) {
+      tiles.push(
+        i % 4 === 0
+          ? { id: `t${i}`, left: i % 7, right: i % 7 }
+          : tile(`t${i}`, i % 7, (i + 1) % 7)
+      );
+    }
+    return tiles;
+  }
+  for (const vp of [
+    { name: "desktop", width: 1180, height: 520 },
+    { name: "tablet-landscape", width: 940, height: 480 },
+  ]) {
+    const tiles = mkOne(21);
+    const play = computePlayBounds(vp, MARGIN, 0, 0);
+    const { placements, tileScale } = layoutBoard(tiles, 0, vp, locked, {
+      hudRight: 0,
+      hudLeft: 0,
+      maxScale: 1,
+    });
+    assert.equal(placements.length, 21, `${vp.name} one21 count`);
+    assert.ok(
+      tileScale >= MIN_BOARD_SCALE - 0.001,
+      `${vp.name} one21 scale ${tileScale}`
+    );
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (const p of placements) {
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y + p.h);
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x + p.w);
+    }
+    const heightUse = (maxY - minY) / (play.maxY - play.minY);
+    const aspect = (maxX - minX) / Math.max(1, maxY - minY);
+    assert.ok(heightUse >= 0.55, `${vp.name} one21 hUse ${heightUse}`);
+    assert.ok(aspect < 3.4, `${vp.name} one21 strip aspect ${aspect}`);
+  }
+}
+
+{
+  // Mid-tablet locked tiles with live hudRight=0: 19→21 stay near full size.
+  function mkBi(total) {
+    const right = Math.floor((total - 1) / 2);
+    const left = total - 1 - right;
+    const tiles = [];
+    for (let i = left; i >= 1; i -= 1) {
+      tiles.push(
+        i % 4 === 0
+          ? { id: `L${i}`, left: i % 7, right: i % 7 }
+          : tile(`L${i}`, i % 7, (i + 1) % 7)
+      );
+    }
+    tiles.push(dbl("c"));
+    for (let i = 1; i <= right; i += 1) {
+      tiles.push(
+        i % 4 === 0
+          ? { id: `R${i}`, left: i % 7, right: i % 7 }
+          : tile(`R${i}`, i % 7, (i + 1) % 7)
+      );
+    }
+    return { tiles, centerIndex: left };
+  }
+  const midTablet = { width: 1024, height: 600 };
+  let prevScale = null;
+  for (const n of [19, 20, 21, 22]) {
+    const { tiles, centerIndex } = mkBi(n);
+    const { placements, tileScale } = layoutBoard(
+      tiles,
+      centerIndex,
+      midTablet,
+      locked,
+      { hudRight: 0, hudLeft: 0, maxScale: 1 }
+    );
+    assert.equal(placements.length, n, `mid-tablet ${n} count`);
+    assert.ok(
+      tileScale >= MIN_BOARD_SCALE - 0.001,
+      `mid-tablet ${n} scale ${tileScale} should stay near readable floor`
+    );
+    if (prevScale != null) {
+      assert.ok(
+        prevScale - tileScale <= 0.16 + 0.001,
+        `mid-tablet scale cliff ${n}: ${prevScale} → ${tileScale}`
+      );
+    }
+    prevScale = tileScale;
   }
 }
 

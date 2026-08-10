@@ -945,6 +945,43 @@ img.game-setup__style-flag {
   }
 }
 
+.game-setup__legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem 0.35rem;
+  margin-top: 0.85rem;
+  padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.game-setup__legal-link {
+  color: var(--setup-muted);
+  text-decoration: none;
+  padding: 0.35rem 0.2rem;
+  border-radius: 0.35rem;
+}
+
+.game-setup__legal-link:hover,
+.game-setup__legal-link:focus-visible {
+  color: var(--setup-ink);
+  outline: none;
+}
+
+.game-setup__legal-sep {
+  color: rgba(169, 183, 195, 0.4);
+  user-select: none;
+}
+
+@media (max-width: 520px) {
+  .game-setup__legal {
+    font-size: 0.72rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .game-setup__chip,
   .game-setup__style-row,

@@ -13,7 +13,6 @@ function GameTable({
   dropActive = false,
   hotEnd = null,
   validEnds = null,
-  hudReserve = 0,
 }) {
   const { t } = useI18n();
   const showDrops = dropActive && tiles.length > 0;
@@ -48,7 +47,6 @@ function GameTable({
             newestId={newestId}
             centerTileId={centerTileId}
             emptyLabel={t("game.tableReady")}
-            hudReserve={hudReserve}
           />
         </div>
       </div>

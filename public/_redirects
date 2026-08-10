@@ -1,0 +1,11 @@
+# Clean legal paths for static hosts (Netlify / compatible).
+# Directory indexes also work; these help without a trailing slash.
+/privacy  /privacy/index.html  200
+/privacy/ /privacy/index.html  200
+/terms    /terms/index.html    200
+/terms/   /terms/index.html    200
+/support  /support/index.html  200
+/support/ /support/index.html  200
+
+# SPA fallback for the game app (must stay after legal rules).
+/*    /index.html   200
