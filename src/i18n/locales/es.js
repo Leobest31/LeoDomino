@@ -64,6 +64,11 @@ export default {
         "Draw Domino americano. Encaja en cualquiera de los extremos, roba hasta poder jugar, pasa si vacío. Primero a 100.",
       americanSummary:
         "Doble seis · 7 fichas · dos extremos abiertos · robar hasta poder jugar · pasar si vacío · jugar a 100",
+      allFives: "All Fives",
+      allFivesDescription:
+        "All Fives americano. Anota cuando los extremos suman un múltiplo de 5. La apertura solo anota con 10. Primero a 150.",
+      allFivesSummary:
+        "Doble seis · 7 fichas · puntos en juego · apertura solo 10 · múltiplos de 5 · fin de ronda al 5 más cercano · jugar a 150",
       dominican: "Dominicano",
       dominicanDescription:
         "Estándar dominicano. Parejas frente a frente. Sin robar — pasa si no puedes jugar. Las parejas juegan a 100.",

@@ -1,7 +1,8 @@
 /**
  * UI game-style catalog — single import path for Setup / Game Style screens.
  * Source of truth remains `game/rulesets`
- * (classic→legacy, haitian→haitian, american→american, dominican→dominican, puertorican→puertorican).
+ * (classic→legacy, haitian→haitian, american→american, allFives→allFives,
+ *  dominican→dominican, puertorican→puertorican).
  * Add future regional variants in the registry only; Configuration stays a single row.
  */
 

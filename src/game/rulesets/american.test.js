@@ -174,8 +174,9 @@ function blockedState(scores = [0, 0]) {
   assert.equal(flagEmoji(style), "🇺🇸");
 
   const styles = listAvailableGameStyles();
-  assert.equal(styles.length, 5);
+  assert.equal(styles.length, 6);
   assert.ok(styles.some((s) => s.id === "american"));
+  assert.ok(styles.some((s) => s.id === "allFives"));
   assert.ok(styles.some((s) => s.id === "dominican"));
   assert.ok(styles.some((s) => s.id === "puertorican"));
   assert.equal(isGameStyleCompatibleWithPlayerCount("american", 3), true);

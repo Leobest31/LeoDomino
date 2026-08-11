@@ -78,6 +78,15 @@ export {
 } from "./puertoRicanScoring.js";
 
 export {
+  ALL_FIVES_MATCH_TARGET,
+  exposedEndTotal,
+  scoreAllFivesPlay,
+  allFivesScorePlay,
+  roundToNearestFive,
+  calculateAllFivesRoundPoints,
+} from "./allFivesScoring.js";
+
+export {
   startMatch,
   getCurrentLegalMoves,
   getAvailableActions,

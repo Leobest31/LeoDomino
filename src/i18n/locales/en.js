@@ -64,6 +64,11 @@ export default {
         "American Draw Dominoes. Match either end, draw until you can play, pass when empty. First to 100.",
       americanSummary:
         "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
+      allFives: "All Fives",
+      allFivesDescription:
+        "American All Fives. Score when open ends total a multiple of 5. Opening scores only on 10. First to 150.",
+      allFivesSummary:
+        "Double-six · 7 tiles · count scoring · opening 10 only · multiples of 5 · round-end nearest 5 · play to 150",
       dominican: "Dominican",
       dominicanDescription:
         "Dominican Standard. Partners sit opposite. No draws — pass when you cannot play. Team scores to 100.",

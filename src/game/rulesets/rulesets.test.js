@@ -68,15 +68,18 @@ function section(title) {
   assert.equal(isKnownRulesetId("american"), true);
   assert.equal(isKnownRulesetId("dominican"), true);
   assert.equal(isKnownRulesetId("puertorican"), true);
+  assert.equal(isKnownRulesetId("allFives"), true);
   assert.equal(tryResolveRuleset("nope"), null);
   assert.equal(tryResolveRuleset("haitian")?.id, "haitian");
   assert.equal(tryResolveRuleset("american")?.id, "american");
+  assert.equal(tryResolveRuleset("allFives")?.id, "allFives");
   assert.equal(tryResolveRuleset("dominican")?.id, "dominican");
   assert.equal(tryResolveRuleset("puertorican")?.id, "puertorican");
   assert.equal(coerceRulesetId(undefined), "legacy");
   assert.equal(coerceRulesetId("legacy"), "legacy");
   assert.equal(coerceRulesetId("haitian"), "haitian");
   assert.equal(coerceRulesetId("american"), "american");
+  assert.equal(coerceRulesetId("allFives"), "allFives");
   assert.equal(coerceRulesetId("dominican"), "dominican");
   assert.equal(coerceRulesetId("puertorican"), "puertorican");
   assert.throws(() => normalizeRulesetId("unknown-style"), /Unknown ruleset/);
@@ -100,20 +103,23 @@ function section(title) {
   assert.equal(normalizeGameStyleId("legacy"), "classic");
   assert.equal(normalizeGameStyleId("classic"), "classic");
   const available = listAvailableGameStyles();
-  assert.equal(available.length, 5);
+  assert.equal(available.length, 6);
   assert.equal(available[0].id, "classic");
   assert.equal(available[1].id, "haitian");
   assert.equal(available[2].id, "american");
-  assert.equal(available[3].id, "dominican");
-  assert.equal(available[4].id, "puertorican");
+  assert.equal(available[3].id, "allFives");
+  assert.equal(available[4].id, "dominican");
+  assert.equal(available[5].id, "puertorican");
   assert.equal(available[1].countryCode, "HT");
   assert.equal(available[1].enabled, true);
   assert.equal(available[2].countryCode, "US");
   assert.equal(available[2].enabled, true);
-  assert.equal(available[3].countryCode, "DO");
+  assert.equal(available[3].countryCode, "US");
   assert.equal(available[3].enabled, true);
-  assert.equal(available[4].countryCode, "PR");
+  assert.equal(available[4].countryCode, "DO");
   assert.equal(available[4].enabled, true);
+  assert.equal(available[5].countryCode, "PR");
+  assert.equal(available[5].enabled, true);
   assert.ok(
     gameStyleFlagDataUrl(available[1]).startsWith("data:image/svg+xml"),
     "Haitian style exposes SVG flag data URL (not letter fallback)"
@@ -126,20 +132,28 @@ function section(title) {
   assert.equal(gameStyleFlagEmoji(available[2]), "🇺🇸");
   assert.ok(
     gameStyleFlagDataUrl(available[3]).startsWith("data:image/svg+xml"),
-    "Dominican style exposes SVG flag data URL"
+    "All Fives style exposes SVG flag data URL"
   );
-  assert.equal(gameStyleFlagEmoji(available[3]), "🇩🇴");
+  assert.equal(gameStyleFlagEmoji(available[3]), "🇺🇸");
   assert.ok(
     gameStyleFlagDataUrl(available[4]).startsWith("data:image/svg+xml"),
+    "Dominican style exposes SVG flag data URL"
+  );
+  assert.equal(gameStyleFlagEmoji(available[4]), "🇩🇴");
+  assert.ok(
+    gameStyleFlagDataUrl(available[5]).startsWith("data:image/svg+xml"),
     "Puerto Rican style exposes SVG flag data URL"
   );
-  assert.equal(gameStyleFlagEmoji(available[4]), "🇵🇷");
+  assert.equal(gameStyleFlagEmoji(available[5]), "🇵🇷");
   assert.equal(gameStyleToRulesetId("haitian"), "haitian");
   assert.equal(gameStyleForRulesetId("haitian")?.id, "haitian");
   assert.equal(normalizeGameStyleId("haitian"), "haitian");
   assert.equal(gameStyleToRulesetId("american"), "american");
   assert.equal(gameStyleForRulesetId("american")?.id, "american");
   assert.equal(normalizeGameStyleId("american"), "american");
+  assert.equal(gameStyleToRulesetId("allFives"), "allFives");
+  assert.equal(gameStyleForRulesetId("allFives")?.id, "allFives");
+  assert.equal(normalizeGameStyleId("allFives"), "allFives");
   assert.equal(gameStyleToRulesetId("dominican"), "dominican");
   assert.equal(gameStyleForRulesetId("dominican")?.id, "dominican");
   assert.equal(normalizeGameStyleId("dominican"), "dominican");
@@ -147,6 +161,7 @@ function section(title) {
   assert.equal(gameStyleForRulesetId("puertorican")?.id, "puertorican");
   assert.equal(normalizeGameStyleId("puertorican"), "puertorican");
   assert.ok(GAME_STYLES.some((s) => s.id === "american"));
+  assert.ok(GAME_STYLES.some((s) => s.id === "allFives"));
   assert.ok(GAME_STYLES.some((s) => s.id === "dominican"));
   assert.ok(GAME_STYLES.some((s) => s.id === "puertorican"));
   section("Classic UI metadata maps to legacy; regional styles selectable");

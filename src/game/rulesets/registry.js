@@ -8,6 +8,7 @@ import { HAITIAN_RULESET_ID, haitianRuleset } from "./haitian.js";
 import { AMERICAN_RULESET_ID, americanRuleset } from "./american.js";
 import { DOMINICAN_RULESET_ID, dominicanRuleset } from "./dominican.js";
 import { PUERTO_RICAN_RULESET_ID, puertoRicanRuleset } from "./puertoRican.js";
+import { ALL_FIVES_RULESET_ID, allFivesRuleset } from "./allFives.js";
 
 /** @type {Map<string, object>} */
 const REGISTRY = new Map();
@@ -56,6 +57,15 @@ export const GAME_STYLES = Object.freeze([
     rulesetId: AMERICAN_RULESET_ID,
     nameKey: "setup.gameStyle.american",
     descriptionKey: "setup.gameStyle.americanDescription",
+    countryCode: "US",
+    enabled: true,
+    available: true,
+  }),
+  Object.freeze({
+    id: "allFives",
+    rulesetId: ALL_FIVES_RULESET_ID,
+    nameKey: "setup.gameStyle.allFives",
+    descriptionKey: "setup.gameStyle.allFivesDescription",
     countryCode: "US",
     enabled: true,
     available: true,
@@ -266,3 +276,4 @@ registerRuleset(haitianRuleset);
 registerRuleset(americanRuleset);
 registerRuleset(dominicanRuleset);
 registerRuleset(puertoRicanRuleset);
+registerRuleset(allFivesRuleset);

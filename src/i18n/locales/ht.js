@@ -67,6 +67,11 @@ export default {
         "Draw Domino Ameriken. Matche nenpòt bout, tire jiskaske ou ka jwe, pase lè rezèv la vid. Premye ki rive 100.",
       americanSummary:
         "Doub-sis · 7 donmino · de bout ouvè · tire jiskaske ou ka jwe · pase lè vid · jwe jiska 100",
+      allFives: "All Fives",
+      allFivesDescription:
+        "All Fives Ameriken. Fè pwen lè bout ouvè yo ajoute yon miltip 5. Premye donmino a bay sèlman sou 10. Premye ki rive 150.",
+      allFivesSummary:
+        "Doub-sis · 7 donmino · pwen pandan jwèt · ouvèti 10 sèlman · miltip 5 · fen wo a awondi a 5 · jwe jiska 150",
       dominican: "Dominiken",
       dominicanDescription:
         "Estanda Dominiken. Patnè yo chita anfas. Pa gen tire — pase lè ou pa ka jwe. Ekip yo jwe jiska 100.",

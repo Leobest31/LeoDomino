@@ -33,6 +33,12 @@ export {
 } from "./puertoRican.js";
 
 export {
+  ALL_FIVES_RULESET_ID,
+  ALL_FIVES_MATCH_TARGET,
+  allFivesRuleset,
+} from "./allFives.js";
+
+export {
   DEFAULT_RULESET_ID,
   RULESET_STORAGE_KEY,
   GAME_STYLES,

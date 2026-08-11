@@ -64,6 +64,11 @@ export default {
         "Draw Domino américain. Jouez sur l’un des deux bouts, piochez jusqu’à pouvoir jouer, passez si vide. Premier à 100.",
       americanSummary:
         "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
+      allFives: "All Fives",
+      allFivesDescription:
+        "All Fives américain. Marquez quand les bouts ouverts totalisent un multiple de 5. L’ouverture ne marque que sur 10. Premier à 150.",
+      allFivesSummary:
+        "Double-six · 7 tuiles · points en cours · ouverture 10 seulement · multiples de 5 · fin de manche au plus proche de 5 · jouer à 150",
       dominican: "Dominicain",
       dominicanDescription:
         "Standard dominicain. Partenaires en face. Pas de pioche — passez si vous ne pouvez pas jouer. Les équipes jouent à 100.",

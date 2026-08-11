@@ -488,12 +488,61 @@ export function playTile(state, tileId, end = END.RIGHT) {
     statusVars: null,
   });
 
+  // Optional on-play count scoring (All Fives, etc.). Opening uses
+  // board-before length so the special first-tile rule stays exact.
+  if (typeof ruleset.policies.scorePlay === "function") {
+    const playPoints = ruleset.policies.scorePlay({
+      board: next.board,
+      isOpening: state.board.length === 0,
+      tileId,
+      end: chosen.end,
+      playerIndex: state.currentPlayer,
+      previousBoard: state.board,
+    });
+    if (Number.isFinite(playPoints) && playPoints > 0) {
+      const scores = next.scores.slice();
+      scores[state.currentPlayer] += playPoints;
+      next = {
+        ...next,
+        scores,
+        statusKey: null,
+        statusVars: { playPoints },
+      };
+    }
+  }
+
   // Domino out?
   if (next.players[state.currentPlayer].hand.length === 0) {
     const reason = dekabes ? ROUND_END_REASON.DEKABES : ROUND_END_REASON.DOMINO;
     return finishRound(next, state.currentPlayer, reason, {
       nextStarterIndex: state.currentPlayer,
     });
+  }
+
+  // Mid-round match win from count scoring (e.g. All Fives to 150).
+  if (typeof ruleset.policies.scorePlay === "function") {
+    const won =
+      typeof ruleset.policies.isMatchWon === "function"
+        ? ruleset.policies.isMatchWon({
+            scores: next.scores,
+            winnerIndex: state.currentPlayer,
+            targetScore: next.targetScore,
+            reason: null,
+          })
+        : next.scores[state.currentPlayer] >= next.targetScore;
+    if (won) {
+      return {
+        ...next,
+        phase: PHASE.MATCH_OVER,
+        matchWinner: state.currentPlayer,
+        roundResult: {
+          winnerIndex: state.currentPlayer,
+          points: 0,
+          reason: "countTarget",
+          nextStarterIndex: state.currentPlayer,
+        },
+      };
+    }
   }
 
   return advancePlayer(next);
