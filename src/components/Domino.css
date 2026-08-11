@@ -145,6 +145,8 @@
   /* Radius stays close to the outer shell so the shoulder is continuous. */
   border-radius: calc(var(--_radius) - var(--_bevel-hi) * 0.4);
   overflow: hidden;
+  /* Decorative plate only — drag/tap stay on the outer `.domino` wrapper. */
+  pointer-events: none;
   background:
     radial-gradient(
       135% 115% at 30% 20%,
@@ -344,6 +346,16 @@
 
 .domino--facedown .domino__face::before {
   background: radial-gradient(circle at 30% 22%, rgba(180, 155, 70, 0.09), transparent 55%);
+}
+
+/* Inner classic décor never owns the gesture — outer `.domino` button does. */
+.domino__half,
+.domino__pips,
+.domino__pip,
+.domino__divider,
+.domino__back,
+.domino__back-pattern {
+  pointer-events: none;
 }
 
 .domino__half {
