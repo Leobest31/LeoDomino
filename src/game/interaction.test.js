@@ -10,6 +10,7 @@ import {
   isAmbiguousPlacement,
   isAutoPlaceable,
   resolvePlayChoice,
+  resolveDragDestination,
 } from "./interaction.js";
 import { END } from "./constants.js";
 
@@ -34,5 +35,11 @@ assert.equal(resolvePlayChoice(moves, "2-5", END.LEFT)?.end, END.LEFT);
 assert.equal(resolvePlayChoice(moves, "2-5", END.RIGHT)?.end, END.RIGHT);
 assert.equal(resolvePlayChoice(moves, "3-3")?.tileId, "3-3");
 assert.equal(resolvePlayChoice(moves, "missing"), null);
+
+assert.equal(resolveDragDestination(moves, "3-3", null).ok, true);
+assert.equal(resolveDragDestination(moves, "2-5", null).ok, false);
+assert.equal(resolveDragDestination(moves, "2-5", END.LEFT).ok, true);
+assert.equal(resolveDragDestination(moves, "2-5", "north").reason, "mismatch");
+assert.equal(resolveDragDestination(moves, "nope", null).reason, "none");
 
 console.log("Interaction helpers tests passed.");

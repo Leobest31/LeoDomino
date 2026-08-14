@@ -22,6 +22,7 @@ import {
 } from "../rulesets/index.js";
 import { PHASE, ROUND_END_REASON } from "./constants.js";
 import { handPipTotal } from "./scoring.js";
+import { emptySpinnerState, readSpinnerState } from "./americanSpinner.js";
 
 /**
  * @typedef {object} GameState
@@ -164,6 +165,7 @@ function beginRound(base, meta) {
     roundStarterIndex: playerIndex,
     roundResult: null,
     matchWinner: null,
+    ...emptySpinnerState(),
     statusKey: tileId ? "rules.starter" : "rules.starterFree",
     statusVars: tileId
       ? {
@@ -229,6 +231,19 @@ export function getAvailableActions(state) {
 
 function advancePlayer(state) {
   const next = nextPlayerIndex(state.currentPlayer, state.players.length);
+  const playPoints = state.statusVars?.playPoints;
+  const scorer =
+    typeof state.statusVars?.scorer === "number"
+      ? state.statusVars.scorer
+      : state.currentPlayer;
+  if (Number.isFinite(playPoints) && playPoints > 0) {
+    return {
+      ...state,
+      currentPlayer: next,
+      statusKey: "game.playPoints",
+      statusVars: { playPoints, scorer },
+    };
+  }
   return {
     ...state,
     currentPlayer: next,
@@ -436,7 +451,7 @@ function resolveBlockedOutcome(state, blockCauserIndex = null) {
  * Play a tile for the current player.
  * @param {GameState} state
  * @param {string} tileId
- * @param {"left"|"right"} [end]
+ * @param {"left"|"right"|"north"|"south"} [end]
  * @returns {GameState}
  */
 export function playTile(state, tileId, end = END.RIGHT) {
@@ -471,8 +486,11 @@ export function playTile(state, tileId, end = END.RIGHT) {
       byId: state.byId,
     });
 
+  const placed = applyPlace(state, state.currentPlayer, tileId, chosen.end);
+  const spin = readSpinnerState(placed);
+
   let next = /** @type {GameState} */ ({
-    ...applyPlace(state, state.currentPlayer, tileId, chosen.end),
+    ...placed,
     phase: state.phase,
     currentPlayer: state.currentPlayer,
     scores: state.scores,
@@ -484,15 +502,22 @@ export function playTile(state, tileId, end = END.RIGHT) {
     roundStarterIndex: state.roundStarterIndex ?? null,
     roundResult: null,
     matchWinner: null,
+    spinnerId: spin.spinnerId,
+    spinnerNorth: spin.spinnerNorth,
+    spinnerSouth: spin.spinnerSouth,
     statusKey: null,
     statusVars: null,
   });
 
-  // Optional on-play count scoring (All Fives, etc.). Opening uses
-  // board-before length so the special first-tile rule stays exact.
+  // Optional on-play count scoring (American Spinner / open ends).
   if (typeof ruleset.policies.scorePlay === "function") {
     const playPoints = ruleset.policies.scorePlay({
+      state: next,
       board: next.board,
+      byId: next.byId,
+      spinnerId: next.spinnerId,
+      spinnerNorth: next.spinnerNorth,
+      spinnerSouth: next.spinnerSouth,
       isOpening: state.board.length === 0,
       tileId,
       end: chosen.end,
@@ -506,7 +531,7 @@ export function playTile(state, tileId, end = END.RIGHT) {
         ...next,
         scores,
         statusKey: null,
-        statusVars: { playPoints },
+        statusVars: { playPoints, scorer: state.currentPlayer },
       };
     }
   }
@@ -519,7 +544,7 @@ export function playTile(state, tileId, end = END.RIGHT) {
     });
   }
 
-  // Mid-round match win from count scoring (e.g. All Fives to 150).
+  // Mid-round match win from count scoring (American to 200).
   if (typeof ruleset.policies.scorePlay === "function") {
     const won =
       typeof ruleset.policies.isMatchWon === "function"
@@ -568,6 +593,7 @@ export function drawTile(state) {
     throw new Error("Reserve is empty");
   }
 
+  const spin = readSpinnerState(state);
   return {
     ...drawn,
     phase: state.phase,
@@ -581,6 +607,9 @@ export function drawTile(state) {
     roundStarterIndex: state.roundStarterIndex ?? null,
     roundResult: null,
     matchWinner: null,
+    spinnerId: spin.spinnerId,
+    spinnerNorth: spin.spinnerNorth,
+    spinnerSouth: spin.spinnerSouth,
     statusKey: "notification.drewTile",
     statusVars: null,
   };

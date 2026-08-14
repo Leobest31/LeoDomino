@@ -1,0 +1,48 @@
+.play-points-float {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.play-points-float__value {
+  font-family: var(--font-display, "Source Serif 4", Georgia, serif);
+  font-size: clamp(2.4rem, 7vw, 3.6rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f5e6b8;
+  text-shadow:
+    0 2px 0 rgba(40, 24, 0, 0.55),
+    0 0 18px rgba(201, 162, 39, 0.45),
+    0 8px 24px rgba(0, 0, 0, 0.45);
+  animation: play-points-pop 0.9s var(--ease-out, ease-out) both;
+}
+
+@keyframes play-points-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.72);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1.08);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-22px) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-points-float__value {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

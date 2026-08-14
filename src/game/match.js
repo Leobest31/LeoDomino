@@ -7,6 +7,21 @@ import { DEFAULT_PLAYER_COUNT, END, HAND_SIZE } from "./constants.js";
 import { createBoard, getOpenEnds, placeTile } from "./board.js";
 import { createShuffledDeck, deal } from "./deck.js";
 import { findLegalMove, getLegalMoves, hasLegalMove } from "./moves.js";
+import {
+  emptySpinnerState,
+  getAmericanLegalMoves,
+  placeAmericanTile,
+  readSpinnerState,
+} from "./rules/americanSpinner.js";
+import { resolveRuleset } from "./rulesets/index.js";
+
+function usesSpinner(match) {
+  try {
+    return Boolean(resolveRuleset(match?.rulesetId).usesSpinner);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * @typedef {object} PlayerState
@@ -61,6 +76,7 @@ export function createMatch(options = {}) {
     })),
     reserve: reserve.slice(),
     board: createBoard(),
+    ...emptySpinnerState(),
   };
 
   if (typeof options.rulesetId === "string" && options.rulesetId) {
@@ -88,6 +104,9 @@ export function listLegalMoves(match, playerIndex) {
   if (!player) {
     throw new Error(`Invalid playerIndex: ${playerIndex}`);
   }
+  if (usesSpinner(match)) {
+    return getAmericanLegalMoves(player.hand, match);
+  }
   return getLegalMoves(player.hand, match.board, match.byId);
 }
 
@@ -111,6 +130,35 @@ export function applyPlace(match, playerIndex, tileId, end = END.RIGHT) {
     throw new Error(`Player ${player.id} does not hold tile ${tileId}`);
   }
 
+  const nextPlayers = match.players.map((entry, index) => {
+    if (index !== playerIndex) return entry;
+    return {
+      ...entry,
+      hand: entry.hand.filter((id) => id !== tileId),
+    };
+  });
+
+  if (usesSpinner(match)) {
+    const legalMoves = getAmericanLegalMoves(player.hand, match);
+    let chosen = legalMoves.find((m) => m.tileId === tileId && m.end === end);
+    if (!chosen && match.board.length === 0) {
+      chosen = legalMoves.find((m) => m.tileId === tileId) ?? null;
+    }
+    if (!chosen) {
+      throw new Error(`Illegal placement: ${tileId} on ${end}`);
+    }
+    const tile = match.byId[tileId];
+    const placed = placeAmericanTile(match, tile, chosen.end);
+    return {
+      ...match,
+      players: nextPlayers,
+      board: placed.board,
+      spinnerId: placed.spinnerId,
+      spinnerNorth: placed.spinnerNorth,
+      spinnerSouth: placed.spinnerSouth,
+    };
+  }
+
   const legal = findLegalMove(player.hand, match.board, match.byId, tileId, end);
   if (!legal) {
     // Opening moves are stored as end "right"; accept left as alias on empty board.
@@ -122,19 +170,15 @@ export function applyPlace(match, playerIndex, tileId, end = END.RIGHT) {
 
   const tile = match.byId[tileId];
   const nextBoard = placeTile(match.board, tile, legal.end);
-
-  const nextPlayers = match.players.map((entry, index) => {
-    if (index !== playerIndex) return entry;
-    return {
-      ...entry,
-      hand: entry.hand.filter((id) => id !== tileId),
-    };
-  });
+  const spin = readSpinnerState(match);
 
   return {
     ...match,
     players: nextPlayers,
     board: nextBoard,
+    spinnerId: spin.spinnerId,
+    spinnerNorth: spin.spinnerNorth,
+    spinnerSouth: spin.spinnerSouth,
   };
 }
 
@@ -182,6 +226,9 @@ export function playerHasLegalMove(match, playerIndex) {
   const player = match.players[playerIndex];
   if (!player) {
     throw new Error(`Invalid playerIndex: ${playerIndex}`);
+  }
+  if (usesSpinner(match)) {
+    return getAmericanLegalMoves(player.hand, match).length > 0;
   }
   return hasLegalMove(player.hand, match.board, match.byId);
 }

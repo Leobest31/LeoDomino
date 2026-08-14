@@ -1,5 +1,6 @@
 /**
- * Ruleset public API — config registry + Classic / Haitian / American / Dominican / Puerto Rican UI catalog.
+ * Ruleset public API — config registry + Classic / Haitian / American /
+ * Dominican / Puerto Rican UI catalog (All Fives merged into American).
  */
 
 export {
@@ -15,6 +16,7 @@ export {
 
 export {
   AMERICAN_RULESET_ID,
+  AMERICAN_MATCH_TARGET,
   americanRuleset,
 } from "./american.js";
 
@@ -35,7 +37,6 @@ export {
 export {
   ALL_FIVES_RULESET_ID,
   ALL_FIVES_MATCH_TARGET,
-  allFivesRuleset,
 } from "./allFives.js";
 
 export {

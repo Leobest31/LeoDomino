@@ -15,10 +15,12 @@ export const HAND_SIZE = 7;
 /** Default number of players for a standard match setup. */
 export const DEFAULT_PLAYER_COUNT = 2;
 
-/** Board ends used when attaching a tile to the chain. */
+/** Board ends used when attaching a tile to the chain (American adds N/S). */
 export const END = Object.freeze({
   LEFT: "left",
   RIGHT: "right",
+  NORTH: "north",
+  SOUTH: "south",
 });
 
 /** Tile orientation on the table chain. */

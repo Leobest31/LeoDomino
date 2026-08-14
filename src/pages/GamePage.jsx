@@ -23,6 +23,7 @@ import {
   isAutoPlaceable,
   legalEndsForTile,
   resolvePlayChoice,
+  resolveDragDestination,
   opponentFeltPosition,
   resolveRuleset,
 } from "../game/index.js";
@@ -67,6 +68,9 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     difficulty,
     setDifficulty,
     boardTiles,
+    spinnerId,
+    spinnerNorth,
+    spinnerSouth,
     humanHand,
     thinkingSeat,
     playerCount,
@@ -78,6 +82,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     commitDraw,
     pass,
     restart,
+    persist,
     setMotionLock,
     HUMAN_INDEX,
   } = useMatch(matchOptions ?? {});
@@ -86,6 +91,8 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const [newestId, setNewestId] = useState(null);
   const [banner, setBanner] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Hold prior HUD scores while the floating +N plays. */
+  const [scoreReveal, setScoreReveal] = useState(null);
   const [enteringIds, setEnteringIds] = useState(() => new Set());
   const [drag, setDrag] = useState(null);
   const [hotEnd, setHotEnd] = useState(null);
@@ -104,6 +111,19 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const openingTileIdRef = useRef(null);
   hiddenIdsRef.current = hiddenIds;
   dragRef.current = drag;
+
+  // AI / resumed count scores: float +N, then release the HUD.
+  useEffect(() => {
+    const pts = state.statusVars?.playPoints;
+    if (!Number.isFinite(pts) || pts <= 0) return;
+    if (scoreReveal?.points === pts) return;
+    // Human path already set scoreReveal inside placeTileOnBoard.
+    if (scoreReveal) return;
+    const hold = state.scores.map((score, index) =>
+      index === state.statusVars?.scorer ? score - pts : score
+    );
+    setScoreReveal({ points: pts, holdScores: hold });
+  }, [state.statusVars, state.scores, scoreReveal]);
 
   // Layout-only: remember the opening tile so the chain stays centered on it.
   if (boardTiles.length === 0) {
@@ -151,7 +171,15 @@ function GamePage({ onMainMenu, matchOptions = null }) {
         arcLiftPx: MOTION.playArcLiftPx,
         skipHide: Boolean(fromRect),
         apply: () => {
+          const priorScores = stateRef.current.scores.slice();
           commitPlay(tileId, chosen.end);
+          const pts = stateRef.current.statusVars?.playPoints;
+          if (Number.isFinite(pts) && pts > 0) {
+            setScoreReveal({
+              points: pts,
+              holdScores: priorScores,
+            });
+          }
         },
         onLanded: () => {
           setNewestId(tileId);
@@ -171,7 +199,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       const current = dragRef.current;
       if (!current) return;
 
-      const end = hitDropEnd(clientX, clientY);
+      const targetedEnd = hitDropEnd(clientX, clientY);
       const tileId = current.tileId;
       const fromRect = {
         x: current.x - current.w / 2,
@@ -184,13 +212,16 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       setHotEnd(null);
       skipClickRef.current = true;
 
-      if (end === "left" || end === "right") {
+      const legalMoves = getAvailableActions(stateRef.current).legalMoves;
+      const resolved = resolveDragDestination(legalMoves, tileId, targetedEnd);
+
+      if (resolved.ok) {
         hideTile(tileId);
-        await placeTileOnBoard(tileId, end, fromRect);
+        await placeTileOnBoard(tileId, resolved.move.end, fromRect);
         return;
       }
 
-      // Dropped elsewhere — glide back to the hand.
+      // Invalid / ambiguous drop — return the tile to the hand (no auto branch pick).
       play("pickup");
       setMotionLock(true);
       await runFlight({
@@ -211,7 +242,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       showTile(tileId);
       setMotionLock(false);
     },
-    [hideTile, placeTileOnBoard, play, runFlight, setMotionLock, showTile]
+    [hideTile, placeTileOnBoard, play, runFlight, setMotionLock, showTile, stateRef]
   );
 
   useEffect(() => {
@@ -661,9 +692,10 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     setSettingsOpen(true);
   };
 
+  /** Leave to Setup without wiping the saved match (Resume restores it). */
   const handleMainMenu = () => {
     play("button");
-    restart();
+    persist();
     onMainMenu?.();
   };
 
@@ -682,11 +714,12 @@ function GamePage({ onMainMenu, matchOptions = null }) {
             onPlayerCountChange={handlePlayerCountChange}
             settingsOpen={settingsOpen}
             onSettingsOpenChange={setSettingsOpen}
+            onMainMenu={handleMainMenu}
             compact
             startBelow={
               <div className="game-page__hud-score">
                 <ScoreBoard
-                  scores={state.scores}
+                  scores={scoreReveal?.holdScores ?? state.scores}
                   names={playerNames}
                   humanIndex={HUMAN_INDEX}
                   target={state.targetScore}
@@ -740,9 +773,14 @@ function GamePage({ onMainMenu, matchOptions = null }) {
                 tiles={boardTiles}
                 newestId={newestId}
                 centerTileId={openingTileIdRef.current}
+                spinnerId={spinnerId}
+                spinnerNorth={spinnerNorth}
+                spinnerSouth={spinnerSouth}
                 dropActive={Boolean(drag) || ambiguousSelected}
                 hotEnd={hotEnd}
                 validEnds={dragValidEnds}
+                playPoints={scoreReveal?.points ?? 0}
+                onPlayPointsDone={() => setScoreReveal(null)}
               />
             </div>
 

@@ -8,7 +8,7 @@ import { HAITIAN_RULESET_ID, haitianRuleset } from "./haitian.js";
 import { AMERICAN_RULESET_ID, americanRuleset } from "./american.js";
 import { DOMINICAN_RULESET_ID, dominicanRuleset } from "./dominican.js";
 import { PUERTO_RICAN_RULESET_ID, puertoRicanRuleset } from "./puertoRican.js";
-import { ALL_FIVES_RULESET_ID, allFivesRuleset } from "./allFives.js";
+import { ALL_FIVES_RULESET_ID } from "./allFives.js";
 
 /** @type {Map<string, object>} */
 const REGISTRY = new Map();
@@ -17,6 +17,17 @@ export const DEFAULT_RULESET_ID = LEGACY_RULESET_ID;
 
 /** Preference key for last-selected ruleset (setup → new match). */
 export const RULESET_STORAGE_KEY = "leodomino.rulesetId";
+
+/**
+ * Map legacy / alias ids onto the canonical registered ruleset id.
+ * @param {string} id
+ * @returns {string}
+ */
+function canonicalRulesetId(id) {
+  // All Fives was merged into American — old saves/prefs keep working.
+  if (id === ALL_FIVES_RULESET_ID) return AMERICAN_RULESET_ID;
+  return id;
+}
 
 /**
  * UI-facing game style catalog (single registry for Setup / Game Style screens).
@@ -62,15 +73,6 @@ export const GAME_STYLES = Object.freeze([
     available: true,
   }),
   Object.freeze({
-    id: "allFives",
-    rulesetId: ALL_FIVES_RULESET_ID,
-    nameKey: "setup.gameStyle.allFives",
-    descriptionKey: "setup.gameStyle.allFivesDescription",
-    countryCode: "US",
-    enabled: true,
-    available: true,
-  }),
-  Object.freeze({
     id: "dominican",
     rulesetId: DOMINICAN_RULESET_ID,
     nameKey: "setup.gameStyle.dominican",
@@ -104,11 +106,12 @@ export function registerRuleset(ruleset) {
 
 /**
  * Resolve a registered ruleset. Unknown ids throw (fail safely).
+ * Legacy "allFives" resolves to American.
  * @param {string|null|undefined} id
  * @returns {object}
  */
 export function resolveRuleset(id) {
-  const key = id == null || id === "" ? DEFAULT_RULESET_ID : id;
+  const key = id == null || id === "" ? DEFAULT_RULESET_ID : canonicalRulesetId(id);
   const ruleset = REGISTRY.get(key);
   if (!ruleset) {
     throw new Error(`Unknown ruleset: ${key}`);
@@ -122,7 +125,7 @@ export function resolveRuleset(id) {
  */
 export function tryResolveRuleset(id) {
   if (typeof id !== "string" || !id) return null;
-  return REGISTRY.get(id) ?? null;
+  return REGISTRY.get(canonicalRulesetId(id)) ?? null;
 }
 
 /**
@@ -130,32 +133,41 @@ export function tryResolveRuleset(id) {
  * @returns {boolean}
  */
 export function isKnownRulesetId(id) {
-  return typeof id === "string" && REGISTRY.has(id);
+  if (typeof id !== "string" || !id) return false;
+  if (id === ALL_FIVES_RULESET_ID) return true;
+  return REGISTRY.has(id);
 }
 
 /**
  * Normalize for match creation. Missing/empty → legacy. Unknown → throws.
+ * Legacy "allFives" → "american".
  * @param {unknown} id
  * @returns {string}
  */
 export function normalizeRulesetId(id) {
   if (id == null || id === "") return DEFAULT_RULESET_ID;
-  if (typeof id !== "string" || !REGISTRY.has(id)) {
+  if (typeof id !== "string") {
     throw new Error(`Unknown ruleset: ${id}`);
   }
-  return id;
+  const canonical = canonicalRulesetId(id);
+  if (!REGISTRY.has(canonical)) {
+    throw new Error(`Unknown ruleset: ${id}`);
+  }
+  return canonical;
 }
 
 /**
  * Soft coerce for save migration.
- * Missing/empty → legacy. Unknown → null (caller rejects).
+ * Missing/empty → legacy. Legacy "allFives" → "american". Unknown → null.
  * @param {unknown} id
  * @returns {string|null}
  */
 export function coerceRulesetId(id) {
   if (id == null || id === "") return DEFAULT_RULESET_ID;
-  if (typeof id !== "string" || !REGISTRY.has(id)) return null;
-  return id;
+  if (typeof id !== "string") return null;
+  const canonical = canonicalRulesetId(id);
+  if (!REGISTRY.has(canonical)) return null;
+  return canonical;
 }
 
 /**
@@ -236,15 +248,19 @@ export function gameStyleToRulesetId(styleId) {
  * @returns {object|null}
  */
 export function gameStyleForRulesetId(rulesetId) {
-  return GAME_STYLES.find((style) => style.rulesetId === rulesetId) ?? null;
+  const canonical =
+    typeof rulesetId === "string" ? canonicalRulesetId(rulesetId) : rulesetId;
+  return GAME_STYLES.find((style) => style.rulesetId === canonical) ?? null;
 }
 
 /**
  * Normalize a stored preference into a selectable style id.
+ * Legacy "allFives" → American.
  * @param {unknown} rulesetIdOrStyleId
  * @returns {string}
  */
 export function normalizeGameStyleId(rulesetIdOrStyleId) {
+  if (rulesetIdOrStyleId === ALL_FIVES_RULESET_ID) return "american";
   if (rulesetIdOrStyleId === DEFAULT_GAME_STYLE_ID) return DEFAULT_GAME_STYLE_ID;
   const byStyle = getGameStyle(/** @type {string} */ (rulesetIdOrStyleId));
   if (byStyle?.available && byStyle.enabled !== false) return byStyle.id;
@@ -270,10 +286,9 @@ export function isGameStyleCompatibleWithPlayerCount(styleId, playerCount) {
   }
 }
 
-// Boot: register engine rulesets.
+// Boot: register engine rulesets (All Fives merged into American — not registered).
 registerRuleset(legacyRuleset);
 registerRuleset(haitianRuleset);
 registerRuleset(americanRuleset);
 registerRuleset(dominicanRuleset);
 registerRuleset(puertoRicanRuleset);
-registerRuleset(allFivesRuleset);

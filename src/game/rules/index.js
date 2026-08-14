@@ -79,12 +79,30 @@ export {
 
 export {
   ALL_FIVES_MATCH_TARGET,
+  AMERICAN_MATCH_TARGET,
   exposedEndTotal,
+  americanExposedEndTotal,
   scoreAllFivesPlay,
   allFivesScorePlay,
   roundToNearestFive,
   calculateAllFivesRoundPoints,
 } from "./allFivesScoring.js";
+
+export {
+  AMERICAN_END,
+  listAmericanOpenEnds,
+  getAmericanScoringEnds,
+  describeAmericanExposedEnds,
+  americanPointsFromExposedTotal,
+  scoreAmericanPlay,
+  getAmericanLegalMoves,
+  placeAmericanTile,
+  resolveSpinnerAfterPlace,
+  resolveAmericanPlayChoice,
+  hasUniqueDestination,
+  readSpinnerState,
+  emptySpinnerState,
+} from "./americanSpinner.js";
 
 export {
   startMatch,

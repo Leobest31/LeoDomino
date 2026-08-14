@@ -1,16 +1,11 @@
 /**
- * American Draw Dominoes ruleset — V1 verification.
+ * American Draw Dominoes (All Fives count scoring) — V1 verification.
  * Run: node src/game/rulesets/american.test.js
- *
- * Scoring convention (reused from Classic/legacy calculateRoundPoints):
- * - Domino out (empty hand): winner scores sum of all opponents' remaining pips.
- * - Blocked: lowest pip total wins; same award — sum of opponents' remaining pips
- *   (2p: opponent hand total). Tie → lower seat index.
- * - Match: first seat whose score >= target (100) wins (matchWinMode firstToReach).
  */
 
 import assert from "node:assert/strict";
 import {
+  AMERICAN_MATCH_TARGET,
   AMERICAN_RULESET_ID,
   DEFAULT_DIFFICULTY,
   END,
@@ -20,6 +15,7 @@ import {
   ROUND_END_REASON,
   applyAiTurn,
   applyAutoAction,
+  calculateAllFivesRoundPoints,
   calculateRoundPoints,
   chooseAiAction,
   chooseAutoAction,
@@ -67,7 +63,7 @@ function americanMatch(overrides = {}) {
   });
 }
 
-/** Seat 0 plays last tile for a pip-sum win. */
+/** Seat 0 plays last tile for a nearest-5 round-end win. */
 function dominoWinState(scores, extras = {}) {
   const byId = indexTiles([
     createTile(0, 1),
@@ -91,7 +87,7 @@ function dominoWinState(scores, extras = {}) {
     currentPlayer: 0,
     scores,
     round: 3,
-    targetScore: 100,
+    targetScore: AMERICAN_MATCH_TARGET,
     rulesetId: AMERICAN_RULESET_ID,
     mustPlayTileId: null,
     consecutivePasses: 0,
@@ -124,7 +120,7 @@ function blockedState(scores = [0, 0]) {
     currentPlayer: 0,
     scores,
     round: 2,
-    targetScore: 100,
+    targetScore: AMERICAN_MATCH_TARGET,
     rulesetId: AMERICAN_RULESET_ID,
     mustPlayTileId: null,
     consecutivePasses: 0,
@@ -144,22 +140,30 @@ function blockedState(scores = [0, 0]) {
   assert.equal(american.deckType, "double-six");
   assert.equal(american.tileCount, 28);
   assert.equal(american.handSize, 7);
-  assert.equal(american.defaultTargetScore, 100);
+  assert.equal(american.defaultTargetScore, 200);
+  assert.equal(american.defaultTargetScore, AMERICAN_MATCH_TARGET);
   assert.equal(american.roundScoreMode, "sumOpponentPips");
   assert.equal(american.matchWinMode, "firstToReach");
+  assert.equal(american.hudScoreFormat, "ofTarget");
   assert.equal(american.drawPolicy, "drawUntilPlayable");
   assert.equal(american.passPolicy, "passWhenReserveEmpty");
   assert.equal(american.round1Starter, "highestDoubleElseHighest");
   assert.equal(american.laterRoundStarter, "previousWinner");
   assert.equal(american.blockedWinnerMode, "lowestPips");
   assert.equal(american.blockedTieBreak, "lowerSeatIndex");
-  assert.equal(american.boardModel, "linearTwoEnds");
+  assert.equal(american.boardModel, "americanSpinner");
+  assert.equal(american.usesSpinner, true);
   assert.deepEqual(american.supportedPlayerCounts, [2, 3, 4]);
   assert.equal(isPlayerCountSupported(american, 2), true);
   assert.equal(isPlayerCountSupported(american, 3), true);
   assert.equal(isPlayerCountSupported(american, 4), true);
-  assert.equal(american.policies.chooseStartingPlayer, resolveRuleset("legacy").policies.chooseStartingPlayer);
-  assert.equal(american.policies.calculateRoundPoints, resolveRuleset("legacy").policies.calculateRoundPoints);
+  assert.equal(
+    american.policies.chooseStartingPlayer,
+    resolveRuleset("legacy").policies.chooseStartingPlayer
+  );
+  assert.equal(american.policies.calculateRoundPoints, calculateAllFivesRoundPoints);
+  assert.notEqual(american.policies.calculateRoundPoints, calculateRoundPoints);
+  assert.equal(typeof american.policies.scorePlay, "function");
 
   const style = getGameStyle("american");
   assert.ok(style);
@@ -174,20 +178,20 @@ function blockedState(scores = [0, 0]) {
   assert.equal(flagEmoji(style), "🇺🇸");
 
   const styles = listAvailableGameStyles();
-  assert.equal(styles.length, 6);
+  assert.equal(styles.length, 5);
   assert.ok(styles.some((s) => s.id === "american"));
-  assert.ok(styles.some((s) => s.id === "allFives"));
+  assert.ok(!styles.some((s) => s.id === "allFives"));
   assert.ok(styles.some((s) => s.id === "dominican"));
   assert.ok(styles.some((s) => s.id === "puertorican"));
   assert.equal(isGameStyleCompatibleWithPlayerCount("american", 3), true);
-  section("registry + GAME_STYLES american / US flag");
+  section("registry + GAME_STYLES american / US flag (no All Fives card)");
 }
 
 // --- Deal 7 for 2/3/4 ---
 {
   const two = americanMatch({ seed: 7, playerCount: 2 });
   assert.equal(two.rulesetId, "american");
-  assert.equal(two.targetScore, 100);
+  assert.equal(two.targetScore, 200);
   assert.equal(two.players[0].hand.length, 7);
   assert.equal(two.players[1].hand.length, 7);
   assert.equal(two.reserve.length, 14);
@@ -209,7 +213,7 @@ function blockedState(scores = [0, 0]) {
   });
   assert.equal(four.players.every((p) => p.hand.length === 7), true);
   assert.equal(four.reserve.length, 0);
-  section("American 2/3/4p deal = 7 each (mirror Classic)");
+  section("American 2/3/4p deal = 7 each (mirror Classic chassis)");
 }
 
 // --- Opening: R1 highest double else highest ---
@@ -279,21 +283,21 @@ function blockedState(scores = [0, 0]) {
   section("pass only when boneyard empty and no legal move");
 }
 
-// --- Hand-empty win → sum opponent pips ---
+// --- Hand-empty win → nearest-5 opponent pips ---
 {
   const before = dominoWinState([10, 20]);
-  // Opponent holds 2-2 (4) + 3-4 (7) = 11
+  // Opponent holds 2-2 (4) + 3-4 (7) = 11 → American awards 10
   const after = playTile(before, "1-2", END.RIGHT);
   assert.equal(after.phase, PHASE.ROUND_OVER);
   assert.equal(after.roundResult.reason, ROUND_END_REASON.DOMINO);
   assert.equal(after.roundResult.winnerIndex, 0);
-  assert.equal(after.roundResult.points, 11);
-  assert.deepEqual(after.scores, [21, 20]);
+  assert.equal(after.roundResult.points, 10);
+  assert.deepEqual(after.scores, [20, 20]);
   assert.equal(after.rulesetId, "american");
-  section("empty-hand win scores sum of opponent pips");
+  section("empty-hand win scores nearest-5 opponent pips");
 }
 
-// --- Blocked → lowest pips wins, same pip-sum award ---
+// --- Blocked → lowest pips wins, nearest-5 award ---
 {
   const state = blockedState([5, 8]);
   assert.equal(isBoardBlocked(state), true);
@@ -303,15 +307,15 @@ function blockedState(scores = [0, 0]) {
   assert.ok(after.phase === PHASE.ROUND_OVER || after.phase === PHASE.MATCH_OVER);
   assert.equal(after.roundResult.reason, ROUND_END_REASON.BLOCKED);
   assert.equal(after.roundResult.winnerIndex, 0);
-  // Opponent pips: 1-1 (2) + 2-3 (5) = 7
-  assert.equal(after.roundResult.points, 7);
-  assert.deepEqual(after.scores, [12, 8]);
-  section("blocked: lowest pips wins and scores opponents' pip sum");
+  // Opponent pips: 1-1 (2) + 2-3 (5) = 7 → rounds to 5
+  assert.equal(after.roundResult.points, 5);
+  assert.deepEqual(after.scores, [10, 8]);
+  section("blocked: lowest pips wins and scores nearest-5 pip sum");
 }
 
-// --- Score accumulation + match end at 100+ ---
+// --- Score accumulation + match end at 150+ ---
 {
-  const points = calculateRoundPoints({
+  const points = calculateAllFivesRoundPoints({
     winnerIndex: 0,
     players: [
       { hand: [] },
@@ -319,16 +323,16 @@ function blockedState(scores = [0, 0]) {
     ],
     byId: indexTiles([createTile(6, 6), createTile(5, 5)]),
   });
-  assert.equal(points, 22);
+  assert.equal(points, 20);
 
-  const nearWin = dominoWinState([90, 40]);
+  const nearWin = dominoWinState([190, 40]);
   const after = playTile(nearWin, "1-2", END.RIGHT);
   assert.equal(after.phase, PHASE.MATCH_OVER);
   assert.equal(after.matchWinner, 0);
-  assert.equal(after.roundResult.points, 11);
-  assert.deepEqual(after.scores, [101, 40]);
-  assert.ok(after.scores[0] >= 100);
-  section("score accumulates; match ends at >= 100");
+  assert.equal(after.roundResult.points, 10);
+  assert.deepEqual(after.scores, [200, 40]);
+  assert.ok(after.scores[0] >= 200);
+  section("score accumulates; match ends at >= 200");
 }
 
 // --- Later rounds: previous winner free open ---
@@ -361,6 +365,7 @@ function blockedState(scores = [0, 0]) {
   assert.equal(resolveRuleset("legacy").matchWinMode, "firstToReach");
   assert.equal(resolveRuleset("legacy").id, "legacy");
   assert.notEqual(resolveRuleset("legacy").id, "american");
+  assert.equal(typeof resolveRuleset("legacy").policies.scorePlay, "undefined");
 
   const haitian = startMatch({
     seed: 77,
@@ -400,7 +405,7 @@ function blockedState(scores = [0, 0]) {
     aiIndex: state.currentPlayer,
   });
   assert.equal(after.rulesetId, "american");
-  assert.equal(after.targetScore, 100);
+  assert.equal(after.targetScore, 200);
   section("AI completes legal American turns");
 }
 

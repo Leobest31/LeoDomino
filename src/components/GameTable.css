@@ -71,6 +71,7 @@
   z-index: 0;
   width: 100%;
   height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   border-radius: 10px;
   overflow: hidden;
@@ -83,7 +84,7 @@
     inset 0 0 80px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
-  padding: 0.22rem 0.28rem;
+  padding: 0.1rem 0.28rem;
   box-sizing: border-box;
 }
 
@@ -144,6 +145,24 @@
 
 .game-table__drop--right {
   right: 0.4rem;
+}
+
+.game-table__drop--north,
+.game-table__drop--south {
+  left: 22%;
+  right: 22%;
+  width: auto;
+  height: min(16%, 3.4rem);
+  top: auto;
+  bottom: auto;
+}
+
+.game-table__drop--north {
+  top: 0.35rem;
+}
+
+.game-table__drop--south {
+  bottom: 0.35rem;
 }
 
 .game-table__drop--ready {

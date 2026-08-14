@@ -432,6 +432,26 @@ export function useMatch(options = {}) {
     right: tile.right,
     orientation: tile.orientation,
   }));
+  const spinnerNorth = Array.isArray(state.spinnerNorth)
+    ? state.spinnerNorth.map((tile) => ({
+        id: tile.id,
+        left: tile.left,
+        right: tile.right,
+        orientation: tile.orientation,
+      }))
+    : [];
+  const spinnerSouth = Array.isArray(state.spinnerSouth)
+    ? state.spinnerSouth.map((tile) => ({
+        id: tile.id,
+        left: tile.left,
+        right: tile.right,
+        orientation: tile.orientation,
+      }))
+    : [];
+  const spinnerId =
+    typeof state.spinnerId === "string" && state.spinnerId
+      ? state.spinnerId
+      : null;
 
   const humanHand = state.players[HUMAN_INDEX].hand.map((id) => {
     const tile = state.byId[id];
@@ -466,6 +486,9 @@ export function useMatch(options = {}) {
     setPlayerCount,
     rulesetId: state.rulesetId ?? rulesetId,
     boardTiles,
+    spinnerId,
+    spinnerNorth,
+    spinnerSouth,
     humanHand,
     opponentHands,
     opponentCount: opponentHands[0]?.count ?? 0,
@@ -483,6 +506,7 @@ export function useMatch(options = {}) {
     pass,
     restart,
     continueRound,
+    persist,
     setMotionLock,
     HUMAN_INDEX,
   };

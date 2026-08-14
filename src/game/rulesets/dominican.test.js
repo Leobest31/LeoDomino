@@ -579,9 +579,10 @@ function playingState({
     rulesetId: AMERICAN_RULESET_ID,
   });
   assert.equal(american.rulesetId, "american");
-  assert.equal(american.targetScore, 100);
+  assert.equal(american.targetScore, 200);
   assert.equal(resolveRuleset("american").drawPolicy, "drawUntilPlayable");
   assert.equal(resolveRuleset("american").blockedWinnerMode, "lowestPips");
+  assert.equal(typeof resolveRuleset("american").policies.scorePlay, "function");
 
   // Classic still uses individual lowest-pips blocked, not team / noScore.
   assert.notEqual(resolveRuleset("legacy").blockedTieBreak, "noScore");

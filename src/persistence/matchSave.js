@@ -110,6 +110,22 @@ export function isValidSavedMatch(value) {
     if (!claimTileId(id, byId, seen)) return false;
   }
 
+  // Optional American Spinner arms (backward-safe when absent).
+  for (const arm of [s.spinnerNorth, s.spinnerSouth]) {
+    if (arm == null) continue;
+    if (!Array.isArray(arm)) return false;
+    for (const entry of arm) {
+      if (!entry || typeof entry !== "object") return false;
+      const id = /** @type {{ id?: unknown }} */ (entry).id;
+      if (!claimTileId(id, byId, seen)) return false;
+    }
+  }
+
+  if (s.spinnerId != null) {
+    if (typeof s.spinnerId !== "string") return false;
+    if (!s.board.some((entry) => entry && entry.id === s.spinnerId)) return false;
+  }
+
   for (const id of s.reserve) {
     if (!claimTileId(id, byId, seen)) return false;
   }
