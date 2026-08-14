@@ -24,6 +24,7 @@
     "test:persistence": "node src/persistence/persistence.test.js",
     "test:chain-layout": "node src/board/layoutEngine.test.js",
     "test:board-layout": "node src/board/layoutEngine.test.js",
+    "test:board-autofit": "node src/board/boardLayout.autofit.test.js",
     "test:board-layout-stress": "node src/board/layoutEngine.stress.test.js",
     "test:board-opening-double": "node src/board/openingDouble.stress.test.js",
     "test:board-fidelity": "node src/board/connectionFidelity.test.js",
@@ -42,7 +43,7 @@
     "test:match-over": "node src/game/matchOver.test.js",
     "test:render-painter": "node src/render/DominoBitmapPainter.test.js",
     "test:render-cache": "node src/render/dominoBitmapCache.test.js",
-    "test": "npm run test:engine && npm run test:rules && npm run test:ai && npm run test:setup-ai && npm run test:rulesets && npm run test:haitian && npm run test:american && npm run test:dominican && npm run test:puertorican && npm run test:dekabes && npm run test:all-fives && npm run test:i18n && npm run test:i18n:ui && npm run test:audio && npm run test:interaction && npm run test:tile-pointer && npm run test:persistence && npm run test:board-sync && npm run test:offline-mp && npm run test:turn-order && npm run test:chain-layout && npm run test:board-layout-stress && npm run test:board-opening-double && npm run test:board-fidelity && npm run test:board-presentation && npm run test:board-moves-stress && npm run test:match-over && npm run test:render-painter && npm run test:render-cache"
+    "test": "npm run test:engine && npm run test:rules && npm run test:ai && npm run test:setup-ai && npm run test:rulesets && npm run test:haitian && npm run test:american && npm run test:dominican && npm run test:puertorican && npm run test:dekabes && npm run test:all-fives && npm run test:i18n && npm run test:i18n:ui && npm run test:audio && npm run test:interaction && npm run test:tile-pointer && npm run test:persistence && npm run test:board-sync && npm run test:offline-mp && npm run test:turn-order && npm run test:chain-layout && npm run test:board-autofit && npm run test:board-layout-stress && npm run test:board-opening-double && npm run test:board-fidelity && npm run test:board-presentation && npm run test:board-moves-stress && npm run test:match-over && npm run test:render-painter && npm run test:render-cache"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

@@ -3,11 +3,11 @@ import DominoTile from "../components/DominoTile";
 import {
   calculateBoardLayout,
   layoutBoard,
-  MIN_BOARD_SCALE,
   resolveBoardTileBase,
 } from "./DominoLayoutEngine.js";
 import {
   buildBoardDisplays,
+  buildSpinnerArmDisplays,
   validateBoardPresentation,
 } from "./connectionDisplay.js";
 import { isBoardDebugEnabled, buildLayoutDebugInfo } from "./boardDebug.js";
@@ -20,15 +20,16 @@ import "./BoardContainer.css";
  * Does NOT invent positions. Maps engine output to absolute
  * `transform: translate3d(x, y, 0)` slots. No flex/grid tile flow.
  *
- * Tile scale stays at/above MIN_BOARD_SCALE. Layout is a bounded snake
- * inside the measured playable green felt (stage size + HUD carve-out).
- * Optional drag-pan is available for long chains but must not be required
- * to reveal off-table tiles — the engine keeps every tile on-felt.
+ * The engine lays out the complete chain (and spinner branches) in logical
+ * space, then auto-fits and bbox-centers the group inside the measured felt.
  */
 function BoardContainer({
   tiles = [],
   newestId = null,
   centerTileId = null,
+  spinnerId = null,
+  spinnerNorth = [],
+  spinnerSouth = [],
   emptyLabel = "",
   debug: debugProp = null,
 }) {
@@ -104,6 +105,7 @@ function BoardContainer({
         gap: 2,
         debug: null,
         placements: [],
+        armPlacements: [],
         camera: null,
       };
     }
@@ -111,15 +113,12 @@ function BoardContainer({
     const st = scaleStabilityRef.current;
     const areaChanged =
       Math.abs(area.w - st.areaW) > 12 || Math.abs(area.h - st.areaH) > 12;
-    // When the chain grows on a stable viewport, never allow scale to rise.
-    // Also never ratchet the cap below the Plan B/C readability floor.
-    const priorCap = Math.max(MIN_BOARD_SCALE, st.scale);
+    // Ceiling-only: adding tiles on a stable viewport must not upscale.
+    // Never floor at MIN_BOARD_SCALE — auto-fit may need to shrink.
     const maxScale =
-      !areaChanged && tiles.length > st.count
-        ? priorCap
-        : !areaChanged && tiles.length === st.count
-          ? priorCap
-          : 1;
+      !areaChanged && tiles.length >= st.count && st.scale > 0
+        ? st.scale
+        : 1;
 
     const build = (hudRight) => {
       const spatial = calculateBoardLayout(
@@ -132,10 +131,13 @@ function BoardContainer({
           hudRight,
           maxScale,
           focusTileId: newestId ?? tiles[tiles.length - 1]?.id,
+          spinnerId,
+          spinnerNorth,
+          spinnerSouth,
         }
       );
 
-      const placements = spatial.tiles.map((t) => ({
+      const toPlacement = (t) => ({
         id: t.tileId,
         x: t.x,
         y: t.y,
@@ -148,11 +150,15 @@ function BoardContainer({
         double: t.double,
         isCorner: t.isCorner,
         isBridge: t.isBridge,
-      }));
+      });
+
+      const placements = spatial.tiles.map(toPlacement);
+      const armPlacements = (spatial.armTiles || []).map(toPlacement);
 
       return {
         ...spatial,
         placements,
+        armPlacements,
         tileScale: spatial.scale,
         debug: buildLayoutDebugInfo(placements, tiles),
       };
@@ -170,9 +176,9 @@ function BoardContainer({
     st.areaW = area.w;
     st.areaH = area.h;
     return resolved;
-  }, [tiles, centerIndex, area, tileSize, newestId]);
+  }, [tiles, centerIndex, area, tileSize, newestId, spinnerId, spinnerNorth, spinnerSouth]);
 
-  const { placements, tileScale, debug, gap, camera } = layout;
+  const { placements, armPlacements, tileScale, debug, gap, camera } = layout;
   // Pan is exploratory UX only — engine must not rely on overflow+pan.
   const panEnabled = tiles.length >= 24;
 
@@ -250,6 +256,20 @@ function BoardContainer({
     [tiles, placements]
   );
 
+  /** Spinner N/S arms — positions come from the same layout engine as the chain. */
+  const armDisplays = useMemo(() => {
+    if (!spinnerId || !placements?.length) return [];
+    const spinPos = placements.find((p) => p.id === spinnerId);
+    if (!spinPos) return [];
+    return buildSpinnerArmDisplays(
+      spinPos,
+      spinnerNorth,
+      spinnerSouth,
+      gap ?? 2,
+      armPlacements
+    );
+  }, [spinnerId, spinnerNorth, spinnerSouth, placements, armPlacements, gap]);
+
   useLayoutEffect(() => {
     if (!import.meta.env.DEV || tiles.length < 2) return;
     const result = validateBoardPresentation(tiles, {
@@ -299,7 +319,7 @@ function BoardContainer({
                 : undefined,
           }}
         >
-          {displays.map((entry) => {
+          {[...displays, ...armDisplays].map((entry) => {
             if (!entry?.pos || !entry.display) return null;
             const { tile, pos, display } = entry;
             const isTip = tipIds.has(tile.id);

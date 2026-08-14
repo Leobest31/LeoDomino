@@ -1,16 +1,17 @@
 /**
- * DominoLayoutEngine — Matrix / node-based spatial board layout (from scratch)
+ * DominoLayoutEngine — logical board layout, then fit-to-felt.
  *
- * Layer 2 of the board stack:
- *   Logical chain (game) → Spatial engine (this file) → Renderer (BoardContainer)
+ * Pipeline (same game state → same layout):
+ *   1. Place every played tile in logical coordinates (opener center = 0,0)
+ *      including American spinner N/S branches in that same space.
+ *   2. Measure the full AABB of rotated footprints (not centers only).
+ *   3. Auto-fit: one uniform scale for the whole board
+ *        fitScale = min(preferred, safeW / chainW, safeH / chainH)
+ *   4. Translate so chain bbox center = safe-felt center.
  *
- * Pure functions only. No React, no CSS flow layout.
- * Every tile gets absolute (x, y, rotation). Overlaps are never emitted.
- *
- * Coordinate system (local): origin (0,0) at the opening tile center.
- * Screen mapping: fixed tile scale, opener pinned to PLAYABLE FELT mid
- * (not the outer stage / viewport center). Soft search bounds never expand
- * past the hard green-table rect — camera/pan must not hide off-felt tiles.
+ * Routing (snake) still turns before the table edge so the pack stays compact.
+ * Scale is applied after the complete chain exists — never by dropping tiles
+ * or shrinking individual bones. Fail-closed empty placements are forbidden.
  *
  * Rotation convention (degrees):
  *   0   — horizontal (long axis E–W)
@@ -28,6 +29,8 @@ export const CHAIN_GAP = 2;
 export const GAP = CHAIN_GAP;
 export const MARGIN = 14;
 export const PADDING = 28;
+/** Extra inset inside the playable felt so bones stay off the gold border. */
+export const SAFE_FELT_INSET = 8;
 export const BRIDGE_LEN = 2;
 /**
  * Plan B/C: readable board floor. Effective tile scale must not fall below
@@ -100,6 +103,11 @@ const EMERGENCY_MIN_SCALE = 0.05;
 /** Extra clearance so half-pixel snap after screen mapping cannot collapse the gap. */
 const SNAP_CLEARANCE = 0.5;
 const OPP = Object.freeze({ E: "W", W: "E", N: "S", S: "N" });
+const RESERVE_PREFIX = "__spin-";
+
+function isReserveId(id) {
+  return typeof id === "string" && id.startsWith(RESERVE_PREFIX);
+}
 
 function snap(n) {
   return Math.round(n * 2) / 2;
@@ -478,7 +486,8 @@ function growArm(
    * Prefer shorter later rails so the snake fills vertical room instead of
    * one/two wide center rows. When set, overrides the default targetRun.
    */
-  targetRunOverride = null
+  targetRunOverride = null,
+  force = false
 ) {
   let prev = start;
   let dir = startDir;
@@ -704,6 +713,21 @@ function growArm(
       if (chosen) chosenDir = dir;
     }
 
+    if (!chosen && force) {
+      const open = [...out.values()];
+      for (const d of [dir, foldDir, OPP[foldDir], OPP[dir], "E", "W", "N", "S"]) {
+        if (!isLegalStep(prev, tile, d, size)) continue;
+        const box = placeAgainst(prev, tile, d, size, gap, dir);
+        box.isCorner = d !== dir;
+        box.isBridge = d === "N" || d === "S";
+        if (!findCollision(box, open, gap, prev.id)) {
+          chosen = box;
+          chosenDir = d;
+          break;
+        }
+      }
+    }
+
     if (!chosen) return false;
     if (findCollision(chosen, occupied, gap, prev.id)) return false;
 
@@ -749,6 +773,208 @@ function bboxOf(items) {
     maxY = Math.max(maxY, p.y + p.h);
   }
   return { minX, minY, maxX, maxY };
+}
+
+/** Playable felt minus inner padding (margin from the gold/table border). */
+export function computeSafeFeltBounds(play, inset = SAFE_FELT_INSET) {
+  const pad = Math.max(0, Number(inset) || 0);
+  const width = play.maxX - play.minX;
+  const height = play.maxY - play.minY;
+  const padX = Math.min(pad, Math.max(0, (width - 48) / 2));
+  const padY = Math.min(pad, Math.max(0, (height - 48) / 2));
+  return {
+    minX: play.minX + padX,
+    maxX: play.maxX - padX,
+    minY: play.minY + padY,
+    maxY: play.maxY - padY,
+  };
+}
+
+/** AABB of rotated tile footprints (not centers). */
+export function computeChainBounds(placements) {
+  if (!placements?.length) {
+    return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0, cx: 0, cy: 0 };
+  }
+  const bb = bboxOf(placements);
+  return {
+    ...bb,
+    width: Math.max(0, bb.maxX - bb.minX),
+    height: Math.max(0, bb.maxY - bb.minY),
+    cx: (bb.minX + bb.maxX) / 2,
+    cy: (bb.minY + bb.maxY) / 2,
+  };
+}
+
+/**
+ * Uniform board scale. Never upscales past preferred. Only shrinks when the
+ * complete chain AABB no longer fits in the safe felt.
+ */
+export function computeFitScale(chainBounds, safeBounds, preferredScale = 1) {
+  const chainW = Math.max(1, chainBounds.width ?? chainBounds.maxX - chainBounds.minX);
+  const chainH = Math.max(1, chainBounds.height ?? chainBounds.maxY - chainBounds.minY);
+  const safeW = Math.max(1, safeBounds.maxX - safeBounds.minX);
+  const safeH = Math.max(1, safeBounds.maxY - safeBounds.minY);
+  const preferred = Math.max(
+    EMERGENCY_MIN_SCALE,
+    Number.isFinite(preferredScale) ? preferredScale : 1
+  );
+  return Math.max(
+    EMERGENCY_MIN_SCALE,
+    Math.min(preferred, safeW / chainW, safeH / chainH)
+  );
+}
+
+function spinnerLaneOccupants(spinner, northCount, southCount, size, gap) {
+  if (!spinner || (northCount <= 0 && southCount <= 0)) return [];
+  const short = Math.min(size.w, size.h);
+  const long = Math.max(size.w, size.h);
+  const x = spinner.x + (spinner.w - short) / 2;
+  const out = [];
+  for (let i = 0; i < northCount; i += 1) {
+    out.push({
+      id: `${RESERVE_PREFIX}n-${i}`,
+      x,
+      y: spinner.y - (i + 1) * (long + gap),
+      w: short,
+      h: long,
+      double: false,
+      isBridge: true,
+      branch: "north",
+    });
+  }
+  for (let i = 0; i < southCount; i += 1) {
+    out.push({
+      id: `${RESERVE_PREFIX}s-${i}`,
+      x,
+      y: spinner.y + spinner.h + gap + i * (long + gap),
+      w: short,
+      h: long,
+      double: false,
+      isBridge: true,
+      branch: "south",
+    });
+  }
+  return out;
+}
+
+function placeSpinnerBranch(map, spinner, tiles, dir, size, gap, hard, force) {
+  const branch = dir === "N" ? "north" : "south";
+  let prev = spinner;
+  let fromDir = dir;
+  for (const tile of tiles) {
+    const occupied = [...map.values()];
+    let box =
+      tryPlace(prev, tile, dir, fromDir, size, gap, hard, occupied, hard) ||
+      tryPlace(
+        prev,
+        tile,
+        dir,
+        fromDir,
+        size,
+        gap,
+        expandSoft(hard, size, 2, null),
+        occupied,
+        force ? null : hard
+      );
+    if (!box && force) {
+      const cand = placeAgainst(prev, tile, dir, size, gap, fromDir);
+      cand.isCorner = false;
+      cand.isBridge = true;
+      if (!findCollision(cand, occupied, gap, prev.id)) box = cand;
+    }
+    if (!box) return false;
+    const placed = {
+      ...box,
+      travelDir: dir,
+      branch,
+      isCorner: false,
+      isBridge: true,
+    };
+    map.set(tile.id, placed);
+    prev = placed;
+    fromDir = dir;
+  }
+  return true;
+}
+
+function attachSpinnerBranches(map, spinnerId, northTiles, southTiles, size, gap, hard, force) {
+  if (!spinnerId) return { ok: true, armIds: [] };
+  const north = Array.isArray(northTiles) ? northTiles : [];
+  const south = Array.isArray(southTiles) ? southTiles : [];
+  if (!north.length && !south.length) return { ok: true, armIds: [] };
+  const spinner = map.get(spinnerId);
+  if (!spinner) return { ok: false, armIds: [] };
+  if (north.length && !placeSpinnerBranch(map, spinner, north, "N", size, gap, hard, force)) {
+    return { ok: false, armIds: [] };
+  }
+  if (south.length && !placeSpinnerBranch(map, spinner, south, "S", size, gap, hard, force)) {
+    return { ok: false, armIds: [] };
+  }
+  return {
+    ok: true,
+    armIds: [...north, ...south].map((t) => t.id),
+  };
+}
+
+function completeMissingTiles(map, tiles, centerIndex, size, gap) {
+  const opener = tiles[centerIndex];
+  if (!opener) return;
+  if (!map.has(opener.id)) {
+    const fp = footprintForTravel(opener, "E", size);
+    map.set(opener.id, {
+      id: opener.id,
+      x: snap(-fp.w / 2),
+      y: snap(-fp.h / 2),
+      w: snap(fp.w),
+      h: snap(fp.h),
+      orientation: fp.orientation,
+      rotation: fp.rotation,
+      double: isDouble(opener),
+      valueLeft: Number(opener.left),
+      valueRight: Number(opener.right),
+      branch: "center",
+    });
+  }
+  const fill = (from, to, step, startDir, branch) => {
+    let prev = map.get(tiles[centerIndex].id);
+    let dir = startDir;
+    for (let i = from; i !== to; i += step) {
+      const tile = tiles[i];
+      if (map.has(tile.id)) {
+        prev = map.get(tile.id);
+        dir = prev.travelDir || dir;
+        continue;
+      }
+      const occupied = [...map.values()];
+      let box = null;
+      let chosenDir = dir;
+      for (const d of [dir, "E", "W", "N", "S"]) {
+        if (!isLegalStep(prev, tile, d, size)) continue;
+        const cand = placeAgainst(prev, tile, d, size, gap, dir);
+        if (!findCollision(cand, occupied, gap, prev.id)) {
+          box = cand;
+          chosenDir = d;
+          break;
+        }
+      }
+      if (!box) {
+        box = placeAgainst(prev, tile, dir, size, gap, dir);
+        chosenDir = dir;
+      }
+      const placed = {
+        ...box,
+        travelDir: chosenDir,
+        branch,
+        isCorner: chosenDir !== dir,
+        isBridge: chosenDir === "N" || chosenDir === "S",
+      };
+      map.set(tile.id, placed);
+      prev = placed;
+      dir = chosenDir;
+    }
+  };
+  fill(centerIndex + 1, tiles.length, 1, "E", "right");
+  fill(centerIndex - 1, -1, -1, "W", "left");
 }
 
 function screenAxisOk(placements, tiles, gap, boxFn = collisionBox) {
@@ -823,7 +1049,9 @@ function placeGraph(
   swapArms,
   hard = soft,
   packSize = null,
-  targetRunOverride = null
+  targetRunOverride = null,
+  extraOccupied = [],
+  force = false
 ) {
   const opener = tiles[centerIndex];
   const fp = footprintForTravel(opener, "E", size);
@@ -849,6 +1077,9 @@ function placeGraph(
     bridgeTarget <= 1 ? [1] : [bridgeTarget, 1];
   for (const bridgeLen of bridgeLens) {
     const map = new Map([[opener.id, origin]]);
+    for (const extra of extraOccupied) {
+      if (extra?.id) map.set(extra.id, extra);
+    }
     const growRight = () =>
       growArm(
         tiles,
@@ -866,7 +1097,8 @@ function placeGraph(
         bridgeLen,
         hard,
         packSize,
-        targetRunOverride
+        targetRunOverride,
+        force
       );
     const growLeft = () =>
       growArm(
@@ -885,7 +1117,8 @@ function placeGraph(
         bridgeLen,
         hard,
         packSize,
-        targetRunOverride
+        targetRunOverride,
+        force
       );
 
     const first = swapArms ? growLeft() : growRight();
@@ -893,11 +1126,16 @@ function placeGraph(
     const second = swapArms ? growRight() : growLeft();
     if (!second) continue;
 
+    for (const id of [...map.keys()]) {
+      if (isReserveId(id)) map.delete(id);
+    }
+
     const list = [...map.values()];
+    const insideHard = force || list.every((p) => fitsSoft(p, hard));
     if (
       map.size === tiles.length &&
       chainCollisionFree(list, gap, tiles) &&
-      list.every((p) => fitsSoft(p, hard))
+      insideHard
     ) {
       return { map, ok: true };
     }
@@ -905,76 +1143,9 @@ function placeGraph(
   return { map: new Map([[opener.id, origin]]), ok: false };
 }
 
-/** True if the local bbox, centered on (cx,cy) at `scale`, fits the playable felt. */
-function bboxFitsPlay(bb, cx, cy, scale, play, midX, midY) {
-  const shiftedMinX = (bb.minX - cx) * scale + midX;
-  const shiftedMaxX = (bb.maxX - cx) * scale + midX;
-  const shiftedMinY = (bb.minY - cy) * scale + midY;
-  const shiftedMaxY = (bb.maxY - cy) * scale + midY;
-  return (
-    shiftedMinX >= play.minX - 0.5 &&
-    shiftedMaxX <= play.maxX + 0.5 &&
-    shiftedMinY >= play.minY - 0.5 &&
-    shiftedMaxY <= play.maxY + 0.5
-  );
-}
-
 /**
- * Pick a camera focus in local space. Prefer opener (playable-felt mid) when
- * the chain still fits; otherwise recenter on newest / endpoints / bbox —
- * but ONLY if the full chain stays inside the hard green table. Overflow
- * layouts are rejected by the searcher (camera must not hide off-felt tiles).
- */
-function pickCameraFocus(placements, bb, openerId, focusTileId, scale, play, midX, midY) {
-  const candidates = [];
-  const pushFocus = (id, mode) => {
-    if (!id) return;
-    const p = placements.find((t) => t.id === id);
-    if (!p) return;
-    candidates.push({
-      cx: p.x + p.w / 2,
-      cy: p.y + p.h / 2,
-      mode,
-    });
-  };
-  pushFocus(openerId, "opener");
-  pushFocus(focusTileId, "newest");
-  // Midpoint of chain tips (playable endpoints).
-  if (placements.length >= 2) {
-    const a = placements[0];
-    const b = placements[placements.length - 1];
-    candidates.push({
-      cx: (a.x + a.w / 2 + b.x + b.w / 2) / 2,
-      cy: (a.y + a.h / 2 + b.y + b.h / 2) / 2,
-      mode: "endpoints",
-    });
-  }
-  candidates.push({
-    cx: (bb.minX + bb.maxX) / 2,
-    cy: (bb.minY + bb.maxY) / 2,
-    mode: "bbox",
-  });
-
-  for (const c of candidates) {
-    if (bboxFitsPlay(bb, c.cx, c.cy, scale, play, midX, midY)) {
-      return { ...c, recentered: c.mode !== "opener", overflow: false };
-    }
-  }
-  // No on-felt focus — mark overflow so the searcher rejects this candidate.
-  const fallback =
-    candidates.find((c) => c.mode === "opener") ||
-    candidates.find((c) => c.mode === "newest") ||
-    candidates.find((c) => c.mode === "endpoints") ||
-    candidates[candidates.length - 1];
-  return { ...fallback, recentered: true, overflow: true };
-}
-
-/**
- * Map local layout → screen top-left with FIXED scale.
- *
- * Screen scale is identity (1); unit scale is applied during placement.
- * Origin maps to the PLAYABLE GREEN TABLE midpoint (HUD carve-out honored),
- * not the outer stage center. Does not accept off-table overflow.
+ * Map logical layout → screen: one uniform auto-fit scale, then bbox-center
+ * onto the safe felt. Does not pin the opening tile.
  */
 function toScreen(
   placements,
@@ -984,15 +1155,22 @@ function toScreen(
   margin = MARGIN,
   hudRight = null,
   focusTileId = null,
-  hudLeft = null
+  hudLeft = null,
+  maxScale = 1
 ) {
-  void padding; // retained for call-site compatibility; no longer used for fit-shrink
+  void padding;
+  void openerId;
+  void focusTileId;
   const width = Math.max(120, viewport.width);
   const height = Math.max(120, viewport.height);
   const play = computePlayBounds({ width, height }, margin, hudRight, hudLeft);
-  const mid = playMid(play);
-  const midX = mid.x;
-  const midY = mid.y;
+  const safe = computeSafeFeltBounds(play);
+  const midX = (safe.minX + safe.maxX) / 2;
+  const midY = (safe.minY + safe.maxY) / 2;
+  const preferred = Math.max(
+    EMERGENCY_MIN_SCALE,
+    Math.min(1, Number.isFinite(maxScale) ? maxScale : 1)
+  );
 
   if (!placements.length) {
     return {
@@ -1007,80 +1185,74 @@ function toScreen(
         x: midX,
         y: midY,
       },
+      play,
+      safe,
     };
   }
 
-  const bb = bboxOf(placements);
-  const contentW = Math.max(1, bb.maxX - bb.minX);
-  const contentH = Math.max(1, bb.maxY - bb.minY);
+  const chain = computeChainBounds(placements);
+  let scale = computeFitScale(chain, safe, preferred);
+  const cx = chain.cx;
+  const cy = chain.cy;
 
-  // Identity screen scale — placement already used the chosen unitScale.
-  // Do NOT derive scale from content bounding box.
-  const scale = 1;
-  const focus = pickCameraFocus(
-    placements,
-    bb,
-    openerId,
-    focusTileId,
-    scale,
-    play,
-    midX,
-    midY
-  );
-  const cx = focus.cx;
-  const cy = focus.cy;
+  const project = (s) =>
+    placements.map((p, zIndex) => {
+      const lx = p.x + p.w / 2;
+      const ly = p.y + p.h / 2;
+      const sx = (lx - cx) * s + midX;
+      const sy = (ly - cy) * s + midY;
+      const w = p.w * s;
+      const h = p.h * s;
+      return {
+        tileId: p.id,
+        valueLeft: p.valueLeft,
+        valueRight: p.valueRight,
+        x: sx - w / 2,
+        y: sy - h / 2,
+        w,
+        h,
+        rotation: p.rotation,
+        orientation: p.orientation,
+        zIndex,
+        travelDir: p.travelDir,
+        branch: p.branch,
+        double: p.double,
+        isCorner: p.isCorner,
+        isBridge: p.isBridge,
+      };
+    });
 
-  const tiles = placements.map((p, zIndex) => {
-    const lx = p.x + p.w / 2;
-    const ly = p.y + p.h / 2;
-    const sx = (lx - cx) * scale + midX;
-    const sy = (ly - cy) * scale + midY;
-    const w = p.w * scale;
-    const h = p.h * scale;
-    const quantize = snap;
-    return {
-      tileId: p.id,
-      valueLeft: p.valueLeft,
-      valueRight: p.valueRight,
-      x: quantize(sx - w / 2),
-      y: quantize(sy - h / 2),
-      w: quantize(w),
-      h: quantize(h),
-      rotation: p.rotation,
-      orientation: p.orientation,
-      zIndex,
-      travelDir: p.travelDir,
-      branch: p.branch,
-      double: p.double,
-      isCorner: p.isCorner,
-      isBridge: p.isBridge,
-    };
-  });
-
-  // Snap can nudge half-pixels — re-verify hard playable containment.
-  const overflow =
-    focus.overflow || !screenTilesInsidePlay(tiles, play, 0.75);
+  let tiles = project(scale);
+  if (!screenTilesInsidePlay(tiles, safe, 0.5) && scale > EMERGENCY_MIN_SCALE) {
+    scale = Math.max(EMERGENCY_MIN_SCALE, scale * 0.985);
+    tiles = project(scale);
+  }
+  const overflow = !screenTilesInsidePlay(tiles, safe, 0.75);
 
   return {
     tiles,
     scale,
     content: {
-      width: contentW,
-      height: contentH,
-      minX: bb.minX,
-      maxX: bb.maxX,
-      minY: bb.minY,
-      maxY: bb.maxY,
+      width: chain.width,
+      height: chain.height,
+      minX: chain.minX,
+      maxX: chain.maxX,
+      minY: chain.minY,
+      maxY: chain.maxY,
+      cx,
+      cy,
     },
     origin: { x: midX, y: midY },
     camera: {
-      recentered: focus.recentered,
+      recentered: true,
       overflow,
-      focusMode: focus.mode,
+      focusMode: "bbox",
       x: midX,
       y: midY,
       localFocus: { x: cx, y: cy },
     },
+    play,
+    safe,
   };
 }
 
@@ -1117,6 +1289,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
   if (!tiles.length) {
     return {
       tiles: [],
+      armTiles: [],
       scale: 1,
       content: { width: 0, height: 0, minX: 0, maxX: 0, minY: 0, maxY: 0 },
       origin: { x: midEarly.x, y: midEarly.y },
@@ -1142,69 +1315,48 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
   const hudLeft = hudLeftEarly;
   const play = playEarly;
 
-  // Hard local bounds = playable green table centered on opener (= felt mid).
-  // Soft is a slight inset so the snake prefers turning before the edge.
-  // Soft NEVER expands past hard — no off-felt sprawl / camera overflow.
-  // Exception: pathological stress chains (>200) use a larger virtual hard
-  // rect so both arms can finish without self-deadlock; overflow layouts are
-  // only kept as essentialFallback (real matches ≤28 still require on-felt).
   const hardLocal = localHardBounds(play);
-  const packHard =
-    tiles.length > 200
-      ? {
-          minX: hardLocal.minX * 8,
-          maxX: hardLocal.maxX * 8,
-          minY: hardLocal.minY * 8,
-          maxY: hardLocal.maxY * 8,
-        }
-      : hardLocal;
-  const softInset = Math.min(10, PADDING);
   const playW0 = Math.max(1, play.maxX - play.minX);
   const playH0 = Math.max(1, play.maxY - play.minY);
-  const packW0 = Math.max(1, packHard.maxX - packHard.minX);
-  const packH0 = Math.max(1, packHard.maxY - packHard.minY);
-  const softW0 = Math.max(120, packW0 - softInset);
-  const softH0 = Math.max(100, packH0 - softInset);
-  // Cramped = genuinely small playable felt (phones / short stages).
-  // Mid tablets (~640×390) must NOT use the aggressive ×0.78 cliff path.
   const crampedViewport = playW0 < 400 || playH0 < 320;
-  // Tall play areas have unused vertical room — spend more attempts packing
-  // before emergency shrink (avoids two short center rows at tiny scale).
   const tallPlay = playH0 > playW0 * 0.85;
-
-  // Cap starting unit scale so a growing chain on a fixed viewport cannot
-  // suddenly upscale (BoardContainer passes prior scale as maxScale).
+  const matchLen = tiles.length;
+  const size = { w: baseW, h: baseH };
+  const gap = effectiveGap(size.w, size.h, requestedGap);
   const scaleCap = Math.max(
     EMERGENCY_MIN_SCALE,
     Math.min(1, options.maxScale != null ? Number(options.maxScale) : 1)
   );
-  let unitScale = Number.isFinite(scaleCap) ? scaleCap : 1;
+
+  const northTiles = Array.isArray(options.spinnerNorth) ? options.spinnerNorth : [];
+  const southTiles = Array.isArray(options.spinnerSouth) ? options.spinnerSouth : [];
+  const northCount = Math.max(
+    northTiles.length,
+    Number(options.spinnerNorthCount) || 0
+  );
+  const southCount = Math.max(
+    southTiles.length,
+    Number(options.spinnerSouthCount) || 0
+  );
+  const spinnerId = typeof options.spinnerId === "string" ? options.spinnerId : null;
+  const openerFp = footprintForTravel(tiles[centerIndex], "E", size);
+  const originProbe = {
+    id: tiles[centerIndex].id,
+    x: snap(-openerFp.w / 2),
+    y: snap(-openerFp.h / 2),
+    w: snap(openerFp.w),
+    h: snap(openerFp.h),
+  };
+  const extraOccupied =
+    spinnerId && tiles[centerIndex].id === spinnerId
+      ? spinnerLaneOccupants(originProbe, northCount, southCount, size, gap)
+      : [];
+
   let result = null;
   let looseFallback = null;
   let fallback = null;
   let essentialFallback = null;
-  /** Best collision-free layout by tile scale — prefer full-size early match. */
   let bestByScale = null;
-  const matchLen = tiles.length;
-  // Pathological stress chains cannot start at full size on phone felts —
-  // begin closer to a feasible pack so the attempt budget is not spent only
-  // failing at unreadable-large scales.
-  if (matchLen >= 200) {
-    unitScale = Math.min(unitScale, 0.35);
-  } else if (matchLen >= 80) {
-    unitScale = Math.min(unitScale, 0.7);
-  }
-  const focusTileId =
-    options.focusTileId ??
-    options.newestId ??
-    (tiles.length ? tiles[tiles.length - 1].id : null);
-  // Ease soft from inset toward hard (never past) while searching — early
-  // turns first, then use the full felt if packing needs it.
-  const largeBase = Math.min(baseW, baseH) >= BOARD_BASE_SHORT_MAX_PX;
-  // Reach hard bounds quickly so long chains can use the full green table.
-  const softEaseStep = crampedViewport || largeBase || matchLen > 14 ? 0.14 : 0.08;
-  let softEaseEpoch = 0;
-  let unitScaleAtEpoch = unitScale;
 
   const preferFullSize = (a, b) => {
     if (!a) return b;
@@ -1262,127 +1414,213 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     };
   };
 
-  const attemptLimit =
-    matchLen >= 80
-      ? 320
-      : matchLen >= 24
-        ? 280
-        : crampedViewport || largeBase
-          ? matchLen > 22
-            ? 220
-            : 180
-          : matchLen > 18
-            ? 240
-            : matchLen > 12
-              ? 180
-              : 90;
-  for (let attempt = 0; attempt < attemptLimit; attempt += 1) {
-    if (Math.abs(unitScale - unitScaleAtEpoch) > 0.0005) {
-      softEaseEpoch = attempt;
-      unitScaleAtEpoch = unitScale;
+  const packSize = { w: baseW, h: baseH };
+  const matchFloor =
+    matchLen <= 21 ? MIN_BOARD_SCALE : matchLen <= 28 ? MIN_MATCH_SCALE : EMERGENCY_MIN_SCALE;
+  const safe0 = computeSafeFeltBounds(play);
+  const safeW0 = Math.max(1, safe0.maxX - safe0.minX);
+  const safeH0 = Math.max(1, safe0.maxY - safe0.minY);
+  const floorMul =
+    Math.min(safeW0 / playW0, safeH0 / playH0) / Math.max(0.2, matchFloor);
+  const canvasMultipliers =
+    matchLen > 200
+      ? [4, 8, 16, 32]
+      : matchLen > 80
+        ? [1.5, 2.5, 4, 8, 16]
+          : matchLen > 28
+          ? [1, 1.25, 1.5, 2, 2.6, 3.5, 5, 8, 12]
+          : [1, 1.06, 1.14, 1.22, 1.32, 1.45, floorMul, 1.7, 1.85, 2.2, 2.8];
+  const variantsForCanvas = (canvasIndex) => {
+    if (matchLen >= 80) return 28;
+    if (canvasIndex === 0) {
+      return matchLen >= 12 ? 72 : 36;
     }
-    const size = { w: baseW * unitScale, h: baseH * unitScale };
-    const gap = effectiveGap(size.w, size.h, requestedGap);
-    const easeAttempt = Math.max(0, attempt - softEaseEpoch);
-    // t=0 → inset soft (turn early); t=1 → hard playable table (full felt).
-    // Long chains start near hard bounds so multi-row packs can use full W×H
-    // before any scale drop.
-    const easeT =
-      matchLen >= 80
-        ? 1
-        : matchLen >= 18
-          ? Math.min(1, 0.75 + easeAttempt * softEaseStep)
-          : Math.min(1, easeAttempt * softEaseStep);
-    const bounds = {
-      minX: (-softW0 / 2) * (1 - easeT) + packHard.minX * easeT,
-      maxX: (softW0 / 2) * (1 - easeT) + packHard.maxX * easeT,
-      minY: (-softH0 / 2) * (1 - easeT) + packHard.minY * easeT,
-      maxY: (softH0 / 2) * (1 - easeT) + packHard.maxY * easeT,
-    };
+    return matchLen >= 24 ? 28 : 20;
+  };
+  const refLong = Math.max(baseW, baseH);
+  const heightTight =
+    playH0 < refLong * (Math.min(baseW, baseH) >= 60 ? 3.5 : 2.8);
+  const softInset = Math.min(10, PADDING);
 
-    // Prefer dual-tile bridges when height allows. Unscaled heightTight so
-    // bridge policy does not flip mid-search when unitScale drops.
-    // Only mark heightTight when the felt literally cannot host ~2 rows —
-    // the old length×long term forced single bridges on tablet landscape and
-    // collapsed 21-tile packs into a thin horizontal strip.
-    const refLong = Math.max(baseW, baseH);
-    const heightTight = playH0 < refLong * 2.8;
-    // Cycle bridge length and later-rail targets so multi-turn packs are
-    // tried at readable size before any shrink.
-    const bridgeTarget =
-      matchLen >= 80
-        ? 1
-        : heightTight
-          ? 1
-          : tallPlay || playW0 < 760
-            ? attempt % 2 === 0
-              ? BRIDGE_LEN
-              : 1
-            : attempt % 5 === 4
-              ? 1
-              : BRIDGE_LEN;
-    // Locked snake elbows: right arm folds DOWN, left arm folds UP.
-    // Invert / swap only as late emergency after canonical packs fail.
-    const invertFolds = attempt >= 90;
-    const foldRight = invertFolds ? FIRST_FOLD_LEFT : FIRST_FOLD_RIGHT;
-    const foldLeft = invertFolds ? FIRST_FOLD_RIGHT : FIRST_FOLD_LEFT;
-    const swapArms = attempt >= 48 && Math.floor(attempt / 3) % 2 === 1;
-
-    // Topology reference: unscaled base so run lengths stay stable across
-    // scale attempts for real matches (prevents the ~19–21 shrink cliff).
-    const packSize = { w: baseW, h: baseH };
-    const railCycle = attempt % 4;
-    const targetRunOverride =
-      matchLen > 200
-        ? 8 + (attempt % 6)
-        : matchLen >= 12 && matchLen <= 40
-          ? railCycle === 0
-            ? TURN_EVERY
-            : railCycle === 1
-              ? TURN_EVERY + 1
-              : railCycle === 2
-                ? Math.max(2, TURN_EVERY - 1)
-                : TURN_EVERY + 2
-          : null;
-
-    const { map, ok } = placeGraph(
-      tiles,
-      centerIndex,
+  const projectPack = (map, force) => {
+    const attached = attachSpinnerBranches(
+      map,
+      spinnerId,
+      northTiles,
+      southTiles,
       size,
       gap,
-      bounds,
-      bridgeTarget,
-      foldRight,
-      foldLeft,
-      swapArms,
-      packHard,
-      packSize,
-      targetRunOverride
+      {
+        minX: -1e6,
+        maxX: 1e6,
+        minY: -1e6,
+        maxY: 1e6,
+      },
+      force
     );
-    if (ok && map.size === tiles.length) {
-      const list = tiles.map((t) => map.get(t.id)).filter(Boolean);
-      if (
-        list.length === tiles.length &&
-        chainCollisionFree(list, gap, tiles) &&
-        list.every((p) => fitsSoft(p, packHard))
-      ) {
-        const screen = toScreen(
-          list,
-          { width, height },
-          options.padding ?? PADDING,
-          tiles[centerIndex].id,
-          margin,
-          hudRight,
-          focusTileId,
-          hudLeft
-        );
-        const tileSpan = Math.max(screen.tiles[0]?.w || 0, screen.tiles[0]?.h || 0);
-        const safeFloor =
-          tileSpan >= 20
-            ? MIN_SAFE_GAP_PX
-            : Math.min(MIN_SAFE_GAP_PX, tileSpan * 0.05);
-        const screenGap = Math.max(safeFloor, Math.min(2, gap * screen.scale));
-        const screenPlacements = screen.tiles.map((t) => ({
+    if (!attached.ok && !force) return null;
+    completeMissingTiles(map, tiles, centerIndex, size, gap);
+    if ((!attached.ok || attached.armIds.length < northTiles.length + southTiles.length) && force) {
+      attachSpinnerBranches(
+        map,
+        spinnerId,
+        northTiles,
+        southTiles,
+        size,
+        gap,
+        { minX: -1e6, maxX: 1e6, minY: -1e6, maxY: 1e6 },
+        true
+      );
+    }
+    const armSet = new Set([
+      ...northTiles.map((t) => t.id),
+      ...southTiles.map((t) => t.id),
+    ]);
+    const mainList = tiles.map((t) => map.get(t.id)).filter(Boolean);
+    if (mainList.length !== tiles.length) return null;
+    const armList = [...armSet].map((id) => map.get(id)).filter(Boolean);
+    const combined = [...mainList, ...armList];
+    const linkTiles = [...tiles];
+    if (spinnerId && northTiles[0]) {
+      linkTiles.push({ id: spinnerId }, northTiles[0]);
+      for (let i = 0; i < northTiles.length - 1; i += 1) {
+        linkTiles.push(northTiles[i], northTiles[i + 1]);
+      }
+    }
+    if (spinnerId && southTiles[0]) {
+      linkTiles.push({ id: spinnerId }, southTiles[0]);
+      for (let i = 0; i < southTiles.length - 1; i += 1) {
+        linkTiles.push(southTiles[i], southTiles[i + 1]);
+      }
+    }
+    if (!chainCollisionFree(combined, gap, linkTiles) && !force) return null;
+
+    const screen = toScreen(
+      combined,
+      { width, height },
+      options.padding ?? PADDING,
+      tiles[centerIndex].id,
+      margin,
+      hudRight,
+      null,
+      hudLeft,
+      scaleCap
+    );
+    const byId = new Map(screen.tiles.map((t) => [t.tileId, t]));
+    const orderedMain = tiles.map((t) => byId.get(t.id)).filter(Boolean);
+    if (orderedMain.length !== tiles.length) return null;
+    const orderedArms = [...northTiles, ...southTiles]
+      .map((t) => byId.get(t.id))
+      .filter(Boolean);
+    const screenPlacements = orderedMain.map((t) => ({
+      id: t.tileId,
+      x: t.x,
+      y: t.y,
+      w: t.w,
+      h: t.h,
+      double: t.double,
+      isCorner: t.isCorner,
+      isBridge: t.isBridge,
+    }));
+    let aabbClear = true;
+    for (let i = 0; i < screen.tiles.length && aabbClear; i += 1) {
+      for (let j = i + 1; j < screen.tiles.length; j += 1) {
+        if (overlaps(screen.tiles[i], screen.tiles[j])) {
+          aabbClear = false;
+          break;
+        }
+      }
+    }
+    if (!aabbClear && !force) return null;
+    const screenGap = Math.max(MIN_SAFE_GAP_PX, Math.min(2, gap * screen.scale));
+    const stats = footprintStats(screenPlacements);
+    return {
+      ...screen,
+      tiles: orderedMain,
+      armTiles: orderedArms,
+      scale: screen.scale,
+      gap: screenGap,
+      heightUse: stats.heightUse,
+      turnCount: stats.turnCount,
+      aspect: stats.aspect,
+    };
+  };
+
+  for (let canvasIndex = 0; canvasIndex < canvasMultipliers.length; canvasIndex += 1) {
+    const mul = canvasMultipliers[canvasIndex];
+    const packHard = {
+      minX: hardLocal.minX * mul,
+      maxX: hardLocal.maxX * mul,
+      minY: hardLocal.minY * mul,
+      maxY: hardLocal.maxY * mul,
+    };
+    const packW0 = Math.max(1, packHard.maxX - packHard.minX);
+    const packH0 = Math.max(1, packHard.maxY - packHard.minY);
+    const softW0 = Math.max(120, packW0 - softInset);
+    const softH0 = Math.max(100, packH0 - softInset);
+
+    for (let attempt = 0; attempt < variantsForCanvas(canvasIndex); attempt += 1) {
+      const easeT = Math.min(1, 0.55 + attempt * 0.08);
+      const bounds = {
+        minX: (-softW0 / 2) * (1 - easeT) + packHard.minX * easeT,
+        maxX: (softW0 / 2) * (1 - easeT) + packHard.maxX * easeT,
+        minY: (-softH0 / 2) * (1 - easeT) + packHard.minY * easeT,
+        maxY: (softH0 / 2) * (1 - easeT) + packHard.maxY * easeT,
+      };
+      const bridgeTarget =
+        heightTight || (crampedViewport && matchLen > 28)
+          ? 1
+          : matchLen >= 80
+            ? 1
+            : tallPlay || playW0 < 760
+              ? attempt % 2 === 0
+                ? BRIDGE_LEN
+                : 1
+              : attempt % 5 === 4
+                ? 1
+                : BRIDGE_LEN;
+      const invertFolds = canvasIndex >= 2 && attempt >= 10;
+      const foldRight = invertFolds ? FIRST_FOLD_LEFT : FIRST_FOLD_RIGHT;
+      const foldLeft = invertFolds ? FIRST_FOLD_RIGHT : FIRST_FOLD_LEFT;
+      const swapArms = canvasIndex >= 1 && attempt >= 12 && attempt % 2 === 1;
+      const railCycle = attempt % 4;
+      const targetRunOverride =
+        matchLen > 200
+          ? 8 + (attempt % 6)
+          : matchLen >= 12
+            ? railCycle === 0
+              ? TURN_EVERY
+              : railCycle === 1
+                ? TURN_EVERY + 1
+                : railCycle === 2
+                  ? Math.max(2, TURN_EVERY - 1)
+                  : TURN_EVERY + 2
+            : null;
+
+      const forcePack = canvasIndex >= 2 && attempt >= variantsForCanvas(canvasIndex) - 3;
+      const { map, ok } = placeGraph(
+        tiles,
+        centerIndex,
+        size,
+        gap,
+        bounds,
+        bridgeTarget,
+        foldRight,
+        foldLeft,
+        swapArms,
+        packHard,
+        packSize,
+        targetRunOverride,
+        extraOccupied,
+        forcePack
+      );
+      if (!ok || map.size !== tiles.length) continue;
+      const candidate = projectPack(map, false);
+      if (!candidate) continue;
+
+      const onFelt = !candidate.camera?.overflow;
+      const axisOk = screenAxisOk(
+        candidate.tiles.map((t) => ({
           id: t.tileId,
           x: t.x,
           y: t.y,
@@ -1391,240 +1629,117 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
           double: t.double,
           isCorner: t.isCorner,
           isBridge: t.isBridge,
-        }));
-        // Prefer on-felt packs. Pathological stress chains (>50) may keep a
-        // collision-free overflow pack as essentialFallback so placement is
-        // never empty when both arms outgrow the phone felt.
-        const onFelt =
-          !screen.camera?.overflow &&
-          screenTilesInsidePlay(screen.tiles, play, 0.75);
-        let aabbClear = true;
-        for (let i = 0; i < screenPlacements.length && aabbClear; i += 1) {
-          for (let j = i + 1; j < screenPlacements.length; j += 1) {
-            if (overlaps(screenPlacements[i], screenPlacements[j])) {
-              aabbClear = false;
-              break;
-            }
-          }
-        }
-        const bridges = measureVerticalBridges(list);
-        const dualCount = bridges.filter((n) => n >= BRIDGE_LEN).length;
-        const mostlyDual =
-          bridges.length === 0 ||
-          dualCount >= Math.ceil(bridges.length * 0.5);
-        const stats = footprintStats(screenPlacements);
-        const candidate = {
-          ...screen,
-          scale: unitScale * screen.scale,
-          gap: screenGap,
-          heightUse: stats.heightUse,
-          turnCount: stats.turnCount,
-          aspect: stats.aspect,
-        };
-        const axisOk = screenAxisOk(screenPlacements, tiles, screenGap);
-        const stripLike =
-          matchLen >= 14 &&
-          matchLen <= 28 &&
-          stats.heightUse < 0.42 &&
-          stats.aspect > 3.2 &&
-          stats.turnCount < 2;
+        })),
+        tiles,
+        candidate.gap
+      );
+      const stripLike =
+        matchLen >= 14 &&
+        candidate.heightUse < 0.42 &&
+        candidate.aspect > 3.2 &&
+        candidate.turnCount < 2;
 
-        if (aabbClear && onFelt) {
-          if (axisOk && !stripLike) {
-            bestByScale = preferFullSize(bestByScale, candidate);
-          }
-          if (axisOk && mostlyDual && !stripLike) {
-            result = preferFullSize(result, candidate);
-            const floor =
-              matchLen <= 21 ? MIN_BOARD_SCALE : MIN_MATCH_SCALE;
-            const readable =
-              candidate.scale >= floor - 0.001 &&
-              !candidate.camera?.overflow;
-            const wellPacked =
-              candidate.heightUse >= 0.55 || candidate.turnCount >= 2;
-            if (readable && wellPacked && easeAttempt >= 6) break;
-            if (candidate.scale >= 0.97 && wellPacked && !candidate.camera?.overflow) {
-              break;
-            }
-          }
-          if (axisOk && (bridges.length === 0 || dualCount >= 1)) {
-            looseFallback = preferFullSize(looseFallback, candidate);
-          }
-          if (axisOk) fallback = preferFullSize(fallback, candidate);
-          {
-            const essentialGap = Math.min(2, gap * screen.scale);
-            const essentialOk = screenAxisOk(
-              screenPlacements,
-              tiles,
-              essentialGap,
-              essentialCollisionBox
-            );
-            if (essentialOk) {
-              essentialFallback = preferFullSize(essentialFallback, candidate);
-            }
-          }
-        } else if (aabbClear && matchLen > 50 && axisOk) {
-          const essentialGap = Math.min(2, gap * screen.scale);
-          const essentialOk = screenAxisOk(
-            screenPlacements,
-            tiles,
-            essentialGap,
-            essentialCollisionBox
-          );
-          if (essentialOk) {
-            essentialFallback = preferFullSize(essentialFallback, candidate);
-            if (candidate.scale >= 0.08) break;
-          }
+      if (onFelt) {
+        if (axisOk && !stripLike) {
+          bestByScale = preferFullSize(bestByScale, candidate);
         }
+        if (axisOk && !stripLike) {
+          result = preferFullSize(result, candidate);
+        }
+        if (axisOk) {
+          looseFallback = preferFullSize(looseFallback, candidate);
+          fallback = preferFullSize(fallback, candidate);
+          essentialFallback = preferFullSize(essentialFallback, candidate);
+        }
+        const wellPacked =
+          candidate.heightUse >= 0.55 || candidate.turnCount >= 2 || matchLen < 14;
+        if (
+          result &&
+          !result.camera?.overflow &&
+          result.scale >= Math.min(scaleCap, 0.97) &&
+          wellPacked &&
+          attempt >= 4
+        ) {
+          canvasIndex = canvasMultipliers.length;
+          break;
+        }
+      } else if (axisOk) {
+        essentialFallback = preferFullSize(essentialFallback, candidate);
       }
     }
+    const goodEnough =
+      matchLen <= 21 ? 0.97 : matchLen <= 28 ? matchFloor : 0.25;
+    if (
+      result &&
+      !result.camera?.overflow &&
+      result.scale >= Math.min(scaleCap, goodEnough) - 0.001
+    ) {
+      break;
+    }
+  }
 
-    // Scale policy: keep tiles at/above MIN_BOARD_SCALE. Early turns inside
-    // hard felt first. Shrink is last resort for hard layout failure only.
-    const playW = play.maxX - play.minX;
-    const playH = play.maxY - play.minY;
-    const noLayoutYet =
-      !bestByScale &&
-      !result &&
-      !looseFallback &&
-      !fallback &&
-      !essentialFallback;
-    const tileSpan = Math.min(baseW, baseH);
-    const overcrowded =
-      matchLen * tileSpan > (playW + playH) * 1.75 || matchLen >= 200;
-    const cramped = overcrowded || crampedViewport || playW < 260 || playH < 240;
-    const softEaseExhausted =
-      easeAttempt >= (crampedViewport || matchLen > 26 ? 22 : 18);
-    const needEmergencyFit = noLayoutYet && (cramped || softEaseExhausted);
-    const bestEffective = preferFullSize(
-      preferFullSize(preferFullSize(result, looseFallback), bestByScale),
-      preferFullSize(fallback, essentialFallback)
+  let picked = preferFullSize(
+    preferFullSize(preferFullSize(result, looseFallback), bestByScale),
+    preferFullSize(fallback, essentialFallback)
+  );
+
+  if (!picked) {
+    const huge = {
+      minX: hardLocal.minX * 32,
+      maxX: hardLocal.maxX * 32,
+      minY: hardLocal.minY * 32,
+      maxY: hardLocal.maxY * 32,
+    };
+    let map = placeGraph(
+      tiles,
+      centerIndex,
+      size,
+      gap,
+      huge,
+      1,
+      FIRST_FOLD_RIGHT,
+      FIRST_FOLD_LEFT,
+      false,
+      huge,
+      packSize,
+      TURN_EVERY,
+      extraOccupied,
+      true
+    ).map;
+    completeMissingTiles(map, tiles, centerIndex, size, gap);
+    picked = projectPack(map, true);
+  }
+
+  if (!picked || picked.tiles.length !== tiles.length) {
+    const map = new Map();
+    completeMissingTiles(map, tiles, centerIndex, size, gap);
+    picked = projectPack(map, true);
+  }
+
+  if (!picked) {
+    const map = new Map();
+    completeMissingTiles(map, tiles, centerIndex, size, gap);
+    const list = tiles.map((t) => map.get(t.id)).filter(Boolean);
+    const screen = toScreen(
+      list,
+      { width, height },
+      options.padding ?? PADDING,
+      tiles[centerIndex].id,
+      margin,
+      hudRight,
+      null,
+      hudLeft,
+      scaleCap
     );
-    // Accept any on-felt layout at/above the board floor as readable.
-    const hasReadable =
-      bestEffective != null &&
-      !bestEffective.camera?.overflow &&
-      bestEffective.scale >= MIN_BOARD_SCALE - 0.001;
-    // ≤21 stay on MIN_BOARD_SCALE; 22–28 may ease to MIN_MATCH_SCALE so
-    // spinner-tall multi-row packs fit without strip collapse.
-    const shrinkFloor =
-      matchLen <= 21
-        ? MIN_BOARD_SCALE
-        : matchLen <= 28
-          ? MIN_MATCH_SCALE
-          : EMERGENCY_MIN_SCALE;
-    const shrinkEvery = needEmergencyFit
-      ? matchLen >= 80
-        ? 2
-        : 6
-      : matchLen >= 80
-        ? 3
-        : matchLen >= 28
-          ? 10
-          : 14;
-    if (result && hasReadable && attempt >= 36) break;
-    // HARD LAYOUT FAILURE path: only when still empty after soft ease, allow
-    // scale below MIN_BOARD_SCALE (documented emergency). Real matches (≤28)
-    // stay on the floor unless literally no on-felt placement exists.
-    // Prefer exhausting on-felt packing at the current scale before shrinking.
-    // After a scale drop, soft-ease resets — allow shrink once we've re-eased
-    // OR spent enough attempts at this scale so tiny felts never fail closed.
-    const easedOrPatient = easeT >= 0.999 || easeAttempt >= (matchLen >= 80 ? 4 : 10);
-    const allowShrink =
-      noLayoutYet &&
-      easedOrPatient &&
-      (needEmergencyFit ||
-        (crampedViewport && attempt >= 36) ||
-        (matchLen > 40 && attempt >= 20) ||
-        (matchLen > 21 && attempt >= 72) ||
-        attempt >= 64);
-    if (attempt % shrinkEvery === shrinkEvery - 1) {
-      if (allowShrink && unitScale > shrinkFloor + 0.001) {
-        // Mid-size felts: gradual 0.94. Tiny felts keep the faster 0.85 step
-        // so packing still succeeds within the attempt budget.
-        const step =
-          matchLen <= 28 && !crampedViewport
-            ? 0.94
-            : needEmergencyFit || crampedViewport || matchLen >= 80
-              ? 0.85
-              : 0.94;
-        unitScale = Math.max(shrinkFloor, unitScale * step);
-      } else if (
-        allowShrink &&
-        noLayoutYet &&
-        matchLen <= 28 &&
-        unitScale <= shrinkFloor + 0.001 &&
-        attempt >= (crampedViewport || largeBase ? 36 : 56)
-      ) {
-        // Below the match floor only as last resort so boards never go empty.
-        // Gentle steps — avoid the legacy ×0.78 cliff from 0.85 → 0.66.
-        const lateRescue = attempt >= attemptLimit - 36;
-        const drop =
-          crampedViewport || largeBase
-            ? 0.85
-            : lateRescue
-              ? 0.9
-              : 0.94;
-        unitScale = Math.max(EMERGENCY_MIN_SCALE, unitScale * drop);
-      } else if (
-        allowShrink &&
-        noLayoutYet &&
-        matchLen > 28 &&
-        unitScale > EMERGENCY_MIN_SCALE + 0.001
-      ) {
-        // Pathological long chains: keep dropping until a pack appears.
-        unitScale = Math.max(EMERGENCY_MIN_SCALE, unitScale * 0.75);
-      } else if (
-        noLayoutYet &&
-        attempt > attemptLimit - 12 &&
-        unitScale <= EMERGENCY_MIN_SCALE + 0.001
-      ) {
-        break;
-      }
-    }
-  }
-
-  // Final pick: largest readable on-felt scale (overflow layouts discarded).
-  let picked = result;
-  if (matchLen <= 28) {
-    if (looseFallback && (!picked || looseFallback.scale > picked.scale * 1.05)) {
-      picked = preferFullSize(picked, looseFallback);
-    }
-    if (bestByScale && (!picked || bestByScale.scale > picked.scale * 1.02)) {
-      picked = preferFullSize(picked, bestByScale);
-    }
-    if (!picked) picked = fallback;
-    if (!picked) picked = essentialFallback;
-  } else {
-    if (picked && looseFallback && looseFallback.scale > picked.scale * 1.1) {
-      picked = looseFallback;
-    }
-    if (!picked) picked = bestByScale;
-    if (!picked) picked = looseFallback;
-    if (!picked) picked = fallback;
-    if (!picked) picked = essentialFallback;
-  }
-  result = picked;
-
-  if (!result) {
-    const mid = playMid(play);
     return {
-      tiles: [],
-      scale: unitScale,
-      content: { width: 0, height: 0, minX: 0, maxX: 0, minY: 0, maxY: 0 },
-      origin: { x: mid.x, y: mid.y },
-      gap: requestedGap,
-      camera: {
-        recentered: false,
-        overflow: false,
-        focusMode: "empty",
-        x: mid.x,
-        y: mid.y,
-      },
+      ...screen,
+      tiles: screen.tiles,
+      armTiles: [],
+      gap,
     };
   }
 
-  return result;
+  return picked;
 }
 
 /* ---------- Compatibility shims for legacy layoutBoard callers ---------- */
@@ -1740,13 +1855,14 @@ export function computeLayoutMetrics(viewport, tileSize, margin, tileCount = 0) 
 }
 
 /**
- * Planned scale hint for callers. Never recommend below MIN_BOARD_SCALE for
- * normal match lengths — the serpentine must fold inside the playable felt
- * rather than pre-shrinking to a theoretical full-chain bbox.
+ * Planned scale hint: preferred size unless a packed full-match AABB would
+ * miss the safe felt. Same planned length (28) keeps this stable mid-match.
  */
 export function computeStableFitScale(viewport, tileSize, margin, tileCount) {
   const planned = Math.max(tileCount, 28);
   const metrics = computeLayoutMetrics(viewport, tileSize, margin, planned);
+  const play = computePlayBounds(viewport, margin);
+  const safe = computeSafeFeltBounds(play);
   const step = metrics.long + CHAIN_GAP;
   const tilesPerRow = Math.max(
     3,
@@ -1758,11 +1874,11 @@ export function computeStableFitScale(viewport, tileSize, margin, tileCount) {
     BRIDGE_LEN * metrics.long + (BRIDGE_LEN + 1) * CHAIN_GAP + metrics.short * 0.25;
   const contentH = (folds + 1) * metrics.short + folds * bridgeH;
   const contentW = tilesPerRow * step + metrics.short * 0.5 + PADDING;
-  const sx = metrics.usableW / Math.max(1, contentW);
-  const sy = metrics.usableH / Math.max(1, contentH);
-  const raw = Math.min(1, Math.min(sx, sy));
-  if (planned <= 28) return Math.max(MIN_BOARD_SCALE, raw);
-  return Math.max(EMERGENCY_MIN_SCALE, raw);
+  return computeFitScale(
+    { width: contentW, height: contentH, minX: 0, minY: 0, maxX: contentW, maxY: contentH },
+    safe,
+    1
+  );
 }
 
 export function measureMinRowClearance(placements) {
@@ -1813,6 +1929,7 @@ export function layoutBoard(tiles, centerIndex, viewport, tileSize, options = {}
   if (!tiles?.length || centerIndex < 0 || centerIndex >= tiles.length) {
     return {
       placements: [],
+      armPlacements: [],
       scale: 1,
       tileScale: 1,
       content: { width: 0, height: 0 },
@@ -1844,9 +1961,24 @@ export function layoutBoard(tiles, centerIndex, viewport, tileSize, options = {}
     isCorner: t.isCorner,
     isBridge: t.isBridge,
   }));
+  const armPlacements = (result.armTiles || []).map((t) => ({
+    id: t.tileId,
+    x: t.x,
+    y: t.y,
+    w: t.w,
+    h: t.h,
+    orientation: t.orientation,
+    rotation: t.rotation ?? rotationForOrientation(t.orientation),
+    travelDir: t.travelDir,
+    branch: t.branch,
+    double: t.double,
+    isCorner: t.isCorner,
+    isBridge: t.isBridge,
+  }));
 
   return {
     placements,
+    armPlacements,
     scale: 1,
     tileScale: result.scale,
     content: result.content ?? {

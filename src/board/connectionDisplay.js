@@ -171,6 +171,126 @@ export function resolveTileDisplay(tile, pos, towardRightPos, towardLeftPos) {
 }
 
 /**
+ * Screen positions for Spinner north/south arms (vertical, growing away
+ * from the Spinner). Does not invent matching — callers still paint via
+ * `resolveTileDisplay` so the connecting half faces the Spinner.
+ *
+ * @param {{ id?: string, x: number, y: number, w: number, h: number }} spinPos
+ * @param {{ id: string, left: number, right: number }[]} spinnerNorth
+ * @param {{ id: string, left: number, right: number }[]} spinnerSouth
+ * @param {number} [gap]
+ */
+export function layoutSpinnerArmPositions(
+  spinPos,
+  spinnerNorth = [],
+  spinnerSouth = [],
+  gap = 2
+) {
+  const short = Math.min(spinPos.w, spinPos.h);
+  const long = Math.max(spinPos.w, spinPos.h);
+  const x = spinPos.x + (spinPos.w - short) / 2;
+  const north = spinnerNorth.map((tile, index) => ({
+    tile,
+    pos: {
+      id: tile.id,
+      x,
+      y: spinPos.y - (index + 1) * (long + gap),
+      w: short,
+      h: long,
+      orientation: "vertical",
+    },
+  }));
+  const south = spinnerSouth.map((tile, index) => ({
+    tile,
+    pos: {
+      id: tile.id,
+      x,
+      y: spinPos.y + spinPos.h + gap + index * (long + gap),
+      w: short,
+      h: long,
+      orientation: "vertical",
+    },
+  }));
+  return { north, south };
+}
+
+/**
+ * Painted Spinner-arm tiles. Logical `.left` faces the Spinner; the display
+ * swap puts that matching pip on the half that physically touches it.
+ * Vertical paint: `left` = north half, `right` = south half.
+ *
+ * @param {{ id?: string, x: number, y: number, w: number, h: number }} spinPos
+ * @param {{ id: string, left: number, right: number }[]} spinnerNorth
+ * @param {{ id: string, left: number, right: number }[]} spinnerSouth
+ * @param {number} [gap]
+ */
+export function buildSpinnerArmDisplays(
+  spinPos,
+  spinnerNorth = [],
+  spinnerSouth = [],
+  gap = 2,
+  armPlacements = null
+) {
+  const byEngine = Array.isArray(armPlacements) && armPlacements.length
+    ? new Map(armPlacements.map((p) => [p.id, p]))
+    : null;
+  const { north, south } = byEngine
+    ? {
+        north: spinnerNorth
+          .map((tile) => {
+            const pos = byEngine.get(tile.id);
+            return pos ? { tile, pos } : null;
+          })
+          .filter(Boolean),
+        south: spinnerSouth
+          .map((tile) => {
+            const pos = byEngine.get(tile.id);
+            return pos ? { tile, pos } : null;
+          })
+          .filter(Boolean),
+      }
+    : layoutSpinnerArmPositions(
+        spinPos,
+        spinnerNorth,
+        spinnerSouth,
+        gap
+      );
+  const out = [];
+
+  north.forEach((entry, i) => {
+    const towardSpinner = i === 0 ? spinPos : north[i - 1].pos;
+    out.push({
+      tile: entry.tile,
+      pos: entry.pos,
+      display: resolveTileDisplay(entry.tile, entry.pos, null, towardSpinner),
+    });
+  });
+
+  south.forEach((entry, i) => {
+    const towardSpinner = i === 0 ? spinPos : south[i - 1].pos;
+    out.push({
+      tile: entry.tile,
+      pos: entry.pos,
+      display: resolveTileDisplay(entry.tile, entry.pos, null, towardSpinner),
+    });
+  });
+
+  return out;
+}
+
+/**
+ * Exposed pip after orientation: the free half opposite the neighbor.
+ * North branch → north (top) half; south → south (bottom) half.
+ *
+ * @param {{ left: number, right: number, orientation?: string }} display
+ * @param {"north"|"south"|"left"|"right"} branch
+ */
+export function exposedPipFromDisplay(display, branch) {
+  if (branch === "north" || branch === "left") return Number(display.left);
+  return Number(display.right);
+}
+
+/**
  * Build display descriptors for every board tile.
  */
 export function buildBoardDisplays(boardTiles, placements) {

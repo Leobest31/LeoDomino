@@ -12,6 +12,8 @@ import {
   pipOnHalf,
   pipOnEdge,
   validateBoardPresentation,
+  buildSpinnerArmDisplays,
+  exposedPipFromDisplay,
 } from "./connectionDisplay.js";
 
 const size = { w: 40, h: 76 };
@@ -175,6 +177,63 @@ function tile(id, left, right) {
     });
     assert.equal(result.ok, true, `${viewport.width}: ${JSON.stringify(result)}`);
   }
+}
+
+// --- Spinner arm paint: matching half must touch the Spinner ---
+{
+  const spinPos = { id: "6-6", x: 100, y: 100, w: 40, h: 76, orientation: "vertical" };
+  const north = [{ id: "1-6", left: 6, right: 1 }];
+  const displays = buildSpinnerArmDisplays(spinPos, north, []);
+  assert.equal(displays.length, 1);
+  const d = displays[0];
+  assert.equal(d.display.orientation, "vertical");
+  assert.equal(facingHalf(d.pos, spinPos, "vertical"), "right");
+  assert.equal(pipOnHalf(d.display, "right"), 6, "6 must touch spinner on top branch");
+  assert.equal(d.display.left, 1);
+  assert.equal(d.display.right, 6);
+  assert.equal(exposedPipFromDisplay(d.display, "north"), 1);
+}
+
+{
+  const spinPos = { id: "6-6", x: 100, y: 100, w: 40, h: 76, orientation: "vertical" };
+  const south = [{ id: "4-6", left: 6, right: 4 }];
+  const displays = buildSpinnerArmDisplays(spinPos, [], south);
+  const d = displays[0];
+  assert.equal(facingHalf(d.pos, spinPos, "vertical"), "left");
+  assert.equal(pipOnHalf(d.display, "left"), 6, "6 must touch spinner on bottom branch");
+  assert.equal(d.display.left, 6);
+  assert.equal(d.display.right, 4);
+  assert.equal(exposedPipFromDisplay(d.display, "south"), 4);
+}
+
+{
+  const spinPos = { id: "6-6", x: 100, y: 100, w: 40, h: 76, orientation: "vertical" };
+  const north = [{ id: "rev", left: 6, right: 3 }];
+  const south = [{ id: "rev-s", left: 6, right: 3 }];
+  const n = buildSpinnerArmDisplays(spinPos, north, [])[0];
+  const s = buildSpinnerArmDisplays(spinPos, [], south)[0];
+  assert.equal(pipOnHalf(n.display, facingHalf(n.pos, spinPos, "vertical")), 6);
+  assert.equal(pipOnHalf(s.display, facingHalf(s.pos, spinPos, "vertical")), 6);
+  assert.equal(exposedPipFromDisplay(n.display, "north"), 3);
+  assert.equal(exposedPipFromDisplay(s.display, "south"), 3);
+}
+
+{
+  // Left/right chain: matching half faces the spinner; unmatched is exposed.
+  const spinner = { id: "6-6", x: 100, y: 100, w: 40, h: 76, orientation: "vertical" };
+  const rightTile = { id: "3-6", left: 6, right: 3 };
+  const rightPos = { id: "3-6", x: 142, y: 118, w: 76, h: 40, orientation: "horizontal" };
+  const rightDisplay = resolveTileDisplay(rightTile, rightPos, null, spinner);
+  assert.equal(facingHalf(rightPos, spinner, "horizontal"), "left");
+  assert.equal(pipOnHalf(rightDisplay, "left"), 6);
+  assert.equal(exposedPipFromDisplay(rightDisplay, "right"), 3);
+
+  const leftTile = { id: "3-6L", left: 3, right: 6 };
+  const leftPos = { id: "3-6L", x: 22, y: 118, w: 76, h: 40, orientation: "horizontal" };
+  const leftDisplay = resolveTileDisplay(leftTile, leftPos, spinner, null);
+  assert.equal(facingHalf(leftPos, spinner, "horizontal"), "right");
+  assert.equal(pipOnHalf(leftDisplay, "right"), 6);
+  assert.equal(exposedPipFromDisplay(leftDisplay, "left"), 3);
 }
 
 console.log("Connection fidelity tests passed.");

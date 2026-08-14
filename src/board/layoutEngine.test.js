@@ -856,16 +856,17 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
         assert.ok(!(xOv && yOv), `${vp.name} n=${n} underlap ${a.id}→${b.id}`);
       }
 
-      const opener = byId.c;
       const midX = (play.minX + play.maxX) / 2;
       const midY = (play.minY + play.maxY) / 2;
+      const bboxCx = (minX + maxX) / 2;
+      const bboxCy = (minY + maxY) / 2;
       assert.ok(
-        Math.abs(opener.x + opener.w / 2 - midX) < 1.5,
-        `${vp.name} n=${n} opener not centered X`
+        Math.abs(bboxCx - midX) < 1.5,
+        `${vp.name} n=${n} chain bbox not centered X`
       );
       assert.ok(
-        Math.abs(opener.y + opener.h / 2 - midY) < 1.5,
-        `${vp.name} n=${n} opener not centered Y`
+        Math.abs(bboxCy - midY) < 1.5,
+        `${vp.name} n=${n} chain bbox not centered Y`
       );
 
       const short = Math.min(placements[0].w, placements[0].h);
@@ -1225,6 +1226,55 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
     chain.length,
     `phone+HUD must place all tiles, got ${layout.tiles.length}`
   );
+}
+
+{
+  // REGRESSION: spinner-arm options must never drop the main chain
+  // (empty placements → invisible played tiles).
+  const spinner = dbl("6-6");
+  const west = tile("5-6", 5, 6);
+  const east = tile("3-6", 6, 3);
+  const shortFelt = { width: 467, height: 238 };
+  const withArms = calculateBoardLayout([west, spinner, east], shortFelt, {
+    centerIndex: 1,
+    tileWidth: 72,
+    tileHeight: 136,
+    hudRight: 0,
+    spinnerId: "6-6",
+    spinnerNorthCount: 2,
+    spinnerSouthCount: 2,
+  });
+  assert.equal(
+    withArms.tiles.length,
+    3,
+    `played tiles must stay laid out with spinner arms, got ${withArms.tiles.length}`
+  );
+}
+
+{
+  // REGRESSION: growing live match must keep every played tile placed
+  // (1 / 5 / 10 / 20) on a short phone felt — never an empty board.
+  const board = [dbl("c")];
+  let open = 6;
+  const shortFelt = { width: 467, height: 260 };
+  const checkpoints = new Set([1, 5, 10, 20]);
+  for (let i = 1; i <= 20; i += 1) {
+    const next = (open + 1) % 7;
+    board.push(tile(`t${i}`, open, next));
+    open = next;
+    if (!checkpoints.has(board.length)) continue;
+    const layout = calculateBoardLayout(board, shortFelt, {
+      centerIndex: 0,
+      tileWidth: 72,
+      tileHeight: 136,
+      hudRight: 0,
+    });
+    assert.equal(
+      layout.tiles.length,
+      board.length,
+      `n=${board.length} must keep all played tiles visible, got ${layout.tiles.length}`
+    );
+  }
 }
 
 console.log("Board layout engine tests passed.");
