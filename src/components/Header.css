@@ -34,6 +34,14 @@
   justify-content: flex-start;
 }
 
+/* Mute (+ optional Main Menu) sit in dark chrome above the score HUD. */
+.header__chrome-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
 .header__side--end {
   justify-content: flex-end;
 }
@@ -95,8 +103,8 @@
 .header--stacked .header__inner {
   align-items: start;
   height: auto;
-  padding-top: 0.16rem;
-  padding-bottom: 0.18rem;
+  padding-top: 0.08rem;
+  padding-bottom: 0.1rem;
   column-gap: clamp(0.35rem, 1.2vw, 0.85rem);
 }
 
@@ -114,7 +122,7 @@
 }
 
 .header--stacked .header__brand .brand-logo {
-  height: clamp(1.7rem, 4.2vw, 2.15rem);
+  height: clamp(1.45rem, 3.6vw, 1.9rem);
 }
 
 .header--stacked .header__icon-btn {

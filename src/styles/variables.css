@@ -69,8 +69,8 @@
   --header-height: 3.15rem;
   --bottom-bar-height: 3.45rem;
   --game-max: 100%;
-  /* Prefer filling the mid stage — high ceiling so the felt can grow */
-  --game-area-height: clamp(24rem, 78dvh, 62rem);
+  /* Felt fills leftover stage after chrome/hand/controls — grow vertically. */
+  --game-area-height: clamp(22rem, 72dvh, 64rem);
   --game-area-width: 100%;
   --game-area-max-width: none;
 

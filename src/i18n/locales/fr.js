@@ -61,14 +61,9 @@ export default {
         "Double-six · 7 tuiles · deux bouts ouverts · premier à 4 points de match · victoire +1 · bloqué +1 · Dekabès +2 · 6-6 ouvre la manche 1",
       american: "Américain",
       americanDescription:
-        "Draw Domino américain. Jouez sur l’un des deux bouts, piochez jusqu’à pouvoir jouer, passez si vide. Premier à 100.",
+        "Domino américain. Le premier double est le Spinner. Marquez quand le total des bouts ouverts est un multiple de 5. Un double exposé compte ses deux faces. Premier à 200.",
       americanSummary:
-        "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
-      allFives: "All Fives",
-      allFivesDescription:
-        "All Fives américain. Marquez quand les bouts ouverts totalisent un multiple de 5. L’ouverture ne marque que sur 10. Premier à 150.",
-      allFivesSummary:
-        "Double-six · 7 tuiles · points en cours · ouverture 10 seulement · multiples de 5 · fin de manche au plus proche de 5 · jouer à 150",
+        "Double-six · 7 tuiles · Spinner · points sur bouts ouverts · double exposé compte les deux faces · multiples de 5 · jouer à 200",
       dominican: "Dominicain",
       dominicanDescription:
         "Standard dominicain. Partenaires en face. Pas de pioche — passez si vous ne pouvez pas jouer. Les équipes jouent à 100.",
@@ -88,6 +83,8 @@ export default {
     draw: "Piocher",
     pass: "Passer",
     newMatch: "Nouvelle partie",
+    mainMenu: "Menu principal",
+    mainMenuAria: "Menu principal",
     round: "Manche",
     playToLabel: "Jusqu’à",
     matchPointsLabel: "Points de match",

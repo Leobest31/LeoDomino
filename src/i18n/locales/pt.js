@@ -61,14 +61,9 @@ export default {
         "Duplo-seis · 7 peças · duas pontas · primeiro a 4 pontos de partida · vitória +1 · bloqueio +1 · Dekabès +2 · 6-6 abre a ronda 1",
       american: "Americano",
       americanDescription:
-        "Draw Domino americano. Encaixa em qualquer ponta, compre até poder jogar, passe se vazio. Primeiro a 100.",
+        "Dominó americano. O primeiro duplo é o Spinner. Marque quando o total das pontas abertas for múltiplo de 5. Um duplo exposto conta as duas metades. Primeiro a 200.",
       americanSummary:
-        "Duplo-seis · 7 peças · duas pontas abertas · comprar até poder jogar · passar se vazio · jogar até 100",
-      allFives: "All Fives",
-      allFivesDescription:
-        "All Fives americano. Marque quando as pontas somam um múltiplo de 5. A abertura só marca com 10. Primeiro a 150.",
-      allFivesSummary:
-        "Duplo-seis · 7 peças · pontos durante o jogo · abertura só 10 · múltiplos de 5 · fim da ronda ao 5 mais próximo · jogar até 150",
+        "Duplo-seis · 7 peças · Spinner · pontos nas pontas abertas · duplo exposto conta as duas metades · múltiplos de 5 · jogar até 200",
       dominican: "Dominicano",
       dominicanDescription:
         "Padrão dominicano. Parceiros sentam-se em frente. Sem comprar — passe se não puder jogar. Equipas jogam até 100.",
@@ -88,6 +83,8 @@ export default {
     draw: "Comprar",
     pass: "Passar",
     newMatch: "Nova partida",
+    mainMenu: "Menu principal",
+    mainMenuAria: "Menu principal",
     round: "Ronda",
     playToLabel: "Até",
     matchPointsLabel: "Pontos de partida",

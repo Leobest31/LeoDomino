@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import { useAudio } from "../audio";
-import { IconMute, IconSettings, IconUnmute } from "./Icon";
+import { IconMenu, IconMute, IconSettings, IconUnmute } from "./Icon";
 import BrandLogo from "./BrandLogo";
 import SettingsPanel from "./SettingsPanel";
 import "./Header.css";
@@ -13,6 +13,7 @@ function Header({
   onPlayerCountChange,
   settingsOpen: settingsOpenProp,
   onSettingsOpenChange,
+  onMainMenu = null,
   startBelow = null,
   centerBelow = null,
   compact = false,
@@ -30,24 +31,42 @@ function Header({
       <header className={`header${stacked ? " header--stacked" : ""}`}>
         <div className="header__inner">
           <div className="header__side header__side--start">
-            <button
-              type="button"
-              className="header__icon-btn"
-              onMouseEnter={() => play("button", { gain: 0.35 })}
-              onClick={async () => {
-                await unlock();
-                if (muted) {
-                  toggleMute();
-                  play("button");
-                } else {
-                  play("button");
-                  toggleMute();
-                }
-              }}
-            >
-              {muted ? <IconMute /> : <IconUnmute />}
-              <span className="sr-only">{muted ? t("audio.unmute") : t("audio.mute")}</span>
-            </button>
+            <div className="header__chrome-actions">
+              {typeof onMainMenu === "function" ? (
+                <button
+                  type="button"
+                  className="header__icon-btn header__icon-btn--menu"
+                  aria-label={t("game.mainMenuAria")}
+                  onMouseEnter={() => play("button", { gain: 0.35 })}
+                  onClick={async () => {
+                    await unlock();
+                    play("button");
+                    onMainMenu();
+                  }}
+                >
+                  <IconMenu />
+                  <span className="sr-only">{t("game.mainMenu")}</span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="header__icon-btn"
+                onMouseEnter={() => play("button", { gain: 0.35 })}
+                onClick={async () => {
+                  await unlock();
+                  if (muted) {
+                    toggleMute();
+                    play("button");
+                  } else {
+                    play("button");
+                    toggleMute();
+                  }
+                }}
+              >
+                {muted ? <IconMute /> : <IconUnmute />}
+                <span className="sr-only">{muted ? t("audio.unmute") : t("audio.mute")}</span>
+              </button>
+            </div>
             {startBelow}
           </div>
 

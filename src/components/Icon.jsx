@@ -30,6 +30,15 @@ export function IconHome({ className = "" }) {
   );
 }
 
+/** Hamburger — Main Menu chrome control. */
+export function IconMenu({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
+      <path d="M5 7h14M5 12h14M5 17h14" {...stroke} />
+    </svg>
+  );
+}
+
 export function IconClose({ className = "" }) {
   return (
     <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">

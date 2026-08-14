@@ -61,14 +61,9 @@ export default {
         "Doble seis · 7 fichas · dos extremos · primero a 4 puntos de partida · victoria +1 · bloqueo +1 · Dekabès +2 · 6-6 abre la ronda 1",
       american: "Americano",
       americanDescription:
-        "Draw Domino americano. Encaja en cualquiera de los extremos, roba hasta poder jugar, pasa si vacío. Primero a 100.",
+        "Dominó americano. El primer doble es el Spinner. Anota cuando el total de los extremos abiertos es múltiplo de 5. Un doble expuesto cuenta ambas mitades. Primero a 200.",
       americanSummary:
-        "Doble seis · 7 fichas · dos extremos abiertos · robar hasta poder jugar · pasar si vacío · jugar a 100",
-      allFives: "All Fives",
-      allFivesDescription:
-        "All Fives americano. Anota cuando los extremos suman un múltiplo de 5. La apertura solo anota con 10. Primero a 150.",
-      allFivesSummary:
-        "Doble seis · 7 fichas · puntos en juego · apertura solo 10 · múltiplos de 5 · fin de ronda al 5 más cercano · jugar a 150",
+        "Doble seis · 7 fichas · Spinner · puntos en extremos abiertos · doble expuesto cuenta ambas mitades · múltiplos de 5 · jugar a 200",
       dominican: "Dominicano",
       dominicanDescription:
         "Estándar dominicano. Parejas frente a frente. Sin robar — pasa si no puedes jugar. Las parejas juegan a 100.",
@@ -88,6 +83,8 @@ export default {
     draw: "Robar",
     pass: "Pasar",
     newMatch: "Nueva partida",
+    mainMenu: "Menú principal",
+    mainMenuAria: "Menú principal",
     round: "Ronda",
     playToLabel: "Hasta",
     matchPointsLabel: "Puntos de partida",

@@ -61,14 +61,9 @@ export default {
         "Double-six · 7 tiles · two open ends · first to 4 match points · win +1 · blocked +1 · Dekabès +2 · 6-6 opens round 1",
       american: "American",
       americanDescription:
-        "American Draw Dominoes. Match either end, draw until you can play, pass when empty. First to 100.",
+        "American Dominoes. The first double is the Spinner. Score when open ends total a multiple of 5. An exposed double counts both halves. First to 200 wins.",
       americanSummary:
-        "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
-      allFives: "All Fives",
-      allFivesDescription:
-        "American All Fives. Score when open ends total a multiple of 5. Opening scores only on 10. First to 150.",
-      allFivesSummary:
-        "Double-six · 7 tiles · count scoring · opening 10 only · multiples of 5 · round-end nearest 5 · play to 150",
+        "Double-six · 7 tiles · Spinner · open-end count scoring · exposed doubles count both halves · multiples of 5 · play to 200",
       dominican: "Dominican",
       dominicanDescription:
         "Dominican Standard. Partners sit opposite. No draws — pass when you cannot play. Team scores to 100.",
@@ -88,6 +83,8 @@ export default {
     draw: "Draw",
     pass: "Pass",
     newMatch: "New Match",
+    mainMenu: "Main Menu",
+    mainMenuAria: "Main Menu",
     round: "Round",
     playToLabel: "Play to",
     matchPointsLabel: "Match points",
