@@ -58,8 +58,10 @@ export const GAME_STYLES = Object.freeze([
     nameKey: "setup.gameStyle.american",
     descriptionKey: "setup.gameStyle.americanDescription",
     countryCode: "US",
-    enabled: true,
-    available: true,
+    // Withdrawn from Setup / Game Style. All Fives is the US-style mode.
+    // Engine ruleset stays registered so in-progress american saves can resume.
+    enabled: false,
+    available: false,
   }),
   Object.freeze({
     id: "allFives",

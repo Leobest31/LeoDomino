@@ -4,6 +4,7 @@
 
 import { END } from "./constants.js";
 import { canPlaceOnEnd, createOpeningPlacement, getOpenEnds, resolvePlacement } from "./board.js";
+import { annotateMoveDestination } from "./boardTopology.js";
 
 /**
  * @typedef {object} LegalMove
@@ -41,13 +42,15 @@ export function getLegalMoves(handIds, board, byId) {
         throw new Error(`Unknown tile id in hand: ${id}`);
       }
       const placement = createOpeningPlacement(tile);
-      moves.push({
-        tileId: id,
-        end: END.RIGHT,
-        left: placement.left,
-        right: placement.right,
-        orientation: placement.orientation,
-      });
+      moves.push(
+        annotateMoveDestination({
+          tileId: id,
+          end: END.RIGHT,
+          left: placement.left,
+          right: placement.right,
+          orientation: placement.orientation,
+        })
+      );
     }
     return moves;
   }
@@ -62,24 +65,28 @@ export function getLegalMoves(handIds, board, byId) {
 
     if (canPlaceOnEnd(board, tile, END.LEFT)) {
       const placement = resolvePlacement(tile, /** @type {number} */ (ends.left), END.LEFT);
-      moves.push({
-        tileId: id,
-        end: END.LEFT,
-        left: placement.left,
-        right: placement.right,
-        orientation: placement.orientation,
-      });
+      moves.push(
+        annotateMoveDestination({
+          tileId: id,
+          end: END.LEFT,
+          left: placement.left,
+          right: placement.right,
+          orientation: placement.orientation,
+        })
+      );
     }
 
     if (canPlaceOnEnd(board, tile, END.RIGHT)) {
       const placement = resolvePlacement(tile, /** @type {number} */ (ends.right), END.RIGHT);
-      moves.push({
-        tileId: id,
-        end: END.RIGHT,
-        left: placement.left,
-        right: placement.right,
-        orientation: placement.orientation,
-      });
+      moves.push(
+        annotateMoveDestination({
+          tileId: id,
+          end: END.RIGHT,
+          left: placement.left,
+          right: placement.right,
+          orientation: placement.orientation,
+        })
+      );
     }
   }
 

@@ -164,6 +164,9 @@ function beginRound(base, meta) {
     roundStarterIndex: playerIndex,
     roundResult: null,
     matchWinner: null,
+    lastPlayPoints: 0,
+    lastPlayPointsSeat: null,
+    lastPlayScoreTerminals: [],
     statusKey: tileId ? "rules.starter" : "rules.starterFree",
     statusVars: tileId
       ? {
@@ -248,8 +251,25 @@ function advancePlayer(state) {
 function finishRound(state, winnerIndex, reason, extras = {}) {
   const ruleset = rulesetOf(state);
   const isDekabes = reason === ROUND_END_REASON.DEKABES;
+  const explainRoundEnd =
+    typeof ruleset.policies.explainRoundEnd === "function"
+      ? ruleset.policies.explainRoundEnd
+      : null;
+  const explanation =
+    explainRoundEnd && winnerIndex != null
+      ? explainRoundEnd({
+          winnerIndex,
+          players: state.players,
+          byId: state.byId,
+          reason,
+          isDekabes,
+        })
+      : null;
+
   let points = 0;
-  if (
+  if (explanation) {
+    points = Number(explanation.awarded) || 0;
+  } else if (
     ruleset.roundScoreMode === "sumOpponentPips" ||
     ruleset.roundScoreMode === "matchPoints"
   ) {
@@ -305,9 +325,10 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
     if (reached !== -1) matchWinner = reached;
   }
   const matchOver = matchWinner != null;
+  const usesSummary = Boolean(ruleset.roundSummary) && explanation != null;
 
   /** @type {string} */
-  let statusKey = matchOver ? "rules.matchWon" : "rules.roundWon";
+  let statusKey = matchOver && !usesSummary ? "rules.matchWon" : "rules.roundWon";
   if (!matchOver && isDekabes) {
     statusKey = "rules.dekabes";
   }
@@ -315,8 +336,8 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
   return {
     ...state,
     scores,
-    phase: matchOver ? PHASE.MATCH_OVER : PHASE.ROUND_OVER,
-    matchWinner,
+    phase: usesSummary || !matchOver ? PHASE.ROUND_OVER : PHASE.MATCH_OVER,
+    matchWinner: usesSummary ? null : matchWinner,
     mustPlayTileId: null,
     consecutivePasses: 0,
     roundResult: {
@@ -325,6 +346,14 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
       points,
       nextStarterIndex,
       ...(isDekabes ? { dekabes: true } : {}),
+      ...(usesSummary
+        ? {
+            summary: true,
+            rawPips: explanation.rawTotal,
+            hands: explanation.hands,
+            pendingMatchWinner: matchOver ? matchWinner : null,
+          }
+        : {}),
     },
     statusKey,
     statusVars: {
@@ -488,17 +517,44 @@ export function playTile(state, tileId, end = END.RIGHT) {
     statusVars: null,
   });
 
-  // Optional on-play count scoring (All Fives, etc.). Opening uses
-  // board-before length so the special first-tile rule stays exact.
-  if (typeof ruleset.policies.scorePlay === "function") {
-    const playPoints = ruleset.policies.scorePlay({
-      board: next.board,
-      isOpening: state.board.length === 0,
-      tileId,
-      end: chosen.end,
-      playerIndex: state.currentPlayer,
-      previousBoard: state.board,
-    });
+  // Optional on-play count scoring (All Fives, etc.). Always scored from
+  // the post-move board. explainPlayScore is the one source of truth for
+  // both the award and the terminal glow records.
+  const scoreOpts = {
+    board: next.board,
+    isOpening: state.board.length === 0,
+    tileId,
+    end: chosen.end,
+    playerIndex: state.currentPlayer,
+    spinnerId: next.spinnerId,
+    spinnerNorth: next.spinnerNorth,
+    spinnerSouth: next.spinnerSouth,
+  };
+  if (typeof ruleset.policies.explainPlayScore === "function") {
+    const report = ruleset.policies.explainPlayScore(scoreOpts);
+    const playPoints = Number(report?.awarded) || 0;
+    if (playPoints > 0) {
+      const scores = next.scores.slice();
+      scores[state.currentPlayer] += playPoints;
+      next = {
+        ...next,
+        scores,
+        statusKey: null,
+        statusVars: { playPoints },
+        lastPlayPoints: playPoints,
+        lastPlayPointsSeat: state.currentPlayer,
+        lastPlayScoreTerminals: report.highlights ?? [],
+      };
+    } else {
+      next = {
+        ...next,
+        lastPlayPoints: 0,
+        lastPlayPointsSeat: null,
+        lastPlayScoreTerminals: [],
+      };
+    }
+  } else if (typeof ruleset.policies.scorePlay === "function") {
+    const playPoints = ruleset.policies.scorePlay(scoreOpts);
     if (Number.isFinite(playPoints) && playPoints > 0) {
       const scores = next.scores.slice();
       scores[state.currentPlayer] += playPoints;
@@ -507,6 +563,16 @@ export function playTile(state, tileId, end = END.RIGHT) {
         scores,
         statusKey: null,
         statusVars: { playPoints },
+        lastPlayPoints: playPoints,
+        lastPlayPointsSeat: state.currentPlayer,
+        lastPlayScoreTerminals: [],
+      };
+    } else {
+      next = {
+        ...next,
+        lastPlayPoints: 0,
+        lastPlayPointsSeat: null,
+        lastPlayScoreTerminals: [],
       };
     }
   }
@@ -519,7 +585,7 @@ export function playTile(state, tileId, end = END.RIGHT) {
     });
   }
 
-  // Mid-round match win from count scoring (e.g. All Fives to 150).
+  // Mid-round match win from count scoring (e.g. All Fives to 200).
   if (typeof ruleset.policies.scorePlay === "function") {
     const won =
       typeof ruleset.policies.isMatchWon === "function"
@@ -583,6 +649,9 @@ export function drawTile(state) {
     matchWinner: null,
     statusKey: "notification.drewTile",
     statusVars: null,
+    lastPlayPoints: 0,
+    lastPlayPointsSeat: null,
+    lastPlayScoreTerminals: [],
   };
 }
 
@@ -608,6 +677,9 @@ export function passTurn(state) {
     consecutivePasses: state.consecutivePasses + 1,
     statusKey: "notification.passed",
     statusVars: { name: state.players[passer].id },
+    lastPlayPoints: 0,
+    lastPlayPointsSeat: null,
+    lastPlayScoreTerminals: [],
   };
 
   next = advancePlayer(next);
@@ -702,6 +774,37 @@ export function startNextRound(state, dealOptions = {}) {
     starterIndex,
     rulesetId,
   });
+}
+
+/**
+ * After the All Fives felt counting hold: open the match-over modal if the
+ * award reached the target, otherwise deal the next round.
+ * Idempotent when already PLAYING or MATCH_OVER (Strict Mode / double timer).
+ *
+ * @param {GameState} state
+ * @returns {GameState}
+ */
+export function advanceAfterRoundSummary(state) {
+  if (state.phase === PHASE.PLAYING || state.phase === PHASE.MATCH_OVER) {
+    return state;
+  }
+  if (state.phase !== PHASE.ROUND_OVER) {
+    throw new Error("Round summary only after a finished round");
+  }
+  const pending = state.roundResult?.pendingMatchWinner;
+  if (pending != null) {
+    return {
+      ...state,
+      phase: PHASE.MATCH_OVER,
+      matchWinner: pending,
+      statusKey: "rules.matchWon",
+      statusVars: {
+        name: state.players[pending]?.id,
+        points: state.roundResult?.points ?? 0,
+      },
+    };
+  }
+  return startNextRound(state);
 }
 
 /**

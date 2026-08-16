@@ -7,12 +7,26 @@ import { PIP_MAX } from "../constants.js";
 import { generateSet } from "../tiles.js";
 import { nextPlayerIndex } from "../players.js";
 
+function tableTileIds(state) {
+  const ids = [];
+  if (Array.isArray(state?.board)) {
+    for (const tile of state.board) ids.push(tile.id);
+  }
+  if (Array.isArray(state?.spinnerNorth)) {
+    for (const tile of state.spinnerNorth) ids.push(tile.id);
+  }
+  if (Array.isArray(state?.spinnerSouth)) {
+    for (const tile of state.spinnerSouth) ids.push(tile.id);
+  }
+  return ids;
+}
+
 /**
  * @param {object} state
  * @param {number} aiIndex
  */
 export function buildMemory(state, aiIndex) {
-  const playedIds = new Set(state.board.map((tile) => tile.id));
+  const playedIds = new Set(tableTileIds(state));
   const aiHandIds = new Set(state.players[aiIndex].hand);
   const playerCount = state.players.length;
 
@@ -111,6 +125,14 @@ function hypergeometricNone(population, successStates, draws) {
  * @returns {string}
  */
 export function boardFingerprint(state) {
-  const chain = state.board.map((t) => `${t.id}:${t.left}${t.right}`).join(",");
+  const chain = tableTileIds(state)
+    .map((id) => {
+      const t =
+        state.board.find((tile) => tile.id === id) ||
+        (state.spinnerNorth || []).find((tile) => tile.id === id) ||
+        (state.spinnerSouth || []).find((tile) => tile.id === id);
+      return t ? `${t.id}:${t.left}${t.right}` : id;
+    })
+    .join(",");
   return `${state.round}|${state.currentPlayer}|${state.reserve.length}|${chain}`;
 }

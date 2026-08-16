@@ -80,11 +80,43 @@ export {
 export {
   ALL_FIVES_MATCH_TARGET,
   exposedEndTotal,
+  explainAllFivesScore,
+  formatAllFivesScoreReport,
   scoreAllFivesPlay,
   allFivesScorePlay,
+  scoringHighlightsFromReport,
   roundToNearestFive,
+  explainAllFivesRoundEnd,
   calculateAllFivesRoundPoints,
 } from "./allFivesScoring.js";
+
+export {
+  ROUND_SUMMARY_TILE_MS,
+  ROUND_SUMMARY_HOLD_MS,
+  flattenRoundSummaryTiles,
+  roundSummaryView,
+  hudScoresDuringRoundSummary,
+  usesAllFivesRoundSummary,
+} from "./allFivesRoundSummary.js";
+
+export {
+  SPINNER_NORTH,
+  SPINNER_SOUTH,
+  PLAY_SCORE_HOLD_MS,
+  usesAllFivesSpinner,
+  isSpinnerEnd,
+  terminalExposedValue,
+  getCurrentTerminalEnds,
+  getOpenScoringEndpoints,
+  getSpinnerPortStates,
+  getExposedBoardEnds,
+  collectExposedEndValues,
+  mainChainLegal,
+  spinnerBranchesAvailable,
+  getAllFivesLegalMoves,
+  hudScoresDuringHold,
+  shouldShowPlayScorePopup,
+} from "./allFivesSpinner.js";
 
 export {
   startMatch,
@@ -94,6 +126,7 @@ export {
   drawTile,
   passTurn,
   startNextRound,
+  advanceAfterRoundSummary,
   isBoardBlocked,
   chooseAutoAction,
   applyAutoAction,

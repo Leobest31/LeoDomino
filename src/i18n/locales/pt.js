@@ -17,6 +17,7 @@ export default {
     cancel: "Cancelar",
     continue: "Continuar",
     back: "Voltar",
+    mainMenu: "Menu principal",
     ok: "OK",
   },
   home: {
@@ -66,9 +67,9 @@ export default {
         "Duplo-seis · 7 peças · duas pontas abertas · comprar até poder jogar · passar se vazio · jogar até 100",
       allFives: "All Fives",
       allFivesDescription:
-        "All Fives americano. Marque quando as pontas somam um múltiplo de 5. A abertura só marca com 10. Primeiro a 150.",
+        "All Fives americano. Marque quando as pontas somam um múltiplo de 5 (mínimo 10). Primeiro a 200.",
       allFivesSummary:
-        "Duplo-seis · 7 peças · pontos durante o jogo · abertura só 10 · múltiplos de 5 · fim da ronda ao 5 mais próximo · jogar até 150",
+        "Duplo-seis · 7 peças · pontos durante o jogo · múltiplos de 5 a partir de 10 · fim da ronda ao 5 mais próximo · jogar até 200",
       dominican: "Dominicano",
       dominicanDescription:
         "Padrão dominicano. Parceiros sentam-se em frente. Sem comprar — passe se não puder jogar. Equipas jogam até 100.",
@@ -123,6 +124,9 @@ export default {
     mustOpenWith: "Deve abrir com {{tile}}",
     drawUntilPlayable: "Compre do monte até poder jogar",
     passOnlyWhenEmpty: "Só pode passar quando o monte estiver vazio",
+    playScore: "+{{points}}",
+    rawPipsLabel: "Pips brutos: {{total}}",
+    roundPointsLabel: "Pontos da ronda",
   },
   rules: {
     roundWon: "{{name}} vence a ronda",

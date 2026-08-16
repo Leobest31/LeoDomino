@@ -16,6 +16,22 @@ export {
 } from "./constants.js";
 
 export {
+  BRANCH,
+  SPINNER_NODE,
+  destinationFromEnd,
+  coercePlayEnd,
+  buildBoardTopology,
+  assertBoardTopology,
+  stampTileDestination,
+  annotateMoveDestination,
+  orientationForBranch,
+  publicLayoutBranch,
+  isMainChainBranch,
+  isSpinnerArmBranch,
+  traceTopologyMove,
+} from "./boardTopology.js";
+
+export {
   HUMAN_INDEX,
   MIN_PLAYER_COUNT,
   MAX_PLAYER_COUNT,
@@ -55,10 +71,18 @@ export { getLegalMoves, hasLegalMove, findLegalMove } from "./moves.js";
 export {
   movesForTile,
   legalEndsForTile,
+  legalMainEndsForTile,
   isAmbiguousPlacement,
   isAutoPlaceable,
   resolvePlayChoice,
 } from "./interaction.js";
+
+export {
+  destinationTileId,
+  destinationAnchorPoint,
+  pickTargetDestination,
+  destinationHighlightMap,
+} from "./destinationTarget.js";
 
 export {
   createMatch,
@@ -117,10 +141,34 @@ export {
   isChuchazo,
   PUERTO_RICAN_MATCH_TARGET,
   exposedEndTotal,
+  explainAllFivesScore,
+  formatAllFivesScoreReport,
   scoreAllFivesPlay,
   allFivesScorePlay,
+  scoringHighlightsFromReport,
   roundToNearestFive,
   calculateAllFivesRoundPoints,
+  explainAllFivesRoundEnd,
+  ROUND_SUMMARY_TILE_MS,
+  ROUND_SUMMARY_HOLD_MS,
+  flattenRoundSummaryTiles,
+  roundSummaryView,
+  hudScoresDuringRoundSummary,
+  usesAllFivesRoundSummary,
+  SPINNER_NORTH,
+  SPINNER_SOUTH,
+  PLAY_SCORE_HOLD_MS,
+  usesAllFivesSpinner,
+  isSpinnerEnd,
+  collectExposedEndValues,
+  getCurrentTerminalEnds,
+  getOpenScoringEndpoints,
+  getSpinnerPortStates,
+  getExposedBoardEnds,
+  spinnerBranchesAvailable,
+  getAllFivesLegalMoves,
+  hudScoresDuringHold,
+  shouldShowPlayScorePopup,
   startMatch,
   getCurrentLegalMoves,
   getAvailableActions,
@@ -128,6 +176,7 @@ export {
   drawTile,
   passTurn,
   startNextRound,
+  advanceAfterRoundSummary,
   isBoardBlocked,
   chooseAutoAction,
   applyAutoAction,

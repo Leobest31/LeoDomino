@@ -12,6 +12,11 @@ import {
 } from "./connectionDisplay.js";
 import { isBoardDebugEnabled, buildLayoutDebugInfo } from "./boardDebug.js";
 import BoardDebugOverlay from "./BoardDebugOverlay.jsx";
+import {
+  buildBoardTopology,
+  traceTopologyMove,
+} from "../game/boardTopology.js";
+import { displayGlowHalves, mergeScoreHighlights } from "./scoreGlow.js";
 import "./BoardContainer.css";
 
 /**
@@ -21,7 +26,7 @@ import "./BoardContainer.css";
  * `transform: translate3d(x, y, 0)` slots. No flex/grid tile flow.
  *
  * The engine lays out the complete chain (and spinner branches) in logical
- * space, then auto-fits and bbox-centers the group inside the measured felt.
+ * space, then auto-fits and pins the first-double anchor to the felt center.
  */
 function BoardContainer({
   tiles = [],
@@ -30,8 +35,10 @@ function BoardContainer({
   spinnerId = null,
   spinnerNorth = [],
   spinnerSouth = [],
+  targetTileId = null,
   emptyLabel = "",
   debug: debugProp = null,
+  scoreHighlights = [],
 }) {
   const stageRef = useRef(null);
   const probeRef = useRef(null);
@@ -41,13 +48,6 @@ function BoardContainer({
   const panRef = useRef({ x: 0, y: 0 });
   const panDragRef = useRef(null);
   const lastWarnKey = useRef("");
-  /** Monotonic scale cap across growing chains on a fixed felt size. */
-  const scaleStabilityRef = useRef({
-    scale: 1,
-    count: 0,
-    areaW: 0,
-    areaH: 0,
-  });
   const debugOn = debugProp ?? isBoardDebugEnabled();
 
   useLayoutEffect(() => {
@@ -93,12 +93,6 @@ function BoardContainer({
 
   const layout = useMemo(() => {
     if (!tiles.length) {
-      scaleStabilityRef.current = {
-        scale: 1,
-        count: 0,
-        areaW: area.w,
-        areaH: area.h,
-      };
       return {
         tiles: [],
         scale: 1,
@@ -110,17 +104,13 @@ function BoardContainer({
       };
     }
 
-    const st = scaleStabilityRef.current;
-    const areaChanged =
-      Math.abs(area.w - st.areaW) > 12 || Math.abs(area.h - st.areaH) > 12;
-    // Ceiling-only: adding tiles on a stable viewport must not upscale.
-    // Never floor at MIN_BOARD_SCALE — auto-fit may need to shrink.
-    const maxScale =
-      !areaChanged && tiles.length >= st.count && st.scale > 0
-        ? st.scale
-        : 1;
-
     const build = (hudRight) => {
+      const topology = buildBoardTopology({
+        board: tiles,
+        spinnerId,
+        spinnerNorth,
+        spinnerSouth,
+      });
       const spatial = calculateBoardLayout(
         tiles,
         { width: area.w, height: area.h },
@@ -129,11 +119,12 @@ function BoardContainer({
           tileWidth: tileSize.w,
           tileHeight: tileSize.h,
           hudRight,
-          maxScale,
+          maxScale: 1,
           focusTileId: newestId ?? tiles[tiles.length - 1]?.id,
-          spinnerId,
-          spinnerNorth,
-          spinnerSouth,
+          spinnerId: topology.spinnerId,
+          spinnerNorth: topology.branches.SPINNER_TOP,
+          spinnerSouth: topology.branches.SPINNER_BOTTOM,
+          topology,
         }
       );
 
@@ -171,10 +162,6 @@ function BoardContainer({
     const resolved =
       preferred.tiles.length > 0 ? preferred : build(null);
 
-    st.scale = resolved.tileScale ?? 1;
-    st.count = tiles.length;
-    st.areaW = area.w;
-    st.areaH = area.h;
     return resolved;
   }, [tiles, centerIndex, area, tileSize, newestId, spinnerId, spinnerNorth, spinnerSouth]);
 
@@ -251,6 +238,11 @@ function BoardContainer({
     return new Set([tiles[0].id, tiles[tiles.length - 1].id]);
   }, [tiles]);
 
+  const scoreGlowById = useMemo(
+    () => mergeScoreHighlights(scoreHighlights),
+    [scoreHighlights]
+  );
+
   const displays = useMemo(
     () => buildBoardDisplays(tiles, placements),
     [tiles, placements]
@@ -271,19 +263,37 @@ function BoardContainer({
   }, [spinnerId, spinnerNorth, spinnerSouth, placements, armPlacements, gap]);
 
   useLayoutEffect(() => {
+    if (!import.meta.env.DEV || !newestId) return;
+    const all = [...displays, ...armDisplays];
+    const newest = all.find((entry) => entry?.tile?.id === newestId);
+    if (!newest?.pos || !newest.display) return;
+    traceTopologyMove({
+      tile: newest.tile.id,
+      chosenDestination: newest.tile.destination ?? newest.tile.branch ?? null,
+      storedBranch: newest.tile.destination ?? newest.tile.branch ?? null,
+      layoutBranch: newest.pos.branch,
+      orientation: newest.display.orientation,
+      x: newest.pos.x,
+      y: newest.pos.y,
+    });
+  }, [newestId, displays, armDisplays]);
+
+  useLayoutEffect(() => {
     if (!import.meta.env.DEV || tiles.length < 2) return;
     const result = validateBoardPresentation(tiles, {
       layoutFn: layoutBoard,
       centerIndex,
       viewport: { width: area.w, height: area.h },
       tileSize,
+      centerTileId: spinnerId,
+      spinnerId,
     });
     if (result.ok) return;
     const key = `${result.stage}:${result.reason}:${result.index}:${result.leftId}:${result.rightId}`;
     if (key === lastWarnKey.current) return;
     lastWarnKey.current = key;
     console.warn("[LeoDomino] Invalid board presentation after move:", result);
-  }, [tiles, centerIndex, area, tileSize]);
+  }, [tiles, centerIndex, area, tileSize, spinnerId]);
 
   return (
     <div
@@ -322,11 +332,19 @@ function BoardContainer({
           {[...displays, ...armDisplays].map((entry) => {
             if (!entry?.pos || !entry.display) return null;
             const { tile, pos, display } = entry;
+            const glow = scoreGlowById.get(tile.id);
+            const halves = glow
+              ? displayGlowHalves(display, glow.scoringSides)
+              : { first: false, second: false };
+            const isVertical = display.orientation !== "horizontal";
             const isTip = tipIds.has(tile.id);
+            const isTarget = Boolean(targetTileId) && tile.id === targetTileId;
             const classes = [
               "board-container__slot",
               tile.id === newestId ? "board-container__slot--enter" : "",
               isTip ? "board-container__slot--tip" : "",
+              isTarget ? "board-container__slot--target" : "",
+              halves.first || halves.second ? "board-container__slot--score" : "",
             ]
               .filter(Boolean)
               .join(" ");
@@ -336,6 +354,13 @@ function BoardContainer({
                 key={tile.id}
                 className={classes}
                 role="listitem"
+                data-score-glow={
+                  halves.first || halves.second
+                    ? [halves.first ? "first" : "", halves.second ? "second" : ""]
+                        .filter(Boolean)
+                        .join(" ")
+                    : undefined
+                }
                 style={{
                   width: pos.w,
                   height: pos.h,
@@ -347,7 +372,20 @@ function BoardContainer({
                   right={display.right}
                   orientation={display.orientation}
                   boardTileId={tile.id}
+                  highlighted={isTarget}
                 />
+                {halves.first ? (
+                  <span
+                    className={`board-container__score-glow board-container__score-glow--first-${isVertical ? "v" : "h"}`}
+                    aria-hidden="true"
+                  />
+                ) : null}
+                {halves.second ? (
+                  <span
+                    className={`board-container__score-glow board-container__score-glow--second-${isVertical ? "v" : "h"}`}
+                    aria-hidden="true"
+                  />
+                ) : null}
               </div>
             );
           })}

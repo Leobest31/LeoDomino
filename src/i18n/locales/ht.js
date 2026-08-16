@@ -20,6 +20,7 @@ export default {
     cancel: "Anile",
     continue: "Kontinye",
     back: "Retounen",
+    mainMenu: "Meni prensipal",
     ok: "OK",
   },
   home: {
@@ -69,9 +70,9 @@ export default {
         "Doub-sis · 7 donmino · de bout ouvè · tire jiskaske ou ka jwe · pase lè vid · jwe jiska 100",
       allFives: "All Fives",
       allFivesDescription:
-        "All Fives Ameriken. Fè pwen lè bout ouvè yo ajoute yon miltip 5. Premye donmino a bay sèlman sou 10. Premye ki rive 150.",
+        "All Fives Ameriken. Fè pwen lè bout ouvè yo ajoute yon miltip 5 (minimòm 10). Premye ki rive 200.",
       allFivesSummary:
-        "Doub-sis · 7 donmino · pwen pandan jwèt · ouvèti 10 sèlman · miltip 5 · fen wo a awondi a 5 · jwe jiska 150",
+        "Doub-sis · 7 donmino · pwen pandan jwèt · miltip 5 depi 10 · fen wo a awondi a 5 · jwe jiska 200",
       dominican: "Dominiken",
       dominicanDescription:
         "Estanda Dominiken. Patnè yo chita anfas. Pa gen tire — pase lè ou pa ka jwe. Ekip yo jwe jiska 100.",
@@ -126,6 +127,9 @@ export default {
     mustOpenWith: "Ou dwe louvri ak {{tile}}",
     drawUntilPlayable: "Tire nan rezèv la jouk ou ka jwe",
     passOnlyWhenEmpty: "Ou ka pase sèlman lè rezèv la vid",
+    playScore: "+{{points}}",
+    rawPipsLabel: "Pip brit: {{total}}",
+    roundPointsLabel: "Pwen wo a",
   },
   rules: {
     roundWon: "{{name}} genyen wo a",

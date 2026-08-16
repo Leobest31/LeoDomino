@@ -110,6 +110,16 @@ export function isValidSavedMatch(value) {
     if (!claimTileId(id, byId, seen)) return false;
   }
 
+  for (const arm of [s.spinnerNorth, s.spinnerSouth]) {
+    if (arm == null) continue;
+    if (!Array.isArray(arm)) return false;
+    for (const entry of arm) {
+      if (!entry || typeof entry !== "object") return false;
+      const id = /** @type {{ id?: unknown }} */ (entry).id;
+      if (!claimTileId(id, byId, seen)) return false;
+    }
+  }
+
   for (const id of s.reserve) {
     if (!claimTileId(id, byId, seen)) return false;
   }

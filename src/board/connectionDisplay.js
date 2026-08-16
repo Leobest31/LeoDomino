@@ -6,7 +6,12 @@
  *
  * Layout owns footprints. This module swaps painted ends so the half that faces
  * each neighbor always shows the matching connection pip.
+ * Branch membership comes from topology/layout — never from x/y or CSS.
  */
+
+import {
+  isMainChainBranch,
+} from "../game/boardTopology.js";
 
 const OPP = Object.freeze({ E: "W", W: "E", N: "S", S: "N" });
 
@@ -112,14 +117,23 @@ export function pipOnEdge(display, edge) {
  * Resolve painted ends for a logical board tile at its laid position.
  */
 export function resolveTileDisplay(tile, pos, towardRightPos, towardLeftPos) {
-  const orientation =
+  const branch = pos?.branch;
+  const travelDir = pos?.travelDir;
+  const fromLayout =
     pos?.orientation === "horizontal" || pos?.orientation === "vertical"
       ? pos.orientation
-      : isDouble(tile)
-        ? "vertical"
-        : "horizontal";
+      : null;
+  let orientation = fromLayout || (isDouble(tile) ? "vertical" : "horizontal");
+  if (
+    !isDouble(tile) &&
+    isMainChainBranch(branch) &&
+    (travelDir === "E" || travelDir === "W" || !travelDir)
+  ) {
+    orientation = "horizontal";
+  }
+  const paintOrientation = orientation;
 
-  let faceRightDir = orientation === "horizontal" ? "E" : "S";
+  let faceRightDir = paintOrientation === "horizontal" ? "E" : "S";
   if (towardRightPos) {
     faceRightDir = facingToward(pos, towardRightPos);
   } else if (towardLeftPos) {
@@ -130,7 +144,7 @@ export function resolveTileDisplay(tile, pos, towardRightPos, towardLeftPos) {
     return {
       left: Number(tile.left),
       right: Number(tile.right),
-      orientation,
+      orientation: paintOrientation,
       faceRightDir,
       swapped: false,
     };
@@ -141,39 +155,39 @@ export function resolveTileDisplay(tile, pos, towardRightPos, towardLeftPos) {
   // the on-axis neighbor so end-to-end links stay correct.
   let swap = false;
   if (towardLeftPos && towardRightPos) {
-    let halfTowardLeft = facingHalf(pos, towardLeftPos, orientation);
-    const halfTowardRight = facingHalf(pos, towardRightPos, orientation);
+    let halfTowardLeft = facingHalf(pos, towardLeftPos, paintOrientation);
+    const halfTowardRight = facingHalf(pos, towardRightPos, paintOrientation);
     if (halfTowardLeft === halfTowardRight) {
-      const leftAxis = neighborOnAxis(pos, towardLeftPos, orientation);
-      const rightAxis = neighborOnAxis(pos, towardRightPos, orientation);
+      const leftAxis = neighborOnAxis(pos, towardLeftPos, paintOrientation);
+      const rightAxis = neighborOnAxis(pos, towardRightPos, paintOrientation);
       if (rightAxis && !leftAxis) {
         halfTowardLeft = halfTowardRight === "right" ? "left" : "right";
       } else if (leftAxis && !rightAxis) {
         // keep halfTowardLeft
       } else {
-        halfTowardLeft = facingHalf(pos, towardLeftPos, orientation);
+        halfTowardLeft = facingHalf(pos, towardLeftPos, paintOrientation);
       }
     }
     swap = halfTowardLeft === "right";
   } else if (towardLeftPos) {
-    swap = facingHalf(pos, towardLeftPos, orientation) === "right";
+    swap = facingHalf(pos, towardLeftPos, paintOrientation) === "right";
   } else if (towardRightPos) {
-    swap = facingHalf(pos, towardRightPos, orientation) === "left";
+    swap = facingHalf(pos, towardRightPos, paintOrientation) === "left";
   }
 
   return {
     left: swap ? Number(tile.right) : Number(tile.left),
     right: swap ? Number(tile.left) : Number(tile.right),
-    orientation,
+    orientation: paintOrientation,
     faceRightDir,
     swapped: swap,
   };
 }
 
 /**
- * Screen positions for Spinner north/south arms (vertical, growing away
- * from the Spinner). Does not invent matching — callers still paint via
- * `resolveTileDisplay` so the connecting half faces the Spinner.
+ * Screen positions for Spinner north/south arms.
+ * Last-resort fallback only: 2 straight, then the LeoDomino first fold
+ * (TOP → RIGHT, BOTTOM → LEFT). Engine placements always win when present.
  *
  * @param {{ id?: string, x: number, y: number, w: number, h: number }} spinPos
  * @param {{ id: string, left: number, right: number }[]} spinnerNorth
@@ -188,30 +202,60 @@ export function layoutSpinnerArmPositions(
 ) {
   const short = Math.min(spinPos.w, spinPos.h);
   const long = Math.max(spinPos.w, spinPos.h);
-  const x = spinPos.x + (spinPos.w - short) / 2;
-  const north = spinnerNorth.map((tile, index) => ({
-    tile,
-    pos: {
-      id: tile.id,
-      x,
-      y: spinPos.y - (index + 1) * (long + gap),
-      w: short,
-      h: long,
-      orientation: "vertical",
-    },
-  }));
-  const south = spinnerSouth.map((tile, index) => ({
-    tile,
-    pos: {
-      id: tile.id,
-      x,
-      y: spinPos.y + spinPos.h + gap + index * (long + gap),
-      w: short,
-      h: long,
-      orientation: "vertical",
-    },
-  }));
-  return { north, south };
+  const cx = spinPos.x + spinPos.w / 2;
+
+  const walk = (tiles, startDir) => {
+    const foldDir = startDir === "N" ? "E" : "W";
+    const out = [];
+    for (let index = 0; index < tiles.length; index += 1) {
+      const tile = tiles[index];
+      const turning = index >= 2;
+      const dir = turning ? foldDir : startDir;
+      const horiz = turning && Number(tile.left) !== Number(tile.right);
+      const w = horiz ? long : short;
+      const h = horiz ? short : long;
+      let x;
+      let y;
+      if (index === 0) {
+        x = cx - w / 2;
+        y = startDir === "N" ? spinPos.y - gap - h : spinPos.y + spinPos.h + gap;
+      } else {
+        const prev = out[index - 1].pos;
+        if (dir === "N") {
+          x = prev.x + (prev.w - w) / 2;
+          y = prev.y - gap - h;
+        } else if (dir === "S") {
+          x = prev.x + (prev.w - w) / 2;
+          y = prev.y + prev.h + gap;
+        } else if (dir === "E") {
+          x = prev.x + prev.w + gap;
+          y = startDir === "N" ? prev.y : prev.y + prev.h - h;
+        } else {
+          x = prev.x - gap - w;
+          y = startDir === "N" ? prev.y : prev.y + prev.h - h;
+        }
+      }
+      out.push({
+        tile,
+        pos: {
+          id: tile.id,
+          x,
+          y,
+          w,
+          h,
+          orientation: horiz ? "horizontal" : "vertical",
+          travelDir: dir,
+          branch: startDir === "N" ? "SPINNER_TOP" : "SPINNER_BOTTOM",
+        },
+      });
+    }
+    return out;
+  };
+
+  return {
+    north: walk(spinnerNorth, "N"),
+    south: walk(spinnerSouth, "S"),
+  };
 }
 
 /**
@@ -231,30 +275,22 @@ export function buildSpinnerArmDisplays(
   gap = 2,
   armPlacements = null
 ) {
+  const fallback = layoutSpinnerArmPositions(
+    spinPos,
+    spinnerNorth,
+    spinnerSouth,
+    gap
+  );
   const byEngine = Array.isArray(armPlacements) && armPlacements.length
     ? new Map(armPlacements.map((p) => [p.id, p]))
     : null;
-  const { north, south } = byEngine
-    ? {
-        north: spinnerNorth
-          .map((tile) => {
-            const pos = byEngine.get(tile.id);
-            return pos ? { tile, pos } : null;
-          })
-          .filter(Boolean),
-        south: spinnerSouth
-          .map((tile) => {
-            const pos = byEngine.get(tile.id);
-            return pos ? { tile, pos } : null;
-          })
-          .filter(Boolean),
-      }
-    : layoutSpinnerArmPositions(
-        spinPos,
-        spinnerNorth,
-        spinnerSouth,
-        gap
-      );
+  const merge = (tiles, routed) =>
+    tiles.map((tile, i) => {
+      const pos = byEngine?.get(tile.id) || routed[i]?.pos;
+      return pos ? { tile, pos } : null;
+    }).filter(Boolean);
+  const north = merge(spinnerNorth, fallback.north);
+  const south = merge(spinnerSouth, fallback.south);
   const out = [];
 
   north.forEach((entry, i) => {
@@ -286,7 +322,14 @@ export function buildSpinnerArmDisplays(
  * @param {"north"|"south"|"left"|"right"} branch
  */
 export function exposedPipFromDisplay(display, branch) {
-  if (branch === "north" || branch === "left") return Number(display.left);
+  if (
+    branch === "north" ||
+    branch === "left" ||
+    branch === "MAIN_LEFT" ||
+    branch === "SPINNER_TOP"
+  ) {
+    return Number(display.left);
+  }
   return Number(display.right);
 }
 
@@ -404,7 +447,12 @@ export function validateBoardPresentation(board, options = {}) {
   const safeCenter =
     centerIndex >= 0 && centerIndex < board.length ? centerIndex : 0;
 
-  const { placements, tileScale } = layoutFn(board, safeCenter, viewport, tileSize);
+  const { placements, tileScale } = layoutFn(board, safeCenter, viewport, tileSize, {
+    spinnerId: options.spinnerId ?? null,
+    spinnerNorth: options.spinnerNorth,
+    spinnerSouth: options.spinnerSouth,
+    centerTileId: options.centerTileId,
+  });
   if (placements.length !== board.length) {
     return {
       ok: false,

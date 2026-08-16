@@ -86,6 +86,56 @@
   transform: scale(0.94);
 }
 
+.header__menu-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  min-height: 44px;
+  max-width: 8.5rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  background: linear-gradient(180deg, rgba(47, 125, 255, 0.1), rgba(201, 162, 39, 0.07));
+  color: var(--color-accent-strong);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-press),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.header__menu-btn svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.header__menu-btn:hover {
+  background: rgba(201, 162, 39, 0.14);
+  border-color: rgba(201, 162, 39, 0.45);
+  box-shadow: 0 0 12px rgba(47, 125, 255, 0.12);
+}
+
+.header__menu-btn:active {
+  transform: scale(0.94);
+}
+
+.header__menu-btn:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}
+
 /* Match HUD: mute+score and logo+opponent share one compact chrome height */
 .header--stacked {
   height: auto;
@@ -115,6 +165,19 @@
 
 .header--stacked .header__brand .brand-logo {
   height: clamp(1.7rem, 4.2vw, 2.15rem);
+}
+
+.header--stacked .header__side--end {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.18rem;
+}
+
+.header--stacked .header__menu-btn {
+  min-height: 40px;
+  max-width: 7.75rem;
+  padding: 0.22rem 0.45rem;
+  font-size: 0.62rem;
 }
 
 .header--stacked .header__icon-btn {
@@ -159,5 +222,17 @@
 
   .header--stacked .header__brand {
     gap: 0.06rem;
+  }
+
+  .header--stacked .header__side--end {
+    gap: 0.1rem;
+  }
+
+  .header__menu-btn,
+  .header--stacked .header__menu-btn {
+    min-height: 36px;
+    max-width: 7.25rem;
+    padding: 0.16rem 0.4rem;
+    font-size: 0.58rem;
   }
 }

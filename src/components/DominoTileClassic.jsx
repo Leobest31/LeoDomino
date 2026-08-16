@@ -49,6 +49,7 @@ function DominoTileClassic({
   boardTileId,
   flipId,
   dragging = false,
+  highlighted = false,
 }) {
   const { t } = useI18n();
   // Dev-only: default is always false, so every player sees the CSS
@@ -66,6 +67,7 @@ function DominoTileClassic({
     onClick || onPointerDown ? "domino--interactive" : "",
     hidden || dragging ? "domino--hidden" : "",
     dragging ? "domino--dragging" : "",
+    highlighted ? "domino--target" : "",
     className,
   ]
     .filter(Boolean)

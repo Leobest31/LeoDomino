@@ -6,7 +6,19 @@
 import { DEFAULT_PLAYER_COUNT, END, HAND_SIZE } from "./constants.js";
 import { createBoard, getOpenEnds, placeTile } from "./board.js";
 import { createShuffledDeck, deal } from "./deck.js";
-import { findLegalMove, getLegalMoves, hasLegalMove } from "./moves.js";
+import { findLegalMove, getLegalMoves } from "./moves.js";
+import {
+  getAllFivesLegalMoves,
+  isSpinnerEnd,
+  resolveSpinnerBranchPlacement,
+  stampAllFivesSpinner,
+  usesAllFivesSpinner,
+} from "./rules/allFivesSpinner.js";
+import {
+  assertBoardTopology,
+  buildBoardTopology,
+  coercePlayEnd,
+} from "./boardTopology.js";
 
 /**
  * @typedef {object} PlayerState
@@ -61,6 +73,9 @@ export function createMatch(options = {}) {
     })),
     reserve: reserve.slice(),
     board: createBoard(),
+    spinnerId: null,
+    spinnerNorth: [],
+    spinnerSouth: [],
   };
 
   if (typeof options.rulesetId === "string" && options.rulesetId) {
@@ -88,6 +103,9 @@ export function listLegalMoves(match, playerIndex) {
   if (!player) {
     throw new Error(`Invalid playerIndex: ${playerIndex}`);
   }
+  if (usesAllFivesSpinner(match)) {
+    return getAllFivesLegalMoves(player.hand, match);
+  }
   return getLegalMoves(player.hand, match.board, match.byId);
 }
 
@@ -111,18 +129,8 @@ export function applyPlace(match, playerIndex, tileId, end = END.RIGHT) {
     throw new Error(`Player ${player.id} does not hold tile ${tileId}`);
   }
 
-  const legal = findLegalMove(player.hand, match.board, match.byId, tileId, end);
-  if (!legal) {
-    // Opening moves are stored as end "right"; accept left as alias on empty board.
-    if (match.board.length === 0 && end === END.LEFT) {
-      return applyPlace(match, playerIndex, tileId, END.RIGHT);
-    }
-    throw new Error(`Illegal placement: ${tileId} on ${end}`);
-  }
-
+  const playEnd = coercePlayEnd(end);
   const tile = match.byId[tileId];
-  const nextBoard = placeTile(match.board, tile, legal.end);
-
   const nextPlayers = match.players.map((entry, index) => {
     if (index !== playerIndex) return entry;
     return {
@@ -131,11 +139,83 @@ export function applyPlace(match, playerIndex, tileId, end = END.RIGHT) {
     };
   });
 
-  return {
+  if (usesAllFivesSpinner(match) && isSpinnerEnd(playEnd)) {
+    if (!match.spinnerId) {
+      throw new Error(`Illegal placement: ${tileId} on ${playEnd} before first double`);
+    }
+    const legal = getAllFivesLegalMoves(player.hand, match).find(
+      (move) => move.tileId === tileId && move.end === playEnd
+    );
+    if (!legal) {
+      throw new Error(`Illegal placement: ${tileId} on ${playEnd}`);
+    }
+    const { pip, north, south } = {
+      pip: match.byId[match.spinnerId]?.a,
+      north: Array.isArray(match.spinnerNorth) ? match.spinnerNorth : [],
+      south: Array.isArray(match.spinnerSouth) ? match.spinnerSouth : [],
+    };
+    const branch = playEnd === END.NORTH ? north : south;
+    const attachPip = branch.length ? Number(branch[branch.length - 1].right) : Number(pip);
+    const placed = resolveSpinnerBranchPlacement(tile, attachPip, playEnd);
+    const nextNorth = playEnd === END.NORTH ? [...north, placed] : north.slice();
+    const nextSouth = playEnd === END.SOUTH ? [...south, placed] : south.slice();
+    const nextMatch = stampAllFivesSpinner(
+      { ...match, players: nextPlayers },
+      tile,
+      match.board,
+      legal,
+      nextNorth,
+      nextSouth
+    );
+    assertBoardTopology(buildBoardTopology(nextMatch));
+    return nextMatch;
+  }
+
+  const legal = findLegalMove(player.hand, match.board, match.byId, tileId, playEnd);
+  if (!legal) {
+    // Opening moves are stored as end "right"; accept left as alias on empty board.
+    if (match.board.length === 0 && playEnd === END.LEFT) {
+      return applyPlace(match, playerIndex, tileId, END.RIGHT);
+    }
+    throw new Error(`Illegal placement: ${tileId} on ${playEnd}`);
+  }
+
+  const nextBoard = placeTile(match.board, tile, legal.end);
+  let nextMatch = {
     ...match,
     players: nextPlayers,
     board: nextBoard,
   };
+
+  // Visual/layout adapter only: the first double of the round is the
+  // shared LeoDomino chain anchor. Does not change Classic/Haitian/etc.
+  // legal-move topology (those rulesets do not read spinner North/South).
+  if (!nextMatch.spinnerId && tile.isDouble) {
+    nextMatch = {
+      ...nextMatch,
+      spinnerId: tile.id,
+      spinnerNorth: Array.isArray(nextMatch.spinnerNorth)
+        ? nextMatch.spinnerNorth
+        : [],
+      spinnerSouth: Array.isArray(nextMatch.spinnerSouth)
+        ? nextMatch.spinnerSouth
+        : [],
+    };
+  }
+
+  if (usesAllFivesSpinner(match)) {
+    nextMatch = stampAllFivesSpinner(
+      nextMatch,
+      tile,
+      nextBoard,
+      legal,
+      Array.isArray(match.spinnerNorth) ? match.spinnerNorth : [],
+      Array.isArray(match.spinnerSouth) ? match.spinnerSouth : []
+    );
+  }
+
+  assertBoardTopology(buildBoardTopology(nextMatch));
+  return nextMatch;
 }
 
 /**
@@ -183,7 +263,7 @@ export function playerHasLegalMove(match, playerIndex) {
   if (!player) {
     throw new Error(`Invalid playerIndex: ${playerIndex}`);
   }
-  return hasLegalMove(player.hand, match.board, match.byId);
+  return listLegalMoves(match, playerIndex).length > 0;
 }
 
 /**

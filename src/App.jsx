@@ -78,7 +78,10 @@ function App() {
       ) : null}
 
       {phase === "gameStyle" ? (
-        <GameStylePage onBack={() => setPhase("setup")} />
+        <GameStylePage
+          onBack={() => setPhase("setup")}
+          onMainMenu={() => setPhase("setup")}
+        />
       ) : null}
 
       {phase === "game" ? (

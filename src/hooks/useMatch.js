@@ -14,6 +14,7 @@ import {
   passTurn,
   startMatch,
   startNextRound,
+  advanceAfterRoundSummary,
   resolvePlayChoice,
   DEFAULT_RULESET_ID,
   RULESET_STORAGE_KEY,
@@ -226,7 +227,9 @@ export function useMatch(options = {}) {
     setSelectedId(null);
     setErrorKey(null);
     setState((current) => {
-      const next = startNextRound(current);
+      const next = current.roundResult?.summary
+        ? advanceAfterRoundSummary(current)
+        : startNextRound(current);
       stateRef.current = next;
       return next;
     });
@@ -415,22 +418,28 @@ export function useMatch(options = {}) {
 
   useEffect(() => {
     if (state.phase !== PHASE.ROUND_OVER) return undefined;
+    if (state.roundResult?.summary) return undefined;
     const timer = window.setTimeout(() => {
       setState((current) => {
         if (current.phase !== PHASE.ROUND_OVER) return current;
+        if (current.roundResult?.summary) return current;
         const next = startNextRound(current);
         stateRef.current = next;
         return next;
       });
     }, MOTION.celebrationMs);
     return () => window.clearTimeout(timer);
-  }, [state.phase, state.round]);
+  }, [state.phase, state.round, state.roundResult?.summary]);
 
+  const spinnerNorth = Array.isArray(state.spinnerNorth) ? state.spinnerNorth : [];
+  const spinnerSouth = Array.isArray(state.spinnerSouth) ? state.spinnerSouth : [];
   const boardTiles = state.board.map((tile) => ({
     id: tile.id,
     left: tile.left,
     right: tile.right,
     orientation: tile.orientation,
+    destination: tile.destination ?? null,
+    branch: tile.branch ?? tile.destination ?? null,
   }));
 
   const humanHand = state.players[HUMAN_INDEX].hand.map((id) => {
@@ -466,6 +475,15 @@ export function useMatch(options = {}) {
     setPlayerCount,
     rulesetId: state.rulesetId ?? rulesetId,
     boardTiles,
+    spinnerId: state.spinnerId ?? null,
+    spinnerNorth,
+    spinnerSouth,
+    lastPlayPoints: Number(state.lastPlayPoints) || 0,
+    lastPlayPointsSeat:
+      typeof state.lastPlayPointsSeat === "number" ? state.lastPlayPointsSeat : null,
+    lastPlayScoreTerminals: Array.isArray(state.lastPlayScoreTerminals)
+      ? state.lastPlayScoreTerminals
+      : [],
     humanHand,
     opponentHands,
     opponentCount: opponentHands[0]?.count ?? 0,

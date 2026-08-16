@@ -17,6 +17,7 @@ export default {
     cancel: "Annuler",
     continue: "Continuer",
     back: "Retour",
+    mainMenu: "Menu principal",
     ok: "OK",
   },
   home: {
@@ -66,9 +67,9 @@ export default {
         "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
       allFives: "All Fives",
       allFivesDescription:
-        "All Fives américain. Marquez quand les bouts ouverts totalisent un multiple de 5. L’ouverture ne marque que sur 10. Premier à 150.",
+        "All Fives américain. Marquez quand les bouts ouverts totalisent un multiple de 5 (minimum 10). Premier à 200.",
       allFivesSummary:
-        "Double-six · 7 tuiles · points en cours · ouverture 10 seulement · multiples de 5 · fin de manche au plus proche de 5 · jouer à 150",
+        "Double-six · 7 tuiles · points en cours · multiples de 5 à partir de 10 · fin de manche au plus proche de 5 · jouer à 200",
       dominican: "Dominicain",
       dominicanDescription:
         "Standard dominicain. Partenaires en face. Pas de pioche — passez si vous ne pouvez pas jouer. Les équipes jouent à 100.",
@@ -123,6 +124,9 @@ export default {
     mustOpenWith: "Vous devez ouvrir avec {{tile}}",
     drawUntilPlayable: "Piochez jusqu’à pouvoir jouer",
     passOnlyWhenEmpty: "Vous ne pouvez passer que si la pioche est vide",
+    playScore: "+{{points}}",
+    rawPipsLabel: "Pips bruts : {{total}}",
+    roundPointsLabel: "Points de manche",
   },
   rules: {
     roundWon: "{{name}} gagne la manche",

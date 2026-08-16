@@ -114,6 +114,45 @@
   text-transform: uppercase;
 }
 
+.game-style__menu {
+  appearance: none;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.2rem 0.35rem 0.55rem;
+  border: 0;
+  background: transparent;
+  color: var(--style-muted);
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.game-style__menu svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+}
+
+.game-style__menu:hover {
+  color: var(--style-ink);
+}
+
+.game-style__menu:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.game-style__menu-label {
+  text-transform: uppercase;
+}
+
 .game-style__title {
   margin: 0;
   justify-self: center;

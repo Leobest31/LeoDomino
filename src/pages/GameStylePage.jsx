@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import { useAudio } from "../audio";
+import { IconHome } from "../components/Icon";
 import {
   DEFAULT_GAME_STYLE_ID,
   DEFAULT_RULESET_ID,
@@ -20,7 +21,7 @@ const GAME_STYLES = listAvailableGameStyles();
 /**
  * Dedicated Game Style picker — preference only; does not start a match.
  */
-function GameStylePage({ onBack }) {
+function GameStylePage({ onBack, onMainMenu }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
   const [selectedId, setSelectedId] = useState(() =>
@@ -47,6 +48,10 @@ function GameStylePage({ onBack }) {
     tap(() => onBack?.());
   };
 
+  const handleMainMenu = () => {
+    tap(() => onMainMenu?.());
+  };
+
   return (
     <main className="game-style" aria-label={t("setup.gameStyle.screenAria")}>
       <div className="game-style__atmosphere" aria-hidden="true">
@@ -66,6 +71,15 @@ function GameStylePage({ onBack }) {
             <span className="game-style__back-label">{t("common.back")}</span>
           </button>
           <h1 className="game-style__title">{t("setup.gameStyle.label")}</h1>
+          <button
+            type="button"
+            className="game-style__menu"
+            onClick={handleMainMenu}
+            aria-label={t("common.mainMenu")}
+          >
+            <IconHome />
+            <span className="game-style__menu-label">{t("common.mainMenu")}</span>
+          </button>
         </header>
 
         <section

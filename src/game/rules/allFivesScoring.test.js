@@ -1,5 +1,5 @@
 /**
- * All Fives special opening-tile scoring + count scoring.
+ * All Fives live terminal scoring + round-end nearest-5.
  * Run: node src/game/rules/allFivesScoring.test.js
  */
 
@@ -30,8 +30,8 @@ function openWith(tile) {
 }
 
 {
-  assert.equal(ALL_FIVES_MATCH_TARGET, 150);
-  section("All Fives match target is 150");
+  assert.equal(ALL_FIVES_MATCH_TARGET, 200);
+  section("All Fives match target is 200");
 }
 
 {
@@ -52,14 +52,14 @@ function openWith(tile) {
   const board = openWith(createTile(2, 3));
   assert.equal(exposedEndTotal(board), 5);
   assert.equal(scoreAllFivesPlay({ board, isOpening: true }), 0);
-  section("opening 3–2 → 0 points");
+  section("opening 3–2 → exact 5 awards 0 live points");
 }
 
 {
   const board = openWith(createTile(1, 4));
   assert.equal(exposedEndTotal(board), 5);
   assert.equal(scoreAllFivesPlay({ board, isOpening: true }), 0);
-  section("opening 4–1 → 0 points");
+  section("opening 4–1 → exact 5 awards 0 live points");
 }
 
 {
@@ -70,29 +70,34 @@ function openWith(tile) {
 }
 
 {
-  // Open 0-0 (sum 0 → opening awards 0), then play 0-5 → ends 5|0 = 5.
+  // 0-0 spinner both halves still 0; 0-5 on one main side → 0+0+5 = 5, live 5 = 0.
   let board = openWith(createTile(0, 0));
   assert.equal(scoreAllFivesPlay({ board, isOpening: true }), 0);
   board = placeTile(board, createTile(0, 5), END.RIGHT);
   assert.equal(exposedEndTotal(board), 5);
-  assert.equal(scoreAllFivesPlay({ board, isOpening: false }), 5);
-  section("second and later plays totaling 5 → award 5 points");
-}
-
-{
-  // Later play totaling 10 still awards 10 (normal All Fives).
-  let board = openWith(createTile(1, 1));
-  board = placeTile(board, createTile(1, 4), END.RIGHT);
-  // ends: left=1, right=4 → 5
-  assert.equal(scoreAllFivesPlay({ board, isOpening: false }), 5);
-  board = placeTile(board, createTile(4, 5), END.RIGHT);
-  // ends: left=1, right=5 → 6 → 0
   assert.equal(scoreAllFivesPlay({ board, isOpening: false }), 0);
-  section("later plays: only positive multiples of 5 score");
+  section("live exact 5 from 0-0 + 0-5 awards 0");
 }
 
 {
-  // Opening points accumulate toward the 150 target.
+  // One main side occupied: spinner remains a terminal double (Y+X+X).
+  let board = openWith(createTile(3, 3));
+  board = placeTile(board, createTile(2, 3), END.RIGHT);
+  assert.equal(exposedEndTotal(board), 8);
+  assert.equal(scoreAllFivesPlay({ board, isOpening: false, spinnerId: "3-3" }), 0);
+  board = openWith(createTile(3, 3));
+  board = placeTile(board, createTile(3, 4), END.RIGHT);
+  assert.equal(exposedEndTotal(board), 10);
+  assert.equal(scoreAllFivesPlay({ board, isOpening: false, spinnerId: "3-3" }), 10);
+  board = openWith(createTile(6, 6));
+  board = placeTile(board, createTile(6, 3), END.LEFT);
+  assert.equal(exposedEndTotal(board, { spinnerId: "6-6" }), 15);
+  assert.equal(scoreAllFivesPlay({ board, isOpening: false, spinnerId: "6-6" }), 15);
+  section("one-sided spinner is a main-line terminal double: 3-3+4=+10, 6-6+3=+15");
+}
+
+{
+  // Opening points accumulate toward the 200 target.
   let cumulative = 0;
   const opening = scoreAllFivesPlay({
     board: openWith(createTile(5, 5)),
@@ -103,16 +108,18 @@ function openWith(tile) {
   assert.equal(cumulative, 10);
   assert.ok(cumulative < ALL_FIVES_MATCH_TARGET);
 
-  // Simulate further count scoring (not opening).
-  cumulative += 20; // e.g. ends totaling 20
+  cumulative += 20;
   cumulative += 15;
   assert.equal(cumulative, 45);
   assert.ok(cumulative < ALL_FIVES_MATCH_TARGET);
 
-  cumulative += 105;
-  assert.equal(cumulative, 150);
+  cumulative += 145;
+  assert.equal(cumulative, 190);
+  assert.ok(cumulative < ALL_FIVES_MATCH_TARGET);
+  cumulative += 10;
+  assert.equal(cumulative, 200);
   assert.ok(cumulative >= ALL_FIVES_MATCH_TARGET);
-  section("opening points count toward the cumulative 150-point target");
+  section("opening points count toward the cumulative 200-point target");
 }
 
 /** Crafted All Fives playing state — empty board, seat 0 to open. */
@@ -148,7 +155,7 @@ function openingState(tileId, handExtras = []) {
   const after = playTile(openingState("5-5", ["2-3", "1-2"]), "5-5");
   assert.equal(after.scores[0], 10);
   assert.equal(after.scores[1], 0);
-  assert.equal(after.targetScore, 150);
+  assert.equal(after.targetScore, 200);
   assert.equal(after.board.length, 1);
   section("engine: opening 5–5 awards 10 via scorePlay");
 }
@@ -162,13 +169,13 @@ function openingState(tileId, handExtras = []) {
 {
   const after = playTile(openingState("2-3", ["5-5", "1-2"]), "2-3");
   assert.equal(after.scores[0], 0);
-  section("engine: opening 3–2 awards 0 via scorePlay");
+  section("engine: opening 3–2 awards 0 live (exact 5 is not a table score)");
 }
 
 {
   const after = playTile(openingState("1-4", ["5-5", "1-2"]), "1-4");
   assert.equal(after.scores[0], 0);
-  section("engine: opening 4–1 awards 0 via scorePlay");
+  section("engine: opening 4–1 awards 0 live (exact 5 is not a table score)");
 }
 
 {
@@ -178,11 +185,10 @@ function openingState(tileId, handExtras = []) {
 }
 
 {
-  // Second play totaling 5 awards 5 through the live ruleset.
+  // Live 5 from 0-0 + 0-5 does not award.
   let state = openingState("0-0", ["0-5", "1-2", "2-3"]);
   state = playTile(state, "0-0");
   assert.equal(state.scores[0], 0);
-  // Seat 1 would be next — put seat 0 back with the 0-5 still in hand.
   state = {
     ...state,
     currentPlayer: 0,
@@ -193,28 +199,38 @@ function openingState(tileId, handExtras = []) {
   };
   state = playTile(state, "0-5", END.RIGHT);
   assert.equal(exposedEndTotal(state.board), 5);
-  assert.equal(state.scores[0], 5);
-  section("engine: second play totaling 5 awards 5");
+  assert.equal(state.scores[0], 0);
+  section("engine: live exact 5 awards 0");
 }
 
 {
-  // Opening 10 contributes to the live match score vs target 150.
   const match = startMatch({
     seed: 42,
     playerIds: ["you", "rival"],
     rulesetId: ALL_FIVES_RULESET_ID,
   });
   assert.equal(match.targetScore, ALL_FIVES_MATCH_TARGET);
-  assert.equal(match.targetScore, 150);
+  assert.equal(match.targetScore, 200);
+
+  const below = {
+    ...openingState("5-5", ["1-2", "2-3"]),
+    scores: [180, 0],
+  };
+  const notYet = playTile(below, "5-5");
+  assert.equal(notYet.scores[0], 190);
+  assert.equal(notYet.phase, PHASE.PLAYING);
+  assert.equal(notYet.matchWinner, null);
 
   const near = {
     ...openingState("5-5", ["1-2", "2-3"]),
-    scores: [140, 0],
+    scores: [190, 0],
   };
   const after = playTile(near, "5-5");
-  assert.equal(after.scores[0], 150);
+  assert.equal(after.scores[0], 200);
   assert.ok(after.scores[0] >= after.targetScore);
-  section("engine: opening 10 counts toward the 150-point target");
+  assert.equal(after.phase, PHASE.MATCH_OVER);
+  assert.equal(after.matchWinner, 0);
+  section("engine: 190 + 10 reaches 200 and completes the match");
 }
 
 {
@@ -252,6 +268,20 @@ function openingState(tileId, handExtras = []) {
     0
   );
   section("round-end: 1–2 remaining pips award 0 after rounding");
+}
+
+{
+  const byId = indexTiles([createTile(0, 3)]);
+  const players = [{ hand: [] }, { hand: ["0-3"] }];
+  assert.equal(
+    calculateAllFivesRoundPoints({ winnerIndex: 0, players, byId }),
+    5
+  );
+  assert.equal(
+    scoreAllFivesPlay({ board: openWith(createTile(2, 3)), isOpening: true }),
+    0
+  );
+  section("round-end may award 5; live table scoring cannot");
 }
 
 console.log("\nAll Fives opening-tile scoring tests passed.");

@@ -165,9 +165,9 @@ function dekabesWinState(scores) {
   assert.equal(classic.rulesetId, LEGACY_RULESET_ID);
   assert.equal(gameStyleToRulesetId("haitian"), "haitian");
   const styles = listAvailableGameStyles();
-  assert.equal(styles.length, 6);
+  assert.equal(styles.length, 5);
   assert.ok(styles.some((s) => s.id === "haitian"));
-  assert.ok(styles.some((s) => s.id === "american"));
+  assert.equal(styles.some((s) => s.id === "american"), false);
   assert.ok(styles.some((s) => s.id === "allFives"));
   assert.ok(styles.some((s) => s.id === "puertorican"));
   assert.equal(isGameStyleCompatibleWithPlayerCount("haitian", 3), false);

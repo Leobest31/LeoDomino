@@ -34,10 +34,11 @@
   animation: felt-celebrate 1s var(--ease-out);
 }
 
-.game-page--match-over .game-page__body,
-.game-page--match-over .bottom-bar {
-  filter: blur(5px);
-  transition: filter 400ms var(--ease-out);
+.game-page--round-summary .game-page__chrome,
+.game-page--round-summary .player-panel,
+.game-page--round-summary .bottom-bar,
+.game-page--round-summary .game-page__side-seats {
+  pointer-events: none;
 }
 
 @keyframes felt-celebrate {

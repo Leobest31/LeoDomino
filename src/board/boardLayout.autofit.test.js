@@ -85,19 +85,22 @@ function assertInsideSafe(placements, viewport, label, hudRight = 0) {
   }
 }
 
-function assertBboxCentered(placements, viewport, label, hudRight = 0) {
+function assertAnchorCentered(placements, viewport, label, hudRight = 0, id = "c") {
   const play = computePlayBounds(viewport, MARGIN, hudRight, 0);
   const safe = computeSafeFeltBounds(play);
   const midX = (safe.minX + safe.maxX) / 2;
   const midY = (safe.minY + safe.maxY) / 2;
-  const bb = computeChainBounds(placements);
+  const anchor = placements.find((p) => p.id === id);
+  assert.ok(anchor, `${label} missing anchor ${id}`);
+  const cx = anchor.x + anchor.w / 2;
+  const cy = anchor.y + anchor.h / 2;
   assert.ok(
-    Math.abs(bb.cx - midX) < 1.5,
-    `${label} bbox cx ${bb.cx} vs felt ${midX}`
+    Math.abs(cx - midX) < 1.5,
+    `${label} anchor cx ${cx} vs felt ${midX}`
   );
   assert.ok(
-    Math.abs(bb.cy - midY) < 1.5,
-    `${label} bbox cy ${bb.cy} vs felt ${midY}`
+    Math.abs(cy - midY) < 1.5,
+    `${label} anchor cy ${cy} vs felt ${midY}`
   );
 }
 
@@ -125,10 +128,10 @@ function assertBboxCentered(placements, viewport, label, hudRight = 0) {
 }
 
 {
-  // Short chain 5–10: preferred scale, centered, no overlap, all visible.
+  // Short chain: preferred scale when the 5-straight lock still fits.
   const vp = VIEWPORTS.desktop;
-  for (const n of [5, 8, 10]) {
-    const { tiles, centerIndex } = mkChain(n);
+  for (const n of [3, 5]) {
+    const { tiles, centerIndex } = mkChain(n, Math.floor((n - 1) / 2));
     const { placements, tileScale, camera } = layoutBoard(
       tiles,
       centerIndex,
@@ -141,7 +144,7 @@ function assertBboxCentered(placements, viewport, label, hudRight = 0) {
     assert.ok(!camera?.overflow, `short ${n} overflow`);
     assertNoOverlap(placements, `short ${n}`);
     assertInsideSafe(placements, vp, `short ${n}`);
-    assertBboxCentered(placements, vp, `short ${n}`);
+    assertAnchorCentered(placements, vp, `short ${n}`);
   }
 }
 
@@ -162,7 +165,7 @@ function assertBboxCentered(placements, viewport, label, hudRight = 0) {
     assert.ok(!camera?.overflow, `medium ${n} overflow`);
     assertNoOverlap(placements, `medium ${n}`);
     assertInsideSafe(placements, vp, `medium ${n}`);
-    assertBboxCentered(placements, vp, `medium ${n}`);
+    assertAnchorCentered(placements, vp, `medium ${n}`);
   }
 }
 
@@ -182,7 +185,7 @@ function assertBboxCentered(placements, viewport, label, hudRight = 0) {
     assert.ok(!camera?.overflow, `long28 ${name} overflow`);
     assertNoOverlap(placements, `long28 ${name}`);
     assertInsideSafe(placements, vp, `long28 ${name}`);
-    assertBboxCentered(placements, vp, `long28 ${name}`);
+    assertAnchorCentered(placements, vp, `long28 ${name}`);
     const play = computePlayBounds(vp, MARGIN, 0, 0);
     const safe = computeSafeFeltBounds(play);
     const bb = computeChainBounds(placements);
@@ -211,7 +214,7 @@ function assertBboxCentered(placements, viewport, label, hudRight = 0) {
     assert.ok(!camera?.overflow, `resize ${name} overflow`);
     assertNoOverlap(placements, `resize ${name}`);
     assertInsideSafe(placements, vp, `resize ${name}`);
-    assertBboxCentered(placements, vp, `resize ${name}`);
+    assertAnchorCentered(placements, vp, `resize ${name}`);
   }
 }
 
@@ -283,7 +286,7 @@ function assertBboxCentered(placements, viewport, label, hudRight = 0) {
   assert.ok(spin && n1 && s1, "spinner and first arms");
   assert.ok(n1.y + n1.h <= spin.y + 1, "north arm sits above spinner");
   assert.ok(s1.y >= spin.y + spin.h - 1, "south arm sits below spinner");
-  assert.equal(layout.camera?.focusMode, "bbox");
+  assert.equal(layout.camera?.focusMode, "anchor");
 }
 
 {

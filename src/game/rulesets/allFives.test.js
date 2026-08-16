@@ -55,6 +55,10 @@ function section(title) {
   assert.equal(normalizeGameStyleId("allFives"), "allFives");
   assert.equal(normalizeGameStyleId(ALL_FIVES_RULESET_ID), "allFives");
   assert.ok(listAvailableGameStyles().some((s) => s.id === "allFives"));
+  assert.equal(
+    listAvailableGameStyles().some((s) => s.id === "american"),
+    false
+  );
   assert.equal(flagEmoji(style), "🇺🇸");
   assert.ok(flagDataUrl(style).startsWith("data:image/svg+xml"));
   assert.equal(isGameStyleCompatibleWithPlayerCount("allFives", 2), true);
@@ -66,11 +70,11 @@ function section(title) {
 {
   const ruleset = resolveRuleset(ALL_FIVES_RULESET_ID);
   assert.equal(ruleset.defaultTargetScore, ALL_FIVES_MATCH_TARGET);
-  assert.equal(ruleset.defaultTargetScore, 150);
+  assert.equal(ruleset.defaultTargetScore, 200);
   assert.equal(typeof ruleset.policies.scorePlay, "function");
   assert.equal(ruleset.policies.calculateRoundPoints, calculateAllFivesRoundPoints);
   assert.notEqual(ruleset.policies.calculateRoundPoints, calculateRoundPoints);
-  section("allFives ruleset: target 150 + isolated round-end policy");
+  section("allFives ruleset: target 200 + isolated round-end policy");
 }
 
 {
@@ -80,8 +84,8 @@ function section(title) {
     rulesetId: ALL_FIVES_RULESET_ID,
   });
   assert.equal(match.rulesetId, ALL_FIVES_RULESET_ID);
-  assert.equal(match.targetScore, 150);
-  section("startMatch stores allFives rulesetId and target 150");
+  assert.equal(match.targetScore, 200);
+  section("startMatch stores allFives rulesetId and target 200");
 }
 
 {

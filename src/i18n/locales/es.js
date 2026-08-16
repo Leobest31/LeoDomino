@@ -17,6 +17,7 @@ export default {
     cancel: "Cancelar",
     continue: "Continuar",
     back: "Volver",
+    mainMenu: "Menú principal",
     ok: "OK",
   },
   home: {
@@ -66,9 +67,9 @@ export default {
         "Doble seis · 7 fichas · dos extremos abiertos · robar hasta poder jugar · pasar si vacío · jugar a 100",
       allFives: "All Fives",
       allFivesDescription:
-        "All Fives americano. Anota cuando los extremos suman un múltiplo de 5. La apertura solo anota con 10. Primero a 150.",
+        "All Fives americano. Anota cuando los extremos suman un múltiplo de 5 (mínimo 10). Primero a 200.",
       allFivesSummary:
-        "Doble seis · 7 fichas · puntos en juego · apertura solo 10 · múltiplos de 5 · fin de ronda al 5 más cercano · jugar a 150",
+        "Doble seis · 7 fichas · puntos en juego · múltiplos de 5 desde 10 · fin de ronda al 5 más cercano · jugar a 200",
       dominican: "Dominicano",
       dominicanDescription:
         "Estándar dominicano. Parejas frente a frente. Sin robar — pasa si no puedes jugar. Las parejas juegan a 100.",
@@ -123,6 +124,9 @@ export default {
     mustOpenWith: "Debes abrir con {{tile}}",
     drawUntilPlayable: "Roba del pozo hasta poder jugar",
     passOnlyWhenEmpty: "Solo puedes pasar si el pozo está vacío",
+    playScore: "+{{points}}",
+    rawPipsLabel: "Puntos brutos: {{total}}",
+    roundPointsLabel: "Puntos de ronda",
   },
   rules: {
     roundWon: "{{name}} gana la ronda",

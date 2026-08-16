@@ -307,6 +307,11 @@
     0 0 0 1.25px rgba(170, 145, 75, 0.38);
 }
 
+.domino--target {
+  outline: 2px solid rgba(232, 197, 71, 0.95);
+  outline-offset: 2px;
+}
+
 @keyframes domino-select-lift {
   0% {
     transform: translateY(-2px) scale(0.988);

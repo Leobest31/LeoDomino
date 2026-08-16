@@ -17,6 +17,7 @@ export default {
     cancel: "Cancel",
     continue: "Continue",
     back: "Back",
+    mainMenu: "Main Menu",
     ok: "OK",
   },
   home: {
@@ -66,9 +67,9 @@ export default {
         "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
       allFives: "All Fives",
       allFivesDescription:
-        "American All Fives. Score when open ends total a multiple of 5. Opening scores only on 10. First to 150.",
+        "American All Fives. Score when open ends total a multiple of 5 (minimum 10). First to 200.",
       allFivesSummary:
-        "Double-six · 7 tiles · count scoring · opening 10 only · multiples of 5 · round-end nearest 5 · play to 150",
+        "Double-six · 7 tiles · count scoring · multiples of 5 from 10 · round-end nearest 5 · play to 200",
       dominican: "Dominican",
       dominicanDescription:
         "Dominican Standard. Partners sit opposite. No draws — pass when you cannot play. Team scores to 100.",
@@ -123,6 +124,9 @@ export default {
     mustOpenWith: "You must open with {{tile}}",
     drawUntilPlayable: "Draw from the boneyard until you can play",
     passOnlyWhenEmpty: "You may pass only when the boneyard is empty",
+    playScore: "+{{points}}",
+    rawPipsLabel: "Raw pips: {{total}}",
+    roundPointsLabel: "Round points",
   },
   rules: {
     roundWon: "{{name}} wins the round",

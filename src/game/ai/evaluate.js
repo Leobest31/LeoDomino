@@ -3,6 +3,7 @@
  */
 
 import { getOpenEnds } from "../board.js";
+import { END } from "../constants.js";
 import { handPipTotal } from "../rules/scoring.js";
 import { playTile } from "../rules/drawDominoes.js";
 import { getDifficultyConfig } from "./difficulties.js";
@@ -31,6 +32,18 @@ export function scoreMove(state, move, aiIndex, difficulty, memory) {
   if (isOpening && !state.mustPlayTileId) {
     if (tile.isDouble) score += 12 + tile.a * 2;
     else score += tile.b * 1.2 + tile.a * 0.4;
+  }
+
+  // Do not auto-continue the main chain on TOP/BOTTOM while a main-line
+  // port is still empty. Explicit N/S plays stay legal; they rank lower.
+  if (move.end === END.NORTH || move.end === END.SOUTH) {
+    const board = state.board || [];
+    const spinIdx = state.spinnerId
+      ? board.findIndex((entry) => entry.id === state.spinnerId)
+      : -1;
+    if (spinIdx >= 0 && (spinIdx === 0 || spinIdx === board.length - 1)) {
+      score -= 30;
+    }
   }
 
   // --- Always useful: dump exposure (heavier when hand is large) ---

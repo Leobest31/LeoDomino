@@ -408,6 +408,8 @@ test("orientation flips correctly when high pip must face the chain", () => {
     left: 3,
     right: 5,
     orientation: ORIENTATION.HORIZONTAL,
+    destination: "MAIN_RIGHT",
+    branch: "MAIN_RIGHT",
   });
   assert.deepEqual(getOpenEnds(board), { left: 2, right: 5 });
 });
@@ -421,6 +423,8 @@ test("left play flips when low pip must face the chain", () => {
     left: 5,
     right: 2,
     orientation: ORIENTATION.HORIZONTAL,
+    destination: "MAIN_LEFT",
+    branch: "MAIN_LEFT",
   });
   assert.deepEqual(getOpenEnds(board), { left: 5, right: 3 });
 });

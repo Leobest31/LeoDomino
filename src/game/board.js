@@ -4,6 +4,7 @@
  */
 
 import { END, ORIENTATION } from "./constants.js";
+import { BRANCH, stampTileDestination } from "./boardTopology.js";
 import { oppositePip, tileHasPip } from "./tiles.js";
 
 /**
@@ -47,12 +48,15 @@ export function getOpenEnds(board) {
  * @returns {BoardTile}
  */
 export function createOpeningPlacement(tile) {
-  return {
-    id: tile.id,
-    left: tile.a,
-    right: tile.b,
-    orientation: tile.isDouble ? ORIENTATION.VERTICAL : ORIENTATION.HORIZONTAL,
-  };
+  return stampTileDestination(
+    {
+      id: tile.id,
+      left: tile.a,
+      right: tile.b,
+      orientation: tile.isDouble ? ORIENTATION.VERTICAL : ORIENTATION.HORIZONTAL,
+    },
+    BRANCH.MAIN_RIGHT
+  );
 }
 
 /**
@@ -75,21 +79,27 @@ export function resolvePlacement(tile, endPip, end) {
   const orientation = tile.isDouble ? ORIENTATION.VERTICAL : ORIENTATION.HORIZONTAL;
 
   if (end === END.LEFT) {
-    return {
-      id: tile.id,
-      left: freePip,
-      right: endPip,
-      orientation,
-    };
+    return stampTileDestination(
+      {
+        id: tile.id,
+        left: freePip,
+        right: endPip,
+        orientation,
+      },
+      END.LEFT
+    );
   }
 
   if (end === END.RIGHT) {
-    return {
-      id: tile.id,
-      left: endPip,
-      right: freePip,
-      orientation,
-    };
+    return stampTileDestination(
+      {
+        id: tile.id,
+        left: endPip,
+        right: freePip,
+        orientation,
+      },
+      END.RIGHT
+    );
   }
 
   throw new Error(`Unknown board end: ${end}`);

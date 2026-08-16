@@ -27,19 +27,23 @@ const VIEWPORTS = [
 
 const TILE_SIZE = { w: 40, h: 76 };
 
-function findCenterIndex(board, openingId) {
+function findCenterIndex(board, openingId, spinnerId) {
+  if (spinnerId) {
+    const i = board.findIndex((t) => t.id === spinnerId);
+    if (i >= 0) return i;
+  }
   if (!openingId) return 0;
   const i = board.findIndex((t) => t.id === openingId);
   return i >= 0 ? i : 0;
 }
 
-function assertBoardOk(board, openingId, label) {
+function assertBoardOk(board, openingId, label, spinnerId = null) {
   const logicalOnly = validateBoardPresentation(board);
   assert.equal(logicalOnly.ok, true, `${label} logical ${JSON.stringify(logicalOnly)}`);
 
   if (board.length < 2) return;
 
-  const centerIndex = findCenterIndex(board, openingId);
+  const centerIndex = findCenterIndex(board, openingId, spinnerId);
   for (const viewport of VIEWPORTS) {
     const result = validateBoardPresentation(board, {
       layoutFn: layoutBoard,
@@ -85,7 +89,7 @@ function runSeed(seed, difficulty) {
   let steps = 0;
   let boardsChecked = 0;
 
-  assertBoardOk(state.board, openingId, `seed ${seed} open`);
+  assertBoardOk(state.board, openingId, `seed ${seed} open`, state.spinnerId);
 
   while (state.phase === PHASE.PLAYING && steps < 400) {
     steps += 1;
@@ -103,11 +107,11 @@ function runSeed(seed, difficulty) {
 
     if (state.board.length !== beforeLen || steps % 3 === 0) {
       boardsChecked += 1;
-      assertBoardOk(state.board, openingId, `seed ${seed} step ${steps}`);
+      assertBoardOk(state.board, openingId, `seed ${seed} step ${steps}`, state.spinnerId);
     }
 
     if (state.phase === PHASE.ROUND_OVER || state.phase === PHASE.MATCH_OVER) {
-      assertBoardOk(state.board, openingId, `seed ${seed} end`);
+      assertBoardOk(state.board, openingId, `seed ${seed} end`, state.spinnerId);
       break;
     }
   }

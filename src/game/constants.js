@@ -19,6 +19,8 @@ export const DEFAULT_PLAYER_COUNT = 2;
 export const END = Object.freeze({
   LEFT: "left",
   RIGHT: "right",
+  NORTH: "north",
+  SOUTH: "south",
 });
 
 /** Tile orientation on the table chain. */

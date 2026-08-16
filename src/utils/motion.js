@@ -14,6 +14,12 @@ export const MOTION = Object.freeze({
   /** Minimal lift — no exaggerated arc. */
   playArcLiftPx: 2,
   drawArcLiftPx: 2,
+  /** All Fives table +N hold before the HUD scoreboard ticks. */
+  playScoreHoldMs: 2000,
+  /** All Fives round-end: one remaining tile counted at a time. */
+  roundSummaryTileMs: 750,
+  /** All Fives round-end: hold final ROUND POINTS before HUD ticks. */
+  roundSummaryHoldMs: 2000,
 });
 
 /**

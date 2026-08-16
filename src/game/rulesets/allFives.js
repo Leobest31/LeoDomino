@@ -1,8 +1,9 @@
 /**
  * All Fives (American All Fives / count) ruleset — engine id "allFives".
  *
- * Play scoring: special opening (only exposed 10 → +10); later plays award
- * every positive multiple of 5 at full value. Target 150.
+ * Play scoring: exact terminal-end total; award that total only when it is
+ * >= 10 and a multiple of 5. Live 5 does not score. No live-play rounding.
+ * Target 200.
  *
  * Round-end: opponents' remaining pips rounded to nearest 5 (not Classic raw).
  * Deal / draw / pass chassis matches Classic draw-dominoes.
@@ -12,6 +13,8 @@ import { legacyRuleset } from "./legacy.js";
 import {
   ALL_FIVES_MATCH_TARGET,
   allFivesScorePlay,
+  explainAllFivesScore,
+  explainAllFivesRoundEnd,
   calculateAllFivesRoundPoints,
 } from "../rules/allFivesScoring.js";
 
@@ -42,10 +45,15 @@ export const allFivesRuleset = Object.freeze({
   defaultTargetScore: ALL_FIVES_MATCH_TARGET,
   matchWinMode: "firstToReach",
   hudScoreFormat: "ofTarget",
+  spinner: true,
+  /** Felt counting of remaining hands before HUD/next-round. */
+  roundSummary: true,
 
   policies: Object.freeze({
     ...legacyRuleset.policies,
     scorePlay: allFivesScorePlay,
+    explainPlayScore: explainAllFivesScore,
+    explainRoundEnd: explainAllFivesRoundEnd,
     calculateRoundPoints: calculateAllFivesRoundPoints,
   }),
 });

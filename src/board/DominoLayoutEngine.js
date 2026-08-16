@@ -1,17 +1,27 @@
 /**
- * DominoLayoutEngine — logical board layout, then fit-to-felt.
+ * DominoLayoutEngine — one LeoDomino chain layout for every ruleset.
  *
  * Pipeline (same game state → same layout):
- *   1. Place every played tile in logical coordinates (opener center = 0,0)
- *      including American spinner N/S branches in that same space.
- *   2. Measure the full AABB of rotated footprints (not centers only).
- *   3. Auto-fit: one uniform scale for the whole board
- *        fitScale = min(preferred, safeW / chainW, safeH / chainH)
- *   4. Translate so chain bbox center = safe-felt center.
+ *   1. Before any double exists: one horizontal main line in board order
+ *      (left end = board[0]). Non-doubles stay horizontal. No spinner
+ *      ports, N/S branches, or first-fold routing. Bbox-center the chain
+ *      on the usable felt — a centered non-double is not a spinner.
+ *   2. First double of the round (spinnerId) becomes the felt-center
+ *      anchor. Reflow the already-played chain around it.
+ *   3. LEFT/RIGHT/TOP/BOTTOM use fixed first-turn routing around that double.
+ *   4. Measure the AABB of rotated footprints.
+ *   5. Keep the preferred tile size when the chain fits; otherwise one
+ *      uniform auto-fit scale. Pin the spinner (not a pre-spinner opener)
+ *      to the usable felt center.
  *
- * Routing (snake) still turns before the table edge so the pack stays compact.
- * Scale is applied after the complete chain exists — never by dropping tiles
- * or shrinking individual bones. Fail-closed empty placements are forbidden.
+ * Fixed first turns (tiles after the center double; the double is not counted):
+ *   LEFT  5 straight west  → tile 6 turns UP
+ *   RIGHT 5 straight east  → tile 6 turns DOWN
+ *   TOP   2 straight north → tile 3 turns RIGHT
+ *   BOTTOM 2 straight south → tile 3 turns LEFT
+ *
+ * Never turn early to keep a larger tile size. Never bbox-center the chain
+ * if that would drift the first double off the felt mid.
  *
  * Rotation convention (degrees):
  *   0   — horizontal (long axis E–W)
@@ -19,6 +29,14 @@
  *   180 — horizontal flipped (paint handled by display layer)
  *   270 — vertical flipped
  */
+
+import {
+  BRANCH,
+  SPINNER_NODE,
+  assertBoardTopology,
+  buildBoardTopology,
+  publicLayoutBranch,
+} from "../game/boardTopology.js";
 
 /** @typedef {{ id: string, left: number, right: number }} BoardTile */
 /** @typedef {{ width: number, height: number }} Viewport */
@@ -29,8 +47,8 @@ export const CHAIN_GAP = 2;
 export const GAP = CHAIN_GAP;
 export const MARGIN = 14;
 export const PADDING = 28;
-/** Extra inset inside the playable felt so bones stay off the gold border. */
-export const SAFE_FELT_INSET = 8;
+/** Extra inset inside the playable felt so bones stay off the gold/table frame. */
+export const SAFE_FELT_INSET = 12;
 export const BRIDGE_LEN = 2;
 /**
  * Plan B/C: readable board floor. Effective tile scale must not fall below
@@ -42,18 +60,32 @@ export const MIN_BOARD_SCALE = 0.85;
 export const MIN_TILE_SCALE = MIN_BOARD_SCALE;
 export const MIN_SCALE = MIN_BOARD_SCALE;
 /**
+ * LeoDomino main-chain lock: tiles after the center double on LEFT and RIGHT
+ * stay on the same horizontal line until this count. The double is not counted.
+ */
+export const LEO_MAIN_STRAIGHT = 5;
+export const SPINNER_MAIN_STRAIGHT = LEO_MAIN_STRAIGHT;
+/**
  * First horizontal run on each arm: exactly this many tiles straight,
  * then the next tile must take the deterministic first fold
  * (right → DOWN/S, left → UP/N).
  */
-export const TURN_EVERY = 3;
+export const TURN_EVERY = LEO_MAIN_STRAIGHT;
+/**
+ * LeoDomino N/S lock: tiles after the center double on TOP and BOTTOM stay
+ * on the same vertical line until this count. The double is not counted.
+ */
+export const LEO_ARM_STRAIGHT = 2;
+export const SPINNER_ARM_STRAIGHT = LEO_ARM_STRAIGHT;
 /** Soft upper bound on later horizontal runs after the first fold. */
 export const RUN_CEILING = 6;
 export const CHAIN_GAP_PX = CHAIN_GAP;
 export const SEGMENT_TILES = TURN_EVERY;
-/** Canonical first-fold directions (locked snake). */
+/** Canonical first-fold directions (locked LeoDomino snake). */
 export const FIRST_FOLD_RIGHT = "S";
 export const FIRST_FOLD_LEFT = "N";
+export const FIRST_FOLD_TOP = "E";
+export const FIRST_FOLD_BOTTOM = "W";
 export const SAFETY_MARGIN_PX = MARGIN;
 export const MIN_BOARD_ZOOM = MIN_BOARD_SCALE;
 export const MAX_GLOBAL_ZOOM = MIN_BOARD_SCALE;
@@ -311,18 +343,6 @@ function expandSoft(soft, size, bridges = BRIDGE_LEN, hard = null) {
   };
 }
 
-/** Local hard bounds when opener maps to playable-felt mid at identity scale. */
-function localHardBounds(play) {
-  const playW = Math.max(1, play.maxX - play.minX);
-  const playH = Math.max(1, play.maxY - play.minY);
-  return {
-    minX: -playW / 2,
-    maxX: playW / 2,
-    minY: -playH / 2,
-    maxY: playH / 2,
-  };
-}
-
 function playMid(play) {
   return {
     x: (play.minX + play.maxX) / 2,
@@ -436,13 +456,23 @@ function isLegalStep(prev, tile, dir, size) {
   const prevVert = prev.h > prev.w + 0.5;
   const prevDouble = !!prev.double;
   const ew = dir === "E" || dir === "W";
+  // Doubles stay vertical. A fold onto E/W therefore sits beside the previous
+  // vertical bone instead of becoming a horizontal rail tile.
   if (prevVert && !prevDouble && ew) {
-    return !isDouble(tile) && fp.orientation === "horizontal";
+    return isDouble(tile) || fp.orientation === "horizontal";
   }
   if (!prevVert && !ew) {
-    return fp.orientation === "vertical";
+    return fp.orientation === "vertical" || isDouble(tile);
   }
   return true;
+}
+
+/** Routed footprint even when the preferred-size halo would reject it. */
+function routedBox(prev, tile, dir, fromDir, size, gap) {
+  const box = placeAgainst(prev, tile, dir, size, gap, fromDir);
+  box.isCorner = Boolean(fromDir && fromDir !== dir);
+  box.isBridge = dir === "N" || dir === "S";
+  return box;
 }
 
 function tryPlace(prev, tile, dir, fromDir, size, gap, soft, occupied, hard = null) {
@@ -460,10 +490,11 @@ function tryPlace(prev, tile, dir, fromDir, size, gap, soft, occupied, hard = nu
 }
 
 /**
- * Grow one arm as a deterministic serpentine ribbon.
- * First horizontal run: exactly TURN_EVERY tiles, then foldDir
- * (right→S / left→N). Later runs: turn before soft bounds / collision;
- * vertical: short bridge then reverse.
+ * Grow one arm as a deterministic LeoDomino ribbon.
+ * When the center is a double: first LEO_MAIN_STRAIGHT tiles stay on the
+ * startDir rail, then the next tile MUST take foldDir (never the opposite).
+ * Before any double exists the chain stays linear (no fake spinner folds).
+ * Later runs after the mandatory first fold use a fixed RUN_CEILING.
  */
 function growArm(
   tiles,
@@ -487,8 +518,10 @@ function growArm(
    * one/two wide center rows. When set, overrides the default targetRun.
    */
   targetRunOverride = null,
-  force = false
+  force = false,
+  leoLayout = false
 ) {
+  void packSize;
   let prev = start;
   let dir = startDir;
   let lastH = startDir === "E" || startDir === "W" ? startDir : "E";
@@ -496,6 +529,11 @@ function growArm(
   let exitAfterPivot = false;
   let run = 0;
   let firstFoldDone = false;
+  const minFirstRun = leoLayout ? LEO_MAIN_STRAIGHT : Number.POSITIVE_INFINITY;
+  const laterRun = Math.max(
+    2,
+    targetRunOverride != null ? targetRunOverride : RUN_CEILING
+  );
 
   for (let i = from; i !== to; i += step) {
     const tile = tiles[i];
@@ -505,8 +543,6 @@ function growArm(
 
     const attempt = (d) =>
       tryPlace(prev, tile, d, dir, size, gap, soft, occupied, hard);
-    // First fold prefers foldDir; may ease soft toward hard (never past it).
-    // Table bounds win: if preferred fold won't fit, other dirs are tried.
     const attemptFirstFold = (d) =>
       attempt(d) ||
       tryPlace(
@@ -520,108 +556,35 @@ function growArm(
         occupied,
         hard
       );
-
-    /** Probe whether a fold from `fromBox` traveling `fromTravel` still fits. */
-    const foldFitsFrom = (fromBox, fromTravel, foldD) =>
-      tryPlace(
-        fromBox,
-        tile,
-        foldD,
-        fromTravel,
-        size,
-        gap,
-        expandSoft(soft, size, 1, hard),
-        occupied,
-        hard
-      ) ||
-      tryPlace(
-        fromBox,
-        tile,
-        foldD,
-        fromTravel,
-        size,
-        gap,
-        soft,
-        occupied,
-        hard
-      );
+    const forcePlace = (d) => {
+      if (!isLegalStep(prev, tile, d, size)) return null;
+      const cand = placeAgainst(prev, tile, d, size, gap, dir);
+      cand.isCorner = d !== dir;
+      cand.isBridge = d === "N" || d === "S";
+      return findCollision(cand, occupied, gap, prev.id) ? null : cand;
+    };
 
     let wantTurn = exitAfterPivot;
+    const mandatoryStraight =
+      !onVertical && !firstFoldDone && run < minFirstRun;
     if (!wantTurn) {
       const straight = attempt(dir);
-      if (!straight) {
-        // Next step would leave the playable table (or collide) — turn early.
+      if (mandatoryStraight) {
+        if (!straight && !force) return false;
+      } else if (!straight) {
         wantTurn = true;
       } else if (onVertical && vertRun >= Math.max(1, bridgeTarget)) {
         if ([OPP[lastH], lastH, foldDir, OPP[foldDir]].some((d) => attempt(d))) {
           wantTurn = true;
         }
-      } else if (!onVertical && !firstFoldDone) {
-        // Prefer TURN_EVERY straight then fold — but TABLE BOUNDS WIN:
-        // if taking another straight would make the preferred fold miss the
-        // hard felt, turn now in a safe direction.
-        if (run >= TURN_EVERY) {
-          wantTurn = true;
-        } else if (run >= 1) {
-          const foldAfterStraight =
-            foldFitsFrom(straight, dir, foldDir) ||
-            foldFitsFrom(straight, dir, OPP[foldDir]);
-          const foldNow =
-            foldFitsFrom(prev, dir, foldDir) ||
-            foldFitsFrom(prev, dir, OPP[foldDir]);
-          if (!foldAfterStraight && foldNow) {
-            wantTurn = true;
-          }
-        }
-      } else if (!onVertical) {
-        // Topology is SCALE-INVARIANT: pack from unscaled packSize so shrink
-        // cannot unlock longer rails mid-search (that was the ~19–21 cliff).
-        const pack = packSize ?? size;
-        const packH = Math.max(
-          1,
-          (hard?.maxY ?? soft.maxY) - (hard?.minY ?? soft.minY)
-        );
-        const packW = Math.max(
-          1,
-          (hard?.maxX ?? soft.maxX) - (hard?.minX ?? soft.minX)
-        );
-        const tallFelt = packH > packW * 0.85;
-        const long = Math.max(pack.w, pack.h);
-        const short = Math.min(pack.w, pack.h);
-        const railStep = long + gap + short * 0.35;
-        // Prefer turning before the far edge so unused height is claimed.
-        const spaceDrivenRun = Math.max(
-          2,
-          Math.floor(packW / railStep) - (tallFelt ? 0 : 1)
-        );
-        const compact = packW < 560;
-        const defaultRun = tallFelt
-          ? TURN_EVERY + 1
-          : compact
-            ? TURN_EVERY + 1
-            : packW < 820
-              ? 5
-              : 6;
-        const targetRun =
-          targetRunOverride != null
-            ? Math.max(2, targetRunOverride)
-            : defaultRun;
-        const runCap =
-          targetRunOverride != null && targetRunOverride > RUN_CEILING
-            ? targetRunOverride
-            : RUN_CEILING;
-        const maxRun = Math.max(
-          2,
-          Math.min(runCap, targetRun, spaceDrivenRun)
-        );
-        const nearLimit = run >= maxRun - 1;
+      } else if (!onVertical && !firstFoldDone && leoLayout && run >= minFirstRun) {
+        wantTurn = true;
+      } else if (!onVertical && firstFoldDone) {
+        const nearLimit = run >= laterRun - 1;
         const effectiveMaxRun =
           nearLimit && hasDoubleAhead(tiles, i, step, DOUBLE_LOOKAHEAD)
-            ? maxRun + DOUBLE_LOOKAHEAD
-            : maxRun;
-        // Prefer a turn once the run is long enough. Probe with expandSoft so
-        // early soft insets do not block the fold and leave a horizontal strip.
-        // If no turn fits yet, keep going straight until bounds force a bend.
+            ? laterRun + DOUBLE_LOOKAHEAD
+            : laterRun;
         if (run >= effectiveMaxRun) {
           const turnDirs = [foldDir, OPP[foldDir], OPP[lastH], lastH];
           const canTurn = turnDirs.some(
@@ -651,10 +614,18 @@ function growArm(
 
     let chosen = null;
     let chosenDir = dir;
+    const lockingFirstFold =
+      leoLayout && !firstFoldDone && !onVertical && wantTurn;
 
-    // Prefer finishing bridgeTarget vertical tiles within hard table bounds.
-    // If the bridge cannot continue on-felt, fall through to a normal turn.
-    if (onVertical && vertRun > 0 && vertRun < Math.max(1, bridgeTarget)) {
+    if (mandatoryStraight) {
+      chosen = attempt(dir) || (force ? forcePlace(dir) : null);
+      if (!chosen) return false;
+      chosenDir = dir;
+    } else if (lockingFirstFold) {
+      chosen = attemptFirstFold(foldDir) || (force ? forcePlace(foldDir) : null);
+      if (!chosen) return false;
+      chosenDir = foldDir;
+    } else if (onVertical && vertRun > 0 && vertRun < Math.max(1, bridgeTarget)) {
       chosen =
         attempt(dir) ||
         tryPlace(
@@ -674,30 +645,30 @@ function growArm(
       chosenDir = dir;
     }
 
-    // First elbow on this arm: locked foldDir (right→S, left→N).
-    const lockingFirstFold = !firstFoldDone && !onVertical && wantTurn;
-
-    if (!chosen) {
-      const primary = onVertical
-        ? [OPP[lastH], lastH, foldDir, OPP[foldDir], dir]
-        : [foldDir, OPP[foldDir], OPP[lastH], lastH, dir];
+    if (!chosen && !lockingFirstFold) {
+      // First main-chain tiles after the spinner stay on the E/W rail.
+      // TOP/BOTTOM are spinner-arm directions, never a main-chain fallback.
+      const lockMainAxis = leoLayout && !firstFoldDone && !onVertical;
+      const primary = lockMainAxis
+        ? [dir]
+        : onVertical
+          ? [OPP[lastH], lastH, foldDir, OPP[foldDir], dir]
+          : [foldDir, OPP[foldDir], OPP[lastH], lastH, dir];
       const seen = new Set();
       for (const d of primary) {
         if (seen.has(d)) continue;
         seen.add(d);
-        const box =
-          lockingFirstFold && d === foldDir ? attemptFirstFold(d) : attempt(d);
+        const box = attempt(d);
         if (box) {
           chosen = box;
           chosenDir = d;
           break;
         }
       }
-      if (!chosen) {
+      if (!chosen && !lockMainAxis) {
         for (const d of ["E", "W", "N", "S"]) {
           if (seen.has(d)) continue;
-          const box =
-            lockingFirstFold && d === foldDir ? attemptFirstFold(d) : attempt(d);
+          const box = attempt(d);
           if (box) {
             chosen = box;
             chosenDir = d;
@@ -707,15 +678,20 @@ function growArm(
       }
     }
 
-    // Forced turn could not place — continue straight rather than fail the arm.
-    if (!chosen && wantTurn) {
+    if (!chosen && wantTurn && !lockingFirstFold) {
       chosen = attempt(dir);
       if (chosen) chosenDir = dir;
     }
 
     if (!chosen && force) {
       const open = [...out.values()];
-      for (const d of [dir, foldDir, OPP[foldDir], OPP[dir], "E", "W", "N", "S"]) {
+      const lockMainAxis = leoLayout && !firstFoldDone && !onVertical;
+      const order = lockingFirstFold
+        ? [foldDir]
+        : lockMainAxis
+          ? [dir]
+          : [dir, foldDir, OPP[foldDir], OPP[dir], "E", "W", "N", "S"];
+      for (const d of order) {
         if (!isLegalStep(prev, tile, d, size)) continue;
         const box = placeAgainst(prev, tile, d, size, gap, dir);
         box.isCorner = d !== dir;
@@ -750,7 +726,7 @@ function growArm(
     const placed = {
       ...chosen,
       travelDir: chosenDir,
-      branch,
+      branch: publicLayoutBranch(branch) ?? branch,
       isCorner: turned,
       isBridge: chosenDir === "N" || chosenDir === "S",
     };
@@ -824,6 +800,40 @@ export function computeFitScale(chainBounds, safeBounds, preferredScale = 1) {
   );
 }
 
+/**
+ * Uniform scale that keeps the layout anchor at the felt mid-point.
+ * Each side of the chain must fit in the matching half of the safe felt.
+ */
+export function computeAnchorFitScale(
+  chainBounds,
+  safeBounds,
+  preferredScale,
+  anchorX,
+  anchorY
+) {
+  const preferred = Math.max(
+    EMERGENCY_MIN_SCALE,
+    Number.isFinite(preferredScale) ? preferredScale : 1
+  );
+  const pad = 0.5;
+  const midX = (safeBounds.minX + safeBounds.maxX) / 2;
+  const midY = (safeBounds.minY + safeBounds.maxY) / 2;
+  const roomL = Math.max(1, midX - safeBounds.minX - pad);
+  const roomR = Math.max(1, safeBounds.maxX - midX - pad);
+  const roomT = Math.max(1, midY - safeBounds.minY - pad);
+  const roomB = Math.max(1, safeBounds.maxY - midY - pad);
+  const leftExtent = Math.max(0, anchorX - chainBounds.minX);
+  const rightExtent = Math.max(0, chainBounds.maxX - anchorX);
+  const topExtent = Math.max(0, anchorY - chainBounds.minY);
+  const botExtent = Math.max(0, chainBounds.maxY - anchorY);
+  let scale = preferred;
+  if (leftExtent > 0) scale = Math.min(scale, roomL / leftExtent);
+  if (rightExtent > 0) scale = Math.min(scale, roomR / rightExtent);
+  if (topExtent > 0) scale = Math.min(scale, roomT / topExtent);
+  if (botExtent > 0) scale = Math.min(scale, roomB / botExtent);
+  return Math.max(EMERGENCY_MIN_SCALE, scale);
+}
+
 function spinnerLaneOccupants(spinner, northCount, southCount, size, gap) {
   if (!spinner || (northCount <= 0 && southCount <= 0)) return [];
   const short = Math.min(size.w, size.h);
@@ -839,7 +849,7 @@ function spinnerLaneOccupants(spinner, northCount, southCount, size, gap) {
       h: long,
       double: false,
       isBridge: true,
-      branch: "north",
+      branch: BRANCH.SPINNER_TOP,
     });
   }
   for (let i = 0; i < southCount; i += 1) {
@@ -851,48 +861,79 @@ function spinnerLaneOccupants(spinner, northCount, southCount, size, gap) {
       h: long,
       double: false,
       isBridge: true,
-      branch: "south",
+      branch: BRANCH.SPINNER_BOTTOM,
     });
   }
   return out;
 }
 
-function placeSpinnerBranch(map, spinner, tiles, dir, size, gap, hard, force) {
-  const branch = dir === "N" ? "north" : "south";
+function growSpinnerArm(
+  map,
+  spinner,
+  tiles,
+  startDir,
+  size,
+  gap,
+  hard,
+  force,
+  minStraight = SPINNER_ARM_STRAIGHT
+) {
+  const branch = startDir === "N" ? BRANCH.SPINNER_TOP : BRANCH.SPINNER_BOTTOM;
+  const foldDir = startDir === "N" ? FIRST_FOLD_TOP : FIRST_FOLD_BOTTOM;
   let prev = spinner;
-  let fromDir = dir;
+  let dir = startDir;
+  let placedCount = 0;
   for (const tile of tiles) {
-    const occupied = [...map.values()];
-    let box =
-      tryPlace(prev, tile, dir, fromDir, size, gap, hard, occupied, hard) ||
-      tryPlace(
-        prev,
-        tile,
-        dir,
-        fromDir,
-        size,
-        gap,
-        expandSoft(hard, size, 2, null),
-        occupied,
-        force ? null : hard
-      );
-    if (!box && force) {
-      const cand = placeAgainst(prev, tile, dir, size, gap, fromDir);
-      cand.isCorner = false;
-      cand.isBridge = true;
-      if (!findCollision(cand, occupied, gap, prev.id)) box = cand;
+    if (map.has(tile.id) && placedCount > 0) {
+      prev = map.get(tile.id);
+      dir = prev.travelDir || dir;
+      placedCount += 1;
+      continue;
     }
-    if (!box) return false;
+    const occupied = [...map.values()].filter((p) => p.id !== tile.id);
+    const attempt = (d) =>
+      tryPlace(prev, tile, d, dir, size, gap, hard, occupied, hard);
+    const forcePlace = (d) => {
+      const cand = routedBox(prev, tile, d, dir, size, gap);
+      if (findCollision(cand, occupied, gap, prev.id) && !force) return null;
+      return cand;
+    };
+
+    let chosen = null;
+    let chosenDir = dir;
+    const take = (d, required) => {
+      chosen = attempt(d) || (force || required ? forcePlace(d) : null);
+      chosenDir = d;
+      return Boolean(chosen);
+    };
+
+    if (placedCount < minStraight) {
+      if (!take(startDir, true)) return false;
+    } else if (placedCount === minStraight) {
+      if (!take(foldDir, true)) return false;
+    } else {
+      const order = [dir, foldDir, OPP[foldDir], OPP[dir], "E", "W", "N", "S"];
+      const seen = new Set();
+      for (const d of order) {
+        if (seen.has(d)) continue;
+        seen.add(d);
+        if (take(d, false)) break;
+      }
+      if (!chosen && force) take(dir, true);
+      if (!chosen) return false;
+    }
+
     const placed = {
-      ...box,
-      travelDir: dir,
+      ...chosen,
+      travelDir: chosenDir,
       branch,
-      isCorner: false,
-      isBridge: true,
+      isCorner: chosenDir !== dir,
+      isBridge: chosenDir === "N" || chosenDir === "S",
     };
     map.set(tile.id, placed);
     prev = placed;
-    fromDir = dir;
+    dir = chosenDir;
+    placedCount += 1;
   }
   return true;
 }
@@ -904,21 +945,40 @@ function attachSpinnerBranches(map, spinnerId, northTiles, southTiles, size, gap
   if (!north.length && !south.length) return { ok: true, armIds: [] };
   const spinner = map.get(spinnerId);
   if (!spinner) return { ok: false, armIds: [] };
-  if (north.length && !placeSpinnerBranch(map, spinner, north, "N", size, gap, hard, force)) {
-    return { ok: false, armIds: [] };
-  }
-  if (south.length && !placeSpinnerBranch(map, spinner, south, "S", size, gap, hard, force)) {
-    return { ok: false, armIds: [] };
-  }
+  const northOk =
+    !north.length || growSpinnerArm(map, spinner, north, "N", size, gap, hard, force);
+  const southOk =
+    !south.length || growSpinnerArm(map, spinner, south, "S", size, gap, hard, force);
+  const armIds = [...north, ...south].map((t) => t.id).filter((id) => map.has(id));
   return {
-    ok: true,
-    armIds: [...north, ...south].map((t) => t.id),
+    ok: Boolean(northOk && southOk && armIds.length === north.length + south.length),
+    armIds,
   };
 }
 
-function completeMissingTiles(map, tiles, centerIndex, size, gap) {
+function completeMissingSpinnerArms(map, topology, size, gap) {
+  if (!topology?.spinnerId) return;
+  const spinner = map.get(topology.spinnerId);
+  if (!spinner) return;
+  const north = topology.branches?.[BRANCH.SPINNER_TOP] || [];
+  const south = topology.branches?.[BRANCH.SPINNER_BOTTOM] || [];
+  attachSpinnerBranches(
+    map,
+    topology.spinnerId,
+    north,
+    south,
+    size,
+    gap,
+    { minX: -1e5, maxX: 1e5, minY: -1e5, maxY: 1e5 },
+    true
+  );
+}
+
+function completeMissingTiles(map, tiles, centerIndex, size, gap, opts = {}) {
   const opener = tiles[centerIndex];
   if (!opener) return;
+  const linear = Boolean(opts.linear);
+  const topology = opts.topology || null;
   if (!map.has(opener.id)) {
     const fp = footprintForTravel(opener, "E", size);
     map.set(opener.id, {
@@ -932,23 +992,36 @@ function completeMissingTiles(map, tiles, centerIndex, size, gap) {
       double: isDouble(opener),
       valueLeft: Number(opener.left),
       valueRight: Number(opener.right),
-      branch: "center",
+      branch: linear
+        ? topology?.membership?.[opener.id] ?? BRANCH.MAIN_RIGHT
+        : SPINNER_NODE,
+      travelDir: "E",
     });
   }
   const fill = (from, to, step, startDir, branch) => {
     let prev = map.get(tiles[centerIndex].id);
     let dir = startDir;
+    let straight = 0;
+    const foldDir = branch === "right" || branch === BRANCH.MAIN_RIGHT
+      ? FIRST_FOLD_RIGHT
+      : FIRST_FOLD_LEFT;
     for (let i = from; i !== to; i += step) {
       const tile = tiles[i];
       if (map.has(tile.id)) {
         prev = map.get(tile.id);
         dir = prev.travelDir || dir;
+        if (dir === startDir) straight += 1;
         continue;
       }
       const occupied = [...map.values()];
+      const allowed = linear
+        ? ["E", "W"]
+        : straight < LEO_MAIN_STRAIGHT
+          ? [startDir]
+          : [foldDir, startDir];
       let box = null;
-      let chosenDir = dir;
-      for (const d of [dir, "E", "W", "N", "S"]) {
+      let chosenDir = allowed[0];
+      for (const d of allowed) {
         if (!isLegalStep(prev, tile, d, size)) continue;
         const cand = placeAgainst(prev, tile, d, size, gap, dir);
         if (!findCollision(cand, occupied, gap, prev.id)) {
@@ -958,52 +1031,38 @@ function completeMissingTiles(map, tiles, centerIndex, size, gap) {
         }
       }
       if (!box) {
-        box = placeAgainst(prev, tile, dir, size, gap, dir);
-        chosenDir = dir;
+        box = placeAgainst(prev, tile, allowed[0], size, gap, dir);
+        chosenDir = allowed[0];
       }
       const placed = {
         ...box,
         travelDir: chosenDir,
-        branch,
+        branch: topology?.membership?.[tile.id] ?? publicLayoutBranch(branch) ?? branch,
         isCorner: chosenDir !== dir,
         isBridge: chosenDir === "N" || chosenDir === "S",
       };
       map.set(tile.id, placed);
       prev = placed;
       dir = chosenDir;
+      straight = chosenDir === startDir ? straight + 1 : 0;
     }
   };
-  fill(centerIndex + 1, tiles.length, 1, "E", "right");
-  fill(centerIndex - 1, -1, -1, "W", "left");
-}
-
-function screenAxisOk(placements, tiles, gap, boxFn = collisionBox) {
-  const attach = new Set();
-  for (let i = 0; i < tiles.length - 1; i += 1) {
-    attach.add(`${tiles[i].id}|${tiles[i + 1].id}`);
-    attach.add(`${tiles[i + 1].id}|${tiles[i].id}`);
-  }
-  for (let i = 0; i < placements.length; i += 1) {
-    for (let j = i + 1; j < placements.length; j += 1) {
-      const a = placements[i];
-      const b = placements[j];
-      const connected = attach.has(`${a.id}|${b.id}`);
-      // Neighbors: visual face gap must stay in the constant band (no overlap).
-      if (connected) {
-        if (overlaps(a, b)) return false;
-        continue;
-      }
-      // Non-neighbors: fixed collision boxes (spinner halo included) must not intersect.
-      const ca = boxFn(a);
-      const cb = boxFn(b);
-      if (overlaps(ca, cb)) return false;
-      const xOv = ca.x < cb.x + cb.w && ca.x + ca.w > cb.x;
-      const yOv = ca.y < cb.y + cb.h && ca.y + ca.h > cb.y;
-      const clear = axisClearance(ca, cb);
-      if ((xOv || yOv) && clear < gap - 0.05) return false;
-    }
-  }
-  return true;
+  fill(
+    centerIndex + 1,
+    tiles.length,
+    1,
+    "E",
+    linear ? BRANCH.MAIN_RIGHT : BRANCH.MAIN_RIGHT
+  );
+  fill(
+    centerIndex - 1,
+    -1,
+    -1,
+    "W",
+    linear ? BRANCH.MAIN_LEFT : BRANCH.MAIN_LEFT
+  );
+  applyTopologyBranches(map, topology);
+  if (!linear) completeMissingSpinnerArms(map, topology, size, gap);
 }
 
 /** Essential-only box: doubles keep their spinner halo; corner/bridge reserve
@@ -1037,6 +1096,61 @@ function chainCollisionFree(placements, gap, tiles, minClear = gap + SNAP_CLEARA
   return true;
 }
 
+function applyTopologyBranches(map, topology) {
+  if (!map || !topology?.membership) return map;
+  for (const [id, pos] of map) {
+    const membership = topology.membership[id];
+    if (!membership) continue;
+    pos.branch = membership;
+  }
+  return map;
+}
+
+/**
+ * Pre-spinner pack: board[0] … board[n] as one E–W rail.
+ * A non-double is never given spinner/double orientation just because it
+ * is the visual center of the felt. Branch comes from topology, not from
+ * travel/rotation.
+ */
+function placeLinearMainChain(tiles, size, gap, topology = null) {
+  const map = new Map();
+  if (!tiles.length) return map;
+  const first = tiles[0];
+  const fp = footprintForTravel(first, "E", size);
+  const firstBranch = topology?.membership?.[first.id] ?? BRANCH.MAIN_RIGHT;
+  let prev = {
+    id: first.id,
+    x: snap(-fp.w / 2),
+    y: snap(-fp.h / 2),
+    w: snap(fp.w),
+    h: snap(fp.h),
+    orientation: isDouble(first) ? "vertical" : "horizontal",
+    rotation: isDouble(first) ? 90 : 0,
+    double: isDouble(first),
+    valueLeft: Number(first.left),
+    valueRight: Number(first.right),
+    branch: firstBranch,
+    travelDir: "E",
+  };
+  map.set(first.id, prev);
+  for (let i = 1; i < tiles.length; i += 1) {
+    const tile = tiles[i];
+    const box = placeAgainst(prev, tile, "E", size, gap, "E");
+    prev = {
+      ...box,
+      travelDir: "E",
+      branch: topology?.membership?.[tile.id] ?? BRANCH.MAIN_RIGHT,
+      orientation: isDouble(tile) ? "vertical" : "horizontal",
+      rotation: isDouble(tile) ? 90 : 0,
+      isCorner: false,
+      isBridge: false,
+    };
+    map.set(tile.id, prev);
+  }
+  applyTopologyBranches(map, topology);
+  return map;
+}
+
 function placeGraph(
   tiles,
   centerIndex,
@@ -1051,7 +1165,8 @@ function placeGraph(
   packSize = null,
   targetRunOverride = null,
   extraOccupied = [],
-  force = false
+  force = false,
+  spinnerLayout = false
 ) {
   const opener = tiles[centerIndex];
   const fp = footprintForTravel(opener, "E", size);
@@ -1066,7 +1181,8 @@ function placeGraph(
     double: isDouble(opener),
     valueLeft: Number(opener.left),
     valueRight: Number(opener.right),
-    branch: "center",
+    branch: spinnerLayout ? SPINNER_NODE : BRANCH.MAIN_RIGHT,
+    travelDir: "E",
   };
   // Opener itself must sit inside the hard playable table.
   if (!fitsSoft(origin, hard)) {
@@ -1093,12 +1209,13 @@ function placeGraph(
         gap,
         soft,
         map,
-        "right",
+        BRANCH.MAIN_RIGHT,
         bridgeLen,
         hard,
         packSize,
         targetRunOverride,
-        force
+        force,
+        spinnerLayout
       );
     const growLeft = () =>
       growArm(
@@ -1113,12 +1230,13 @@ function placeGraph(
         gap,
         soft,
         map,
-        "left",
+        BRANCH.MAIN_LEFT,
         bridgeLen,
         hard,
         packSize,
         targetRunOverride,
-        force
+        force,
+        spinnerLayout
       );
 
     const first = swapArms ? growLeft() : growRight();
@@ -1144,8 +1262,9 @@ function placeGraph(
 }
 
 /**
- * Map logical layout → screen: one uniform auto-fit scale, then bbox-center
- * onto the safe felt. Does not pin the opening tile.
+ * Map logical layout → screen: one uniform auto-fit scale, then pin the
+ * spinner double to the usable felt center. Before a spinner exists, pin
+ * the horizontal chain's bounding-box center instead.
  */
 function toScreen(
   placements,
@@ -1159,7 +1278,6 @@ function toScreen(
   maxScale = 1
 ) {
   void padding;
-  void openerId;
   void focusTileId;
   const width = Math.max(120, viewport.width);
   const height = Math.max(120, viewport.height);
@@ -1191,16 +1309,19 @@ function toScreen(
   }
 
   const chain = computeChainBounds(placements);
-  let scale = computeFitScale(chain, safe, preferred);
-  const cx = chain.cx;
-  const cy = chain.cy;
+  const anchor = openerId ? placements.find((p) => p.id === openerId) : null;
+  const ax = anchor ? anchor.x + anchor.w / 2 : chain.cx;
+  const ay = anchor ? anchor.y + anchor.h / 2 : chain.cy;
+  let scale = anchor
+    ? computeAnchorFitScale(chain, safe, preferred, ax, ay)
+    : computeFitScale(chain, safe, preferred);
 
   const project = (s) =>
     placements.map((p, zIndex) => {
       const lx = p.x + p.w / 2;
       const ly = p.y + p.h / 2;
-      const sx = (lx - cx) * s + midX;
-      const sy = (ly - cy) * s + midY;
+      const sx = (lx - ax) * s + midX;
+      const sy = (ly - ay) * s + midY;
       const w = p.w * s;
       const h = p.h * s;
       return {
@@ -1215,7 +1336,7 @@ function toScreen(
         orientation: p.orientation,
         zIndex,
         travelDir: p.travelDir,
-        branch: p.branch,
+        branch: publicLayoutBranch(p.branch) ?? p.branch,
         double: p.double,
         isCorner: p.isCorner,
         isBridge: p.isBridge,
@@ -1223,9 +1344,15 @@ function toScreen(
     });
 
   let tiles = project(scale);
-  if (!screenTilesInsidePlay(tiles, safe, 0.5) && scale > EMERGENCY_MIN_SCALE) {
-    scale = Math.max(EMERGENCY_MIN_SCALE, scale * 0.985);
+  let guard = 0;
+  while (
+    !screenTilesInsidePlay(tiles, safe, 0.5) &&
+    scale > EMERGENCY_MIN_SCALE &&
+    guard < 28
+  ) {
+    scale = Math.max(EMERGENCY_MIN_SCALE, scale * 0.96);
     tiles = project(scale);
+    guard += 1;
   }
   const overflow = !screenTilesInsidePlay(tiles, safe, 0.75);
 
@@ -1239,17 +1366,17 @@ function toScreen(
       maxX: chain.maxX,
       minY: chain.minY,
       maxY: chain.maxY,
-      cx,
-      cy,
+      cx: ax,
+      cy: ay,
     },
     origin: { x: midX, y: midY },
     camera: {
       recentered: true,
       overflow,
-      focusMode: "bbox",
+      focusMode: anchor ? "anchor" : "bbox",
       x: midX,
       y: midY,
-      localFocus: { x: cx, y: cy },
+      localFocus: { x: ax, y: ay },
     },
     play,
     safe,
@@ -1297,11 +1424,37 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     };
   }
 
+  const spinnerId =
+    typeof options.spinnerId === "string" && options.spinnerId
+      ? options.spinnerId
+      : null;
+  const topology =
+    options.topology ||
+    buildBoardTopology({
+      board: tiles,
+      spinnerId,
+      spinnerNorth: options.spinnerNorth,
+      spinnerSouth: options.spinnerSouth,
+    });
+  assertBoardTopology(topology);
+
+  // Spinner layout is enabled only by the first-double id from game state.
+  // A non-double opener, a centered tile, or a double that is not spinnerId
+  // must never activate TOP/BOTTOM or vertical main-chain packing.
   let centerIndex =
     options.centerIndex != null
       ? options.centerIndex
-      : tiles.findIndex((t) => t.id === options.centerTileId);
+      : tiles.findIndex((t) => t.id === (topology.spinnerId || options.centerTileId));
   if (centerIndex < 0 || centerIndex >= tiles.length) centerIndex = 0;
+
+  let spinnerIndex = -1;
+  if (topology.spinnerId) {
+    const spinIdx = tiles.findIndex((t) => t.id === topology.spinnerId);
+    if (spinIdx >= 0) spinnerIndex = spinIdx;
+  }
+  const leoLayout = spinnerIndex >= 0;
+  if (leoLayout) centerIndex = spinnerIndex;
+  const layoutSpinnerId = leoLayout ? tiles[centerIndex].id : null;
 
   const baseW = Math.max(1, options.tileWidth ?? options.tileSize?.w ?? 40);
   const baseH = Math.max(1, options.tileHeight ?? options.tileSize?.h ?? baseW * TILE_ASPECT);
@@ -1313,14 +1466,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
   // unaffected.
   const hudRight = hudRightEarly;
   const hudLeft = hudLeftEarly;
-  const play = playEarly;
 
-  const hardLocal = localHardBounds(play);
-  const playW0 = Math.max(1, play.maxX - play.minX);
-  const playH0 = Math.max(1, play.maxY - play.minY);
-  const crampedViewport = playW0 < 400 || playH0 < 320;
-  const tallPlay = playH0 > playW0 * 0.85;
-  const matchLen = tiles.length;
   const size = { w: baseW, h: baseH };
   const gap = effectiveGap(size.w, size.h, requestedGap);
   const scaleCap = Math.max(
@@ -1328,17 +1474,49 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     Math.min(1, options.maxScale != null ? Number(options.maxScale) : 1)
   );
 
-  const northTiles = Array.isArray(options.spinnerNorth) ? options.spinnerNorth : [];
-  const southTiles = Array.isArray(options.spinnerSouth) ? options.spinnerSouth : [];
+  const northTiles = leoLayout
+    ? topology.branches[BRANCH.SPINNER_TOP]
+    : [];
+  const southTiles = leoLayout
+    ? topology.branches[BRANCH.SPINNER_BOTTOM]
+    : [];
   const northCount = Math.max(
     northTiles.length,
-    Number(options.spinnerNorthCount) || 0
+    leoLayout ? Number(options.spinnerNorthCount) || 0 : 0
   );
   const southCount = Math.max(
     southTiles.length,
-    Number(options.spinnerSouthCount) || 0
+    leoLayout ? Number(options.spinnerSouthCount) || 0 : 0
   );
-  const spinnerId = typeof options.spinnerId === "string" ? options.spinnerId : null;
+
+  if (!leoLayout) {
+    const map = placeLinearMainChain(tiles, size, gap, topology);
+    completeMissingTiles(map, tiles, 0, size, gap, { linear: true, topology });
+    applyTopologyBranches(map, topology);
+    const mainList = tiles.map((t) => map.get(t.id)).filter(Boolean);
+    const screen = toScreen(
+      mainList,
+      { width, height },
+      options.padding ?? PADDING,
+      null,
+      margin,
+      hudRight,
+      null,
+      hudLeft,
+      scaleCap
+    );
+    const byId = new Map(screen.tiles.map((t) => [t.tileId, t]));
+    const orderedMain = tiles.map((t) => byId.get(t.id)).filter(Boolean);
+    const screenGap = Math.max(MIN_SAFE_GAP_PX, Math.min(2, gap * screen.scale));
+    return {
+      ...screen,
+      tiles: orderedMain,
+      armTiles: [],
+      scale: screen.scale,
+      gap: screenGap,
+    };
+  }
+
   const openerFp = footprintForTravel(tiles[centerIndex], "E", size);
   const originProbe = {
     id: tiles[centerIndex].id,
@@ -1347,148 +1525,67 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     w: snap(openerFp.w),
     h: snap(openerFp.h),
   };
-  const extraOccupied =
-    spinnerId && tiles[centerIndex].id === spinnerId
-      ? spinnerLaneOccupants(originProbe, northCount, southCount, size, gap)
-      : [];
-
-  let result = null;
-  let looseFallback = null;
-  let fallback = null;
-  let essentialFallback = null;
-  let bestByScale = null;
-
-  const preferFullSize = (a, b) => {
-    if (!a) return b;
-    if (!b) return a;
-    // Never prefer an overflowing (off-felt) layout over an on-felt one.
-    if (!!a.camera?.overflow !== !!b.camera?.overflow) {
-      return a.camera?.overflow ? b : a;
-    }
-    if (b.scale > a.scale + 0.01) return b;
-    if (a.scale > b.scale + 0.01) return a;
-    // Same scale: prefer the pack that actually uses table height (rejects
-    // tiny horizontal strips that waste the felt while claiming "fit").
-    const aUse = a.heightUse ?? 0;
-    const bUse = b.heightUse ?? 0;
-    if (bUse > aUse + 0.08) return b;
-    if (aUse > bUse + 0.08) return a;
-    const aTurns = a.turnCount ?? 0;
-    const bTurns = b.turnCount ?? 0;
-    if (bTurns > aTurns) return b;
-    if (aTurns > bTurns) return a;
-    return a;
-  };
-
-  const footprintStats = (placements) => {
-    if (!placements.length) return { heightUse: 0, turnCount: 0, aspect: 99 };
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const p of placements) {
-      minX = Math.min(minX, p.x);
-      minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x + p.w);
-      maxY = Math.max(maxY, p.y + p.h);
-    }
-    let turnCount = 0;
-    for (let i = 1; i < placements.length - 1; i += 1) {
-      const a = placements[i - 1];
-      const b = placements[i];
-      const c = placements[i + 1];
-      const d1x = b.x + b.w / 2 - (a.x + a.w / 2);
-      const d1y = b.y + b.h / 2 - (a.y + a.h / 2);
-      const d2x = c.x + c.w / 2 - (b.x + b.w / 2);
-      const d2y = c.y + c.h / 2 - (b.y + b.h / 2);
-      const aH = Math.abs(d1x) > Math.abs(d1y);
-      const bH = Math.abs(d2x) > Math.abs(d2y);
-      if (aH !== bH) turnCount += 1;
-    }
-    const bw = Math.max(1, maxX - minX);
-    const bh = Math.max(1, maxY - minY);
-    return {
-      heightUse: bh / playH0,
-      turnCount,
-      aspect: bw / bh,
-    };
-  };
-
+  const extraOccupied = spinnerLaneOccupants(
+    originProbe,
+    Math.min(northCount, SPINNER_ARM_STRAIGHT),
+    Math.min(southCount, SPINNER_ARM_STRAIGHT),
+    size,
+    gap
+  );
   const packSize = { w: baseW, h: baseH };
-  const matchFloor =
-    matchLen <= 21 ? MIN_BOARD_SCALE : matchLen <= 28 ? MIN_MATCH_SCALE : EMERGENCY_MIN_SCALE;
-  const safe0 = computeSafeFeltBounds(play);
-  const safeW0 = Math.max(1, safe0.maxX - safe0.minX);
-  const safeH0 = Math.max(1, safe0.maxY - safe0.minY);
-  const floorMul =
-    Math.min(safeW0 / playW0, safeH0 / playH0) / Math.max(0.2, matchFloor);
-  const canvasMultipliers =
-    matchLen > 200
-      ? [4, 8, 16, 32]
-      : matchLen > 80
-        ? [1.5, 2.5, 4, 8, 16]
-          : matchLen > 28
-          ? [1, 1.25, 1.5, 2, 2.6, 3.5, 5, 8, 12]
-          : [1, 1.06, 1.14, 1.22, 1.32, 1.45, floorMul, 1.7, 1.85, 2.2, 2.8];
-  const variantsForCanvas = (canvasIndex) => {
-    if (matchLen >= 80) return 28;
-    if (canvasIndex === 0) {
-      return matchLen >= 12 ? 72 : 36;
-    }
-    return matchLen >= 24 ? 28 : 20;
-  };
-  const refLong = Math.max(baseW, baseH);
-  const heightTight =
-    playH0 < refLong * (Math.min(baseW, baseH) >= 60 ? 3.5 : 2.8);
-  const softInset = Math.min(10, PADDING);
+  const UNBOUNDED = { minX: -1e5, maxX: 1e5, minY: -1e5, maxY: 1e5 };
 
-  const projectPack = (map, force) => {
+  const projectPack = (map, force, packBounds = null) => {
+    const armHard = packBounds || UNBOUNDED;
     const attached = attachSpinnerBranches(
       map,
-      spinnerId,
+      layoutSpinnerId,
       northTiles,
       southTiles,
       size,
       gap,
-      {
-        minX: -1e6,
-        maxX: 1e6,
-        minY: -1e6,
-        maxY: 1e6,
-      },
+      armHard,
       force
     );
     if (!attached.ok && !force) return null;
-    completeMissingTiles(map, tiles, centerIndex, size, gap);
+    completeMissingTiles(map, tiles, centerIndex, size, gap, { topology });
     if ((!attached.ok || attached.armIds.length < northTiles.length + southTiles.length) && force) {
       attachSpinnerBranches(
         map,
-        spinnerId,
+        layoutSpinnerId,
         northTiles,
         southTiles,
         size,
         gap,
-        { minX: -1e6, maxX: 1e6, minY: -1e6, maxY: 1e6 },
+        UNBOUNDED,
         true
       );
     }
-    const armSet = new Set([
-      ...northTiles.map((t) => t.id),
-      ...southTiles.map((t) => t.id),
-    ]);
+    applyTopologyBranches(map, topology);
+    completeMissingSpinnerArms(map, topology, size, gap);
+    const expectedArms = northTiles.length + southTiles.length;
     const mainList = tiles.map((t) => map.get(t.id)).filter(Boolean);
     if (mainList.length !== tiles.length) return null;
-    const armList = [...armSet].map((id) => map.get(id)).filter(Boolean);
+    let armList = [...northTiles, ...southTiles]
+      .map((t) => map.get(t.id))
+      .filter(Boolean);
+    if (armList.length !== expectedArms && force) {
+      completeMissingSpinnerArms(map, topology, size, gap);
+      armList = [...northTiles, ...southTiles]
+        .map((t) => map.get(t.id))
+        .filter(Boolean);
+    }
+    if (armList.length !== expectedArms && !force) return null;
     const combined = [...mainList, ...armList];
     const linkTiles = [...tiles];
-    if (spinnerId && northTiles[0]) {
-      linkTiles.push({ id: spinnerId }, northTiles[0]);
+    if (layoutSpinnerId && northTiles[0]) {
+      linkTiles.push({ id: layoutSpinnerId }, northTiles[0]);
       for (let i = 0; i < northTiles.length - 1; i += 1) {
         linkTiles.push(northTiles[i], northTiles[i + 1]);
       }
     }
-    if (spinnerId && southTiles[0]) {
-      linkTiles.push({ id: spinnerId }, southTiles[0]);
+    if (layoutSpinnerId && southTiles[0]) {
+      linkTiles.push({ id: layoutSpinnerId }, southTiles[0]);
       for (let i = 0; i < southTiles.length - 1; i += 1) {
         linkTiles.push(southTiles[i], southTiles[i + 1]);
       }
@@ -1512,16 +1609,9 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     const orderedArms = [...northTiles, ...southTiles]
       .map((t) => byId.get(t.id))
       .filter(Boolean);
-    const screenPlacements = orderedMain.map((t) => ({
-      id: t.tileId,
-      x: t.x,
-      y: t.y,
-      w: t.w,
-      h: t.h,
-      double: t.double,
-      isCorner: t.isCorner,
-      isBridge: t.isBridge,
-    }));
+    if (orderedArms.length !== northTiles.length + southTiles.length && !force) {
+      return null;
+    }
     let aabbClear = true;
     for (let i = 0; i < screen.tiles.length && aabbClear; i += 1) {
       for (let j = i + 1; j < screen.tiles.length; j += 1) {
@@ -1533,195 +1623,61 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     }
     if (!aabbClear && !force) return null;
     const screenGap = Math.max(MIN_SAFE_GAP_PX, Math.min(2, gap * screen.scale));
-    const stats = footprintStats(screenPlacements);
     return {
       ...screen,
       tiles: orderedMain,
       armTiles: orderedArms,
       scale: screen.scale,
       gap: screenGap,
-      heightUse: stats.heightUse,
-      turnCount: stats.turnCount,
-      aspect: stats.aspect,
     };
   };
 
-  for (let canvasIndex = 0; canvasIndex < canvasMultipliers.length; canvasIndex += 1) {
-    const mul = canvasMultipliers[canvasIndex];
-    const packHard = {
-      minX: hardLocal.minX * mul,
-      maxX: hardLocal.maxX * mul,
-      minY: hardLocal.minY * mul,
-      maxY: hardLocal.maxY * mul,
-    };
-    const packW0 = Math.max(1, packHard.maxX - packHard.minX);
-    const packH0 = Math.max(1, packHard.maxY - packHard.minY);
-    const softW0 = Math.max(120, packW0 - softInset);
-    const softH0 = Math.max(100, packH0 - softInset);
-
-    for (let attempt = 0; attempt < variantsForCanvas(canvasIndex); attempt += 1) {
-      const easeT = Math.min(1, 0.55 + attempt * 0.08);
-      const bounds = {
-        minX: (-softW0 / 2) * (1 - easeT) + packHard.minX * easeT,
-        maxX: (softW0 / 2) * (1 - easeT) + packHard.maxX * easeT,
-        minY: (-softH0 / 2) * (1 - easeT) + packHard.minY * easeT,
-        maxY: (softH0 / 2) * (1 - easeT) + packHard.maxY * easeT,
-      };
-      const bridgeTarget =
-        heightTight || (crampedViewport && matchLen > 28)
-          ? 1
-          : matchLen >= 80
-            ? 1
-            : tallPlay || playW0 < 760
-              ? attempt % 2 === 0
-                ? BRIDGE_LEN
-                : 1
-              : attempt % 5 === 4
-                ? 1
-                : BRIDGE_LEN;
-      const invertFolds = canvasIndex >= 2 && attempt >= 10;
-      const foldRight = invertFolds ? FIRST_FOLD_LEFT : FIRST_FOLD_RIGHT;
-      const foldLeft = invertFolds ? FIRST_FOLD_RIGHT : FIRST_FOLD_LEFT;
-      const swapArms = canvasIndex >= 1 && attempt >= 12 && attempt % 2 === 1;
-      const railCycle = attempt % 4;
-      const targetRunOverride =
-        matchLen > 200
-          ? 8 + (attempt % 6)
-          : matchLen >= 12
-            ? railCycle === 0
-              ? TURN_EVERY
-              : railCycle === 1
-                ? TURN_EVERY + 1
-                : railCycle === 2
-                  ? Math.max(2, TURN_EVERY - 1)
-                  : TURN_EVERY + 2
-            : null;
-
-      const forcePack = canvasIndex >= 2 && attempt >= variantsForCanvas(canvasIndex) - 3;
-      const { map, ok } = placeGraph(
-        tiles,
-        centerIndex,
-        size,
-        gap,
-        bounds,
-        bridgeTarget,
-        foldRight,
-        foldLeft,
-        swapArms,
-        packHard,
-        packSize,
-        targetRunOverride,
-        extraOccupied,
-        forcePack
-      );
-      if (!ok || map.size !== tiles.length) continue;
-      const candidate = projectPack(map, false);
-      if (!candidate) continue;
-
-      const onFelt = !candidate.camera?.overflow;
-      const axisOk = screenAxisOk(
-        candidate.tiles.map((t) => ({
-          id: t.tileId,
-          x: t.x,
-          y: t.y,
-          w: t.w,
-          h: t.h,
-          double: t.double,
-          isCorner: t.isCorner,
-          isBridge: t.isBridge,
-        })),
-        tiles,
-        candidate.gap
-      );
-      const stripLike =
-        matchLen >= 14 &&
-        candidate.heightUse < 0.42 &&
-        candidate.aspect > 3.2 &&
-        candidate.turnCount < 2;
-
-      if (onFelt) {
-        if (axisOk && !stripLike) {
-          bestByScale = preferFullSize(bestByScale, candidate);
-        }
-        if (axisOk && !stripLike) {
-          result = preferFullSize(result, candidate);
-        }
-        if (axisOk) {
-          looseFallback = preferFullSize(looseFallback, candidate);
-          fallback = preferFullSize(fallback, candidate);
-          essentialFallback = preferFullSize(essentialFallback, candidate);
-        }
-        const wellPacked =
-          candidate.heightUse >= 0.55 || candidate.turnCount >= 2 || matchLen < 14;
-        if (
-          result &&
-          !result.camera?.overflow &&
-          result.scale >= Math.min(scaleCap, 0.97) &&
-          wellPacked &&
-          attempt >= 4
-        ) {
-          canvasIndex = canvasMultipliers.length;
-          break;
-        }
-      } else if (axisOk) {
-        essentialFallback = preferFullSize(essentialFallback, candidate);
-      }
-    }
-    const goodEnough =
-      matchLen <= 21 ? 0.97 : matchLen <= 28 ? matchFloor : 0.25;
-    if (
-      result &&
-      !result.camera?.overflow &&
-      result.scale >= Math.min(scaleCap, goodEnough) - 0.001
-    ) {
-      break;
-    }
-  }
-
-  let picked = preferFullSize(
-    preferFullSize(preferFullSize(result, looseFallback), bestByScale),
-    preferFullSize(fallback, essentialFallback)
-  );
-
-  if (!picked) {
-    const huge = {
-      minX: hardLocal.minX * 32,
-      maxX: hardLocal.maxX * 32,
-      minY: hardLocal.minY * 32,
-      maxY: hardLocal.maxY * 32,
-    };
-    let map = placeGraph(
+  const tryPack = (force) =>
+    placeGraph(
       tiles,
       centerIndex,
       size,
       gap,
-      huge,
-      1,
+      UNBOUNDED,
+      BRIDGE_LEN,
       FIRST_FOLD_RIGHT,
       FIRST_FOLD_LEFT,
       false,
-      huge,
+      UNBOUNDED,
       packSize,
-      TURN_EVERY,
+      RUN_CEILING,
       extraOccupied,
-      true
-    ).map;
-    completeMissingTiles(map, tiles, centerIndex, size, gap);
-    picked = projectPack(map, true);
+      force,
+      leoLayout
+    );
+
+  let { map, ok } = tryPack(false);
+  if (!ok || map.size !== tiles.length) {
+    ({ map, ok } = tryPack(true));
+  }
+  completeMissingTiles(map, tiles, centerIndex, size, gap, { topology });
+  applyTopologyBranches(map, topology);
+  let picked = projectPack(map, false, UNBOUNDED);
+  if (!picked) {
+    picked = projectPack(map, true, UNBOUNDED);
   }
 
   if (!picked || picked.tiles.length !== tiles.length) {
     const map = new Map();
-    completeMissingTiles(map, tiles, centerIndex, size, gap);
+    completeMissingTiles(map, tiles, centerIndex, size, gap, { topology });
     picked = projectPack(map, true);
   }
 
   if (!picked) {
-    const map = new Map();
-    completeMissingTiles(map, tiles, centerIndex, size, gap);
-    const list = tiles.map((t) => map.get(t.id)).filter(Boolean);
+    const fallback = new Map();
+    completeMissingTiles(fallback, tiles, centerIndex, size, gap, { topology });
+    completeMissingSpinnerArms(fallback, topology, size, gap);
+    const mainList = tiles.map((t) => fallback.get(t.id)).filter(Boolean);
+    const armList = [...northTiles, ...southTiles]
+      .map((t) => fallback.get(t.id))
+      .filter(Boolean);
     const screen = toScreen(
-      list,
+      [...mainList, ...armList],
       { width, height },
       options.padding ?? PADDING,
       tiles[centerIndex].id,
@@ -1731,10 +1687,13 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       hudLeft,
       scaleCap
     );
+    const byId = new Map(screen.tiles.map((t) => [t.tileId, t]));
     return {
       ...screen,
-      tiles: screen.tiles,
-      armTiles: [],
+      tiles: tiles.map((t) => byId.get(t.id)).filter(Boolean),
+      armTiles: [...northTiles, ...southTiles]
+        .map((t) => byId.get(t.id))
+        .filter(Boolean),
       gap,
     };
   }
@@ -1924,6 +1883,9 @@ export function measureVerticalBridges(placements) {
 
 /**
  * Legacy-compatible layoutBoard — wraps calculateBoardLayout.
+ * If the caller does not pass spinnerId, a double at centerIndex is treated
+ * as the first-double anchor (historical API). New code should pass spinnerId
+ * explicitly; calculateBoardLayout never infers a spinner from the center tile.
  */
 export function layoutBoard(tiles, centerIndex, viewport, tileSize, options = {}) {
   if (!tiles?.length || centerIndex < 0 || centerIndex >= tiles.length) {
@@ -1940,9 +1902,15 @@ export function layoutBoard(tiles, centerIndex, viewport, tileSize, options = {}
     };
   }
 
+  const center = tiles[centerIndex];
+  const spinnerId =
+    options.spinnerId ??
+    (center && Number(center.left) === Number(center.right) ? center.id : null);
+
   const result = calculateBoardLayout(tiles, viewport, {
     ...options,
     centerIndex,
+    spinnerId,
     tileWidth: tileSize.w,
     tileHeight: tileSize.h,
   });

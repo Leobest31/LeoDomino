@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import { useAudio } from "../audio";
-import { IconMute, IconSettings, IconUnmute } from "./Icon";
+import { IconHome, IconMute, IconSettings, IconUnmute } from "./Icon";
 import BrandLogo from "./BrandLogo";
 import SettingsPanel from "./SettingsPanel";
 import "./Header.css";
@@ -16,6 +16,7 @@ function Header({
   startBelow = null,
   centerBelow = null,
   compact = false,
+  onMainMenu = null,
 }) {
   const { t } = useI18n();
   const { muted, toggleMute, play, unlock } = useAudio();
@@ -70,6 +71,22 @@ function Header({
               <IconSettings />
               <span className="sr-only">{t("common.settings")}</span>
             </button>
+            {typeof onMainMenu === "function" ? (
+              <button
+                type="button"
+                className="header__menu-btn"
+                onMouseEnter={() => play("button", { gain: 0.35 })}
+                onClick={async () => {
+                  await unlock();
+                  play("button");
+                  onMainMenu();
+                }}
+                aria-label={t("common.mainMenu")}
+              >
+                <IconHome />
+                <span>{t("common.mainMenu")}</span>
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="header__rail" aria-hidden="true" />
