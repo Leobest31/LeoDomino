@@ -35,6 +35,7 @@ import {
   isPuertoRicanCapicua,
   isPuertoRicanMatchWon,
   listAvailableGameStyles,
+  resolveHandSize,
   nextPlayerIndex,
   placeTile,
   playTile,
@@ -128,7 +129,9 @@ function playingState({
   assert.equal(pr.id, PUERTO_RICAN_RULESET_ID);
   assert.equal(pr.deckType, "double-six");
   assert.equal(pr.tileCount, 28);
-  assert.equal(pr.handSize, 7);
+  assert.equal(typeof pr.handSize, "function");
+  assert.equal(resolveHandSize(pr, 4), 7);
+  assert.equal(resolveHandSize(pr, 2), 14);
   assert.equal(pr.defaultTargetScore, 200);
   assert.equal(pr.defaultTargetScore, PUERTO_RICAN_MATCH_TARGET);
   assert.equal(pr.drawPolicy, "none");
@@ -144,9 +147,9 @@ function playingState({
   assert.equal(pr.chuchazo?.value, 0);
   assert.equal(isPuertoRicanCapicua(), false);
   assert.equal(isChuchazo(), false);
-  assert.deepEqual(pr.supportedPlayerCounts, [4]);
+  assert.deepEqual(pr.supportedPlayerCounts, [2, 4]);
   assert.equal(isPlayerCountSupported(pr, 4), true);
-  assert.equal(isPlayerCountSupported(pr, 2), false);
+  assert.equal(isPlayerCountSupported(pr, 2), true);
   assert.equal(isPlayerCountSupported(pr, 3), false);
 
   const styles = listAvailableGameStyles();
@@ -157,8 +160,8 @@ function playingState({
   assert.ok(gameStyleFlagDataUrl(style).startsWith("data:image/svg+xml"));
   assert.equal(gameStyleFlagEmoji(style), "🇵🇷");
   assert.equal(isGameStyleCompatibleWithPlayerCount("puertorican", 4), true);
-  assert.equal(isGameStyleCompatibleWithPlayerCount("puertorican", 2), false);
-  section("PR registration + 4p-only + PR flag + stubs");
+  assert.equal(isGameStyleCompatibleWithPlayerCount("puertorican", 2), true);
+  section("PR registration + V1 2p + 4p partnership engine + PR flag + stubs");
 }
 
 // --- Deal / no draw ---
@@ -173,17 +176,17 @@ function playingState({
   assert.equal(actions.canDraw, false);
   assert.equal(actions.canPass, false);
   assert.equal(actions.canPlay, true);
-  assert.throws(
-    () =>
-      startMatch({
-        seed: 2,
-        playerCount: 2,
-        playerIds: ["a", "b"],
-        rulesetId: "puertorican",
-      }),
-    /does not support 2-player/
-  );
-  section("4p deal 7 each, reserve empty, no-draw; 2p rejected");
+  const two = startMatch({
+    seed: 2,
+    playerCount: 2,
+    playerIds: ["you", "leoBest"],
+    rulesetId: "puertorican",
+  });
+  assert.equal(two.players.length, 2);
+  assert.equal(two.players.every((p) => p.hand.length === 14), true);
+  assert.equal(two.reserve.length, 0);
+  assert.equal(getAvailableActions(two).canDraw, false);
+  section("4p deal 7 each; 2p deal 14 each, reserve empty, no-draw");
 }
 
 // --- Opening 6-6 ---
@@ -431,14 +434,25 @@ function playingState({
 
 // --- Persistence ---
 {
-  const state = prMatch({ seed: 4242 });
-  const withScores = { ...state, scores: [30, 30, 12, 12] };
+  const state = startMatch({
+    seed: 4242,
+    playerCount: 2,
+    playerIds: ["you", "leoBest"],
+    rulesetId: "puertorican",
+  });
+  const withScores = { ...state, scores: [30, 12] };
   assert.equal(
     isValidSavedMatch({ version: MATCH_SAVE_VERSION, state: withScores }),
     true
   );
   assert.equal(normalizeSaveRuleset(withScores).rulesetId, "puertorican");
-  section("Persistence: puertorican rulesetId preserved");
+  const four = prMatch({ seed: 4242 });
+  assert.equal(
+    isValidSavedMatch({ version: MATCH_SAVE_VERSION, state: four }),
+    false,
+    "V1 does not resume 4-hand Puerto Rican tables"
+  );
+  section("Persistence: puertorican 1v1 rulesetId; 4p saves reset");
 }
 
 // --- CCW + AI ---

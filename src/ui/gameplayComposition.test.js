@@ -108,8 +108,8 @@ function longSpinner() {
   assert.match(page, /rulesetId: state\.rulesetId/, "layout receives live ruleset");
   assert.match(
     css,
-    /game-page--players-4\[data-layout-density="short"\]\[data-ruleset="allFives"\]/,
-    "American 4-player phone chrome hugs Rival 1"
+    /game-page--players-4\[data-layout-density="short"\] \.game-page__chrome/,
+    "4-player phone chrome hugs Rival 1 for Classic and American"
   );
 }
 
@@ -349,8 +349,27 @@ function legacyBottomReservation(L) {
   const C = gameplayComposition(am4Phone);
   assert.ok(C.menu.bottom <= C.felt.top + 0.01, "menu stays above expanded felt");
   assert.ok(C.score.bottom <= C.felt.top + 0.01, "score stays above expanded felt");
-  assert.equal(classic4Phone.feltTop, basePhone.feltTop, "Classic 4p phone felt is unchanged");
+  assert.equal(classic4Phone.feltTop, am4Phone.feltTop, "Classic 4p phone uses the same upward hug");
+  assert.equal(classic4Phone.feltBottom, am4Phone.feltBottom, "Classic 4p phone felt bottom stays put");
+  assert.equal(classic4Phone.handTop, am4Phone.handTop, "Classic 4p phone hand stays put");
+  assert.equal(classic4Phone.feltHeight, am4Phone.feltHeight, "Classic 4p phone felt grows the same amount");
   assert.equal(am2Phone.feltTop, basePhone.feltTop, "American 2p phone felt is unchanged");
+  const classic2Phone = resolveGameplayLayout(phone, {
+    playerCount: 2,
+    rulesetId: "legacy",
+  });
+  assert.equal(classic2Phone.feltTop, am4Phone.feltTop, "Classic 2p phone uses the Rival 1 upward hug");
+  assert.equal(classic2Phone.feltBottom, basePhone.feltBottom, "Classic 2p phone felt bottom stays put");
+  assert.equal(classic2Phone.handTop, basePhone.handTop, "Classic 2p phone hand stays put");
+  assert.equal(classic2Phone.playedShort, basePhone.playedShort, "Classic 2p phone tile short unchanged");
+  const classic3Phone = resolveGameplayLayout(phone, {
+    playerCount: 3,
+    rulesetId: "legacy",
+  });
+  assert.equal(classic3Phone.feltTop, am4Phone.feltTop, "Classic 3p phone uses the Rival 1 upward hug");
+  assert.equal(classic3Phone.feltBottom, basePhone.feltBottom, "Classic 3p phone felt bottom stays put");
+  assert.equal(classic3Phone.handTop, basePhone.handTop, "Classic 3p phone hand stays put");
+  assert.equal(classic3Phone.playedShort, basePhone.playedShort, "Classic 3p phone tile short unchanged");
   assert.equal(am4Tablet.feltTop, baseTablet.feltTop, "American 4p tablet felt top is unchanged");
   assert.equal(
     am4Tablet.feltHeight,

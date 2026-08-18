@@ -233,3 +233,25 @@
     animation: none;
   }
 }
+
+.opponent-panel--compact {
+  gap: 0.08rem;
+  padding: 0.04rem 0.35rem 0.08rem;
+}
+
+.opponent-panel--compact .opponent-panel__tray {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.opponent-panel--compact .opponent-panel__hand {
+  width: max-content;
+  margin-inline: auto;
+}
+
+.opponent-panel--compact .opponent-panel__tile > * {
+  transform: scale(0.72);
+  transform-origin: center center;
+}

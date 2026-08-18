@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import SplashPage from "./pages/SplashPage";
-import GameSetupPage from "./pages/GameSetupPage";
+import HomePage from "./pages/HomePage";
 import GameStylePage from "./pages/GameStylePage";
 import GamePage from "./pages/GamePage";
 import "./App.css";
 
-/** @typedef {"intro" | "setup" | "gameStyle" | "game"} AppPhase */
+/** @typedef {"intro" | "home" | "gameStyle" | "game"} AppPhase */
 
 /**
- * Startup: brand intro → game setup → table.
- * Game Style is a setup sub-screen (preference only; does not start a match).
- * Match mounts only after PLAY (or Resume). Main Menu returns to setup.
+ * Startup: brand intro → Home → Game Style → table.
+ * PLAY VS LEOBEST opens Game Style. PLAY on that screen starts the 1v1 match.
+ * Main Menu returns to Home.
  */
 function App() {
   /** @type {[AppPhase, function]} */
@@ -29,7 +29,7 @@ function App() {
 
   const handleSplashExitEnd = () => {
     setSplashExiting(false);
-    setPhase("setup");
+    setPhase("home");
   };
 
   const handlePlay = (config) => {
@@ -53,11 +53,11 @@ function App() {
   const handleMainMenu = () => {
     setMatchOptions(null);
     setGameKey((key) => key + 1);
-    setPhase("setup");
+    setPhase("home");
   };
 
   const bootShell =
-    phase === "intro" || phase === "setup" || phase === "gameStyle";
+    phase === "intro" || phase === "home" || phase === "gameStyle";
 
   return (
     <div className={`app app--game${bootShell ? " app--booting" : ""}`}>
@@ -69,18 +69,18 @@ function App() {
         />
       ) : null}
 
-      {phase === "setup" ? (
-        <GameSetupPage
-          onPlay={handlePlay}
+      {phase === "home" ? (
+        <HomePage
+          onPlayVsLeoBest={() => setPhase("gameStyle")}
           onResume={handleResume}
-          onOpenGameStyle={() => setPhase("gameStyle")}
         />
       ) : null}
 
       {phase === "gameStyle" ? (
         <GameStylePage
-          onBack={() => setPhase("setup")}
-          onMainMenu={() => setPhase("setup")}
+          onBack={() => setPhase("home")}
+          onMainMenu={() => setPhase("home")}
+          onPlay={handlePlay}
         />
       ) : null}
 

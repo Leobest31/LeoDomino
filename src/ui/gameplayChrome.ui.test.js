@@ -74,15 +74,17 @@ assert.match(gamePage, /<BottomBar[\s\S]*<PlayerPanel/, "Player 1 hand is in the
 assert.doesNotMatch(gamePage, /endAbove/, "dock no longer hosts reserve");
 assert.doesNotMatch(gamePage, /onPlay=\{handlePlay\}/, "Jwe handler not wired");
 assert.doesNotMatch(gamePage, /onDraw=\{handleDraw\}/, "Tire handler not wired");
-assert.match(gamePage, /runDrawSequence/, "automatic draw sequence preserved");
+assert.match(gamePage, /handleReservePick/, "human reserve pick is wired");
+assert.match(gamePage, /<ReservePicker/, "centered reserve picker mounts on the felt");
+assert.doesNotMatch(gamePage, /runDrawSequence/, "automatic human draw sequence removed");
 assert.match(gamePage, /canPass=\{isHumanTurn && actions\.canPass\}/, "Pase eligibility unchanged");
 
 assert.match(gamePage, /playerCount: state\.players\.length/, "layout sees 4-player matches");
 assert.match(gamePage, /rulesetId: state\.rulesetId/, "layout sees American ruleset");
 assert.match(
   read("pages/GamePage.css"),
-  /\[data-ruleset="allFives"\]/,
-  "American 4-player phone chrome is not locked to the 96px band"
+  /\.game-page--players-4\[data-layout-density="short"\] \.game-page__chrome/,
+  "4-player phone chrome is not locked to the 96px band"
 );
 
 const phone = resolveGameplayLayout({ width: 844, height: 390 });

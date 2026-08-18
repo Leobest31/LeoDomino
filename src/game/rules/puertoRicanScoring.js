@@ -53,7 +53,8 @@ export function calculatePuertoRicanRoundPoints({
 }) {
   if (winnerIndex == null || winnerIndex < 0) return 0;
 
-  const winTeam = puertoRicanTeamIdForSeat(winnerIndex);
+  const n = Array.isArray(players) ? players.length : 4;
+  const winTeam = puertoRicanTeamIdForSeat(winnerIndex, n);
   const loseTeam = winTeam === 0 ? 1 : 0;
   return puertoRicanTeamPipTotal(loseTeam, players, byId);
 }
@@ -76,7 +77,11 @@ export function applyPuertoRicanAfterRoundScoreUpdate({
   if (winnerIndex == null || winnerIndex < 0 || !Number.isFinite(points)) {
     return next;
   }
-  const partner = puertoRicanPartnerSeat(winnerIndex);
+  if (scores.length === 2) {
+    next[winnerIndex] = (scores[winnerIndex] ?? 0) + points;
+    return next;
+  }
+  const partner = puertoRicanPartnerSeat(winnerIndex, scores.length);
   const teamScore = (scores[winnerIndex] ?? 0) + points;
   next[winnerIndex] = teamScore;
   next[partner] = teamScore;
@@ -100,6 +105,7 @@ export function isPuertoRicanMatchWon({ scores, winnerIndex, targetScore }) {
  * @param {number} options.winnerIndex
  * @returns {number}
  */
-export function resolvePuertoRicanMatchWinner({ winnerIndex }) {
-  return puertoRicanTeamLeadSeat(puertoRicanTeamIdForSeat(winnerIndex));
+export function resolvePuertoRicanMatchWinner({ winnerIndex, scores }) {
+  const n = Array.isArray(scores) ? scores.length : 4;
+  return puertoRicanTeamLeadSeat(puertoRicanTeamIdForSeat(winnerIndex, n), n);
 }

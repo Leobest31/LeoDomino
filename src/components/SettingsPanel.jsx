@@ -22,8 +22,6 @@ function SettingsPanel({
   onClose,
   difficulty,
   onDifficultyChange,
-  playerCount,
-  onPlayerCountChange,
 }) {
   const { t } = useI18n();
   const { volume, muted, ambient, setVolume, setMuted, setAmbient, play } = useAudio();
@@ -115,26 +113,6 @@ function SettingsPanel({
             <label className="settings-panel__field">
               <span className="settings-panel__label">{t("ai.switcherAria")}</span>
               <DifficultySwitcher value={difficulty} onChange={onDifficultyChange} />
-            </label>
-          ) : null}
-
-          {playerCount != null && onPlayerCountChange ? (
-            <label className="settings-panel__field">
-              <span className="settings-panel__label">{t("game.playerCount")}</span>
-              <select
-                className="settings-panel__select"
-                value={playerCount}
-                aria-label={t("game.playerCountAria")}
-                onChange={(event) => {
-                  onPlayerCountChange(Number(event.target.value));
-                  play("button");
-                }}
-              >
-                <option value={2}>{t("game.playersN", { n: 2 })}</option>
-                <option value={3}>{t("game.playersN", { n: 3 })}</option>
-                <option value={4}>{t("game.playersN", { n: 4 })}</option>
-              </select>
-              <span className="settings-panel__hint">{t("game.playerCountHint")}</span>
             </label>
           ) : null}
 

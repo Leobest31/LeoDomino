@@ -13,16 +13,15 @@
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding:
-    max(1.1rem, env(safe-area-inset-top))
+    max(0.7rem, env(safe-area-inset-top))
     max(1.1rem, env(safe-area-inset-right))
-    max(1.25rem, env(safe-area-inset-bottom))
+    0
     max(1.1rem, env(safe-area-inset-left));
   background: #05070c;
   color: var(--style-ink);
@@ -55,11 +54,13 @@
   position: relative;
   z-index: 1;
   width: min(100%, 26.5rem);
-  margin-block: auto;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: clamp(1rem, 2.8vh, 1.5rem);
+  gap: clamp(0.75rem, 2.4vh, 1.25rem);
   padding-bottom: 0.35rem;
 }
 
@@ -165,6 +166,13 @@
   color: var(--style-ink);
   text-align: center;
   white-space: nowrap;
+}
+
+.game-style__hint {
+  margin: 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--style-muted);
 }
 
 .game-style__panel {
@@ -296,17 +304,57 @@ img.game-style__flag {
   box-shadow: 0 0 0 1px rgba(232, 197, 71, 0.2);
 }
 
+.game-style__playbar {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  width: min(100%, 26.5rem);
+  padding:
+    0.75rem 0
+    max(0.85rem, env(safe-area-inset-bottom));
+}
+
+.game-style__play {
+  appearance: none;
+  width: 100%;
+  min-height: 3.15rem;
+  border: 1px solid rgba(232, 197, 71, 0.48);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #d8b64e 0%, #b08a28 52%, #9a7620 100%);
+  color: #1a1408;
+  font-family: var(--font-ui);
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 245, 200, 0.28);
+}
+
+.game-style__play:disabled,
+.game-style__play[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.game-style__play:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 3px;
+}
+
 @media (min-width: 600px) {
-  .game-style__shell {
+  .game-style__shell,
+  .game-style__playbar {
     width: min(100%, 28.5rem);
   }
 }
 
 @media (max-height: 720px) {
   .game-style {
-    padding-block:
-      max(0.55rem, env(safe-area-inset-top))
-      max(0.7rem, env(safe-area-inset-bottom));
+    padding-top: max(0.55rem, env(safe-area-inset-top));
   }
 
   .game-style__shell {

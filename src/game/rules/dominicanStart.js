@@ -33,12 +33,13 @@ export { chooseDoubleSixStarter as chooseDominicanRound1Starter };
 export function chooseDominicanBlockedStarter({
   winningTeamId,
   blockCauserIndex,
+  playerCount = 4,
 }) {
-  const seats = seatsOnTeam(winningTeamId);
+  const seats = seatsOnTeam(winningTeamId, playerCount);
   if (
     blockCauserIndex != null &&
     Number.isInteger(blockCauserIndex) &&
-    teamIdForSeat(blockCauserIndex) === winningTeamId
+    teamIdForSeat(blockCauserIndex, playerCount) === winningTeamId
   ) {
     return blockCauserIndex;
   }
@@ -62,6 +63,7 @@ export function resolveDominicanTeamBlockedOutcome({
   blockCauserIndex = null,
   blockedTieBreak,
 }) {
+  const n = Array.isArray(state.players) ? state.players.length : 4;
   const team0 = teamPipTotal(0, state.players, state.byId);
   const team1 = teamPipTotal(1, state.players, state.byId);
   if (team0 === team1) {
@@ -80,6 +82,7 @@ export function resolveDominicanTeamBlockedOutcome({
   const nextStarterIndex = chooseDominicanBlockedStarter({
     winningTeamId,
     blockCauserIndex,
+    playerCount: n,
   });
   return { tied: false, winnerIndex: nextStarterIndex, nextStarterIndex };
 }

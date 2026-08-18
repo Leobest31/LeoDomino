@@ -42,7 +42,8 @@ export function calculateDominicanRoundPoints({
 }) {
   if (winnerIndex == null || winnerIndex < 0) return 0;
 
-  const winTeam = teamIdForSeat(winnerIndex);
+  const n = Array.isArray(players) ? players.length : 4;
+  const winTeam = teamIdForSeat(winnerIndex, n);
   const loseTeam = winTeam === 0 ? 1 : 0;
   const winPips = teamPipTotal(winTeam, players, byId);
   const losePips = teamPipTotal(loseTeam, players, byId);
@@ -73,7 +74,11 @@ export function applyDominicanAfterRoundScoreUpdate({
   if (winnerIndex == null || winnerIndex < 0 || !Number.isFinite(points)) {
     return next;
   }
-  const partner = partnerSeat(winnerIndex);
+  if (scores.length === 2) {
+    next[winnerIndex] = (scores[winnerIndex] ?? 0) + points;
+    return next;
+  }
+  const partner = partnerSeat(winnerIndex, scores.length);
   const teamScore = (scores[winnerIndex] ?? 0) + points;
   next[winnerIndex] = teamScore;
   next[partner] = teamScore;
@@ -101,6 +106,7 @@ export function isDominicanMatchWon({ scores, winnerIndex, targetScore }) {
  * @param {number} options.winnerIndex
  * @returns {number}
  */
-export function resolveDominicanMatchWinner({ winnerIndex }) {
-  return teamLeadSeat(teamIdForSeat(winnerIndex));
+export function resolveDominicanMatchWinner({ winnerIndex, scores }) {
+  const n = Array.isArray(scores) ? scores.length : 4;
+  return teamLeadSeat(teamIdForSeat(winnerIndex, n), n);
 }

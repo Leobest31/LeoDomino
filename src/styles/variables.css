@@ -70,7 +70,7 @@
   --bottom-bar-height: 2.7rem;
   --game-max: 100%;
   /* Prefer filling the mid stage — high ceiling so the felt can grow */
-  --game-area-height: clamp(24rem, 78dvh, 62rem);
+  --game-area-height: 100%;
   --game-area-width: 100%;
   --game-area-max-width: none;
 

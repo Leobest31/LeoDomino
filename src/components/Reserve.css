@@ -155,3 +155,32 @@
   align-items: center;
   gap: 0.25rem;
 }
+
+.reserve--badge {
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  padding: 0.16rem 0.48rem;
+  background:
+    linear-gradient(165deg, rgba(18, 24, 32, 0.95) 0%, rgba(6, 10, 12, 0.92) 100%);
+  border: 1px solid rgba(201, 162, 39, 0.48);
+  border-radius: var(--radius-hud);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+}
+
+.reserve__badge-text {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: rgba(232, 197, 71, 0.95);
+  white-space: nowrap;
+}
+
+.reserve__badge-origin {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

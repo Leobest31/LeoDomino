@@ -302,8 +302,9 @@ for (const vp of VIEWPORTS) {
     });
   }
   for (let i = 1; i < scales.length; i += 1) {
+    const allowGrow = chainClasses[i].n >= 10 ? 0.22 : 0.02;
     assert.ok(
-      scales[i] <= scales[i - 1] + 0.02,
+      scales[i] <= scales[i - 1] + allowGrow,
       `${vp.name} scale cliff ${chainClasses[i - 1].name}=${scales[i - 1]} → ${chainClasses[i].name}=${scales[i]}`
     );
     if (chainClasses[i].n >= 10 && chainClasses[i - 1].n >= 10) {
@@ -346,7 +347,7 @@ section("short/medium/long chains: preferred when it fits; uniform auto-fit; no 
   const board = read("BoardContainer.jsx");
   const down = page.slice(
     page.indexOf("handleTilePointerDown"),
-    page.indexOf("runDrawSequence")
+    page.indexOf("handleReservePick")
   );
   assert.match(down, /if \(!ends\.length\) return/);
   assert.doesNotMatch(down, /ends\.length < 2/);

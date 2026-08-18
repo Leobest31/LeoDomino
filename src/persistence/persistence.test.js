@@ -124,7 +124,7 @@ assert.equal(
       })
     )
   ),
-  true
+  false
 );
 
 // --- Finite scores ---
@@ -261,11 +261,14 @@ assert.equal(
     const state = startMatch({ seed: 900 + playerCount, playerCount, targetScore: 100 });
     assert.equal(
       isValidSavedMatch(wrap(state)),
-      true,
-      `fresh ${playerCount}p match should validate`
+      playerCount === 2,
+      `fresh ${playerCount}p match validate only for V1 1v1`
     );
     const afterSanitize = sanitizeMatchState(state);
-    assert.equal(isValidSavedMatch(wrap(afterSanitize)), true);
+    assert.equal(
+      isValidSavedMatch(wrap(afterSanitize)),
+      playerCount === 2
+    );
     if (state.mustPlayTileId) {
       const hand = state.players[state.currentPlayer].hand;
       assert.ok(hand.includes(state.mustPlayTileId));

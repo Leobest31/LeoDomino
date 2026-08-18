@@ -9,8 +9,6 @@ import "./Header.css";
 function Header({
   difficulty,
   onDifficultyChange,
-  playerCount,
-  onPlayerCountChange,
   settingsOpen: settingsOpenProp,
   onSettingsOpenChange,
   startBelow = null,
@@ -101,8 +99,6 @@ function Header({
         onClose={() => setSettingsOpen(false)}
         difficulty={difficulty}
         onDifficultyChange={onDifficultyChange}
-        playerCount={playerCount}
-        onPlayerCountChange={onPlayerCountChange}
       />
     </>
   );

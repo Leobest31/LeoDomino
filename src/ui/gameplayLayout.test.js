@@ -15,6 +15,8 @@ import {
   PLAYED_LONG_MAX_OF_FELT_H_SHORT,
   PLAYED_SHORT_MAX_PX,
   PHONE_PLAYED_SIZE_BOOST,
+  PHONE_PLAYED_SIZE_SAFE_H,
+  PHONE_LANDSCAPE_MAX_H,
 } from "./gameplayLayout.js";
 import {
   calculateBoardLayout,
@@ -109,7 +111,7 @@ for (const vp of VIEWPORTS) {
     `${vp.name} chrome+felt+dock must fill safe height`
   );
   assert.equal(L.handExclusion, 0, `${vp.name} dock is outside felt`);
-  if (vp.height <= 430) assert.equal(density, "short", `${vp.name} density`);
+  if (vp.height <= PHONE_LANDSCAPE_MAX_H) assert.equal(density, "short", `${vp.name} density`);
 }
 
 const comparison = VIEWPORTS.map((vp) => {
@@ -134,7 +136,6 @@ console.log("Gameplay composition ratios:\n", comparison);
   for (const [name, L] of [
     ["tablet", tablet],
     ["phone", phone],
-    ["portrait", portrait],
   ]) {
     assert.ok(
       Math.abs(L.playerHandLong / L.handLong - PLAYER_HAND_SCALE) < 0.08,
@@ -144,6 +145,13 @@ console.log("Gameplay composition ratios:\n", comparison);
     assert.ok(row <= L.handBudget + 1, `${name} 7-tile row ${row} vs budget ${L.handBudget}`);
     assert.ok(L.playerHandOverlap >= -8, `${name} overlap is controlled`);
   }
+  assert.equal(portrait.orientation, "portrait");
+  assert.ok(
+    portrait.playerHandLong >= portrait.handLong,
+    `portrait hand stays at least as large as the chrome tile (${portrait.playerHandLong} vs ${portrait.handLong})`
+  );
+  assert.ok(portrait.playerHandShort >= 26, "portrait hand remains touchable");
+  assert.equal(portrait.playerHandOverlap, 0, "portrait uses scroll instead of overlap");
   const vars = gameplayLayoutCssVars(tablet);
   assert.match(vars["--player-hand-h"], /px$/);
   assert.match(vars["--player-hand-gap"], /px$/);
@@ -178,6 +186,18 @@ console.log("Gameplay composition ratios:\n", comparison);
   assert.ok(
     Math.abs(phone.playedLong / phoneUnboosted - PHONE_PLAYED_SIZE_BOOST) < 0.04,
     `phone preferred is +15% vs the shared formula (${phone.playedLong.toFixed(1)} vs unboosted ${phoneUnboosted.toFixed(1)})`
+  );
+
+  const androidPhone = resolveGameplayLayout({ width: 915, height: 412 });
+  const tallPhone = resolveGameplayLayout({ width: 876, height: 440 });
+  assert.equal(PHONE_PLAYED_SIZE_SAFE_H, 412);
+  assert.ok(
+    Math.abs(tallPhone.playedShort - androidPhone.playedShort) < 0.6,
+    `taller phone safes keep the approved phone preferred size (${tallPhone.playedShort.toFixed(1)} vs ${androidPhone.playedShort.toFixed(1)})`
+  );
+  assert.ok(
+    Math.abs(phone.playedShort - 66.6) < 1.2,
+    `390-class phone preferred stays ${phone.playedShort.toFixed(1)}`
   );
 }
 
@@ -330,16 +350,72 @@ function dbl(id, pip) {
   const phone = { width: 832, height: 384 };
   const tablet = { width: 1280, height: 800 };
   const am4 = { playerCount: 4, rulesetId: "allFives" };
+  const classic4 = { playerCount: 4, rulesetId: "legacy" };
   const base = resolveGameplayLayout(phone);
   const grown = resolveGameplayLayout(phone, am4);
+  const classic = resolveGameplayLayout(phone, classic4);
   assert.equal(grown.feltBottom, base.feltBottom);
   assert.equal(grown.handTop, base.handTop);
   assert.ok(grown.feltTop < base.feltTop - 8);
   assert.ok(grown.feltHeight > base.feltHeight + 8);
+  assert.equal(classic.feltTop, grown.feltTop, "Classic 4p phone matches American hug");
+  assert.equal(classic.feltBottom, grown.feltBottom);
+  assert.equal(classic.handTop, grown.handTop);
   const tabBase = resolveGameplayLayout(tablet);
   const tabAm4 = resolveGameplayLayout(tablet, am4);
+  const tabClassic4 = resolveGameplayLayout(tablet, classic4);
   assert.equal(tabAm4.feltHeight, tabBase.feltHeight);
   assert.equal(tabAm4.feltTop, tabBase.feltTop);
+  assert.equal(tabClassic4.feltHeight, tabBase.feltHeight);
+  assert.equal(tabClassic4.feltTop, tabBase.feltTop);
+
+  const classic2 = { playerCount: 2, rulesetId: "legacy" };
+  const classic2Phone = resolveGameplayLayout(phone, classic2);
+  assert.equal(classic2Phone.feltTop, grown.feltTop, "Classic 2p phone uses the Rival 1 upward hug");
+  assert.equal(classic2Phone.feltBottom, base.feltBottom, "Classic 2p phone table bottom stays put");
+  assert.equal(classic2Phone.handTop, base.handTop, "Classic 2p phone Player 1 hand stays put");
+  assert.equal(classic2Phone.dockTop, base.dockTop, "Classic 2p phone dock stays put");
+  assert.equal(classic2Phone.playedShort, base.playedShort, "Classic 2p phone tile short unchanged");
+  assert.equal(classic2Phone.playedLong, base.playedLong, "Classic 2p phone tile long unchanged");
+  const classic2Tablet = resolveGameplayLayout(tablet, classic2);
+  assert.equal(classic2Tablet.feltTop, tabBase.feltTop, "Classic 2p tablet felt top unchanged");
+  assert.equal(classic2Tablet.feltBottom, tabBase.feltBottom, "Classic 2p tablet table bottom unchanged");
+  assert.equal(classic2Tablet.handTop, tabBase.handTop, "Classic 2p tablet hand unchanged");
+
+  const classic3 = { playerCount: 3, rulesetId: "legacy" };
+  const classic3Phone = resolveGameplayLayout(phone, classic3);
+  assert.equal(classic3Phone.feltTop, grown.feltTop, "Classic 3p phone uses the Rival 1 upward hug");
+  assert.equal(classic3Phone.chromeFeltGap, grown.chromeFeltGap, "Classic 3p phone keeps the 2px frame gap");
+  assert.equal(classic3Phone.feltBottom, base.feltBottom, "Classic 3p phone table bottom stays put");
+  assert.equal(classic3Phone.handTop, base.handTop, "Classic 3p phone Player 1 hand stays put");
+  assert.equal(classic3Phone.dockTop, base.dockTop, "Classic 3p phone dock stays put");
+  assert.equal(classic3Phone.feltWidth, base.feltWidth, "Classic 3p phone table width unchanged");
+  assert.equal(classic3Phone.playedShort, base.playedShort, "Classic 3p phone tile short unchanged");
+  assert.equal(classic3Phone.playedLong, base.playedLong, "Classic 3p phone tile long unchanged");
+  const classic3Tablet = resolveGameplayLayout(tablet, classic3);
+  assert.equal(classic3Tablet.feltTop, tabBase.feltTop, "Classic 3p tablet felt top unchanged");
+  assert.equal(classic3Tablet.feltBottom, tabBase.feltBottom, "Classic 3p tablet table bottom unchanged");
+  assert.equal(classic3Tablet.handTop, tabBase.handTop, "Classic 3p tablet hand unchanged");
+
+  const others = [
+    { playerCount: 2, rulesetId: "allFives" },
+    { playerCount: 2, rulesetId: "american" },
+    { playerCount: 2, rulesetId: "haitian" },
+    { playerCount: 2, rulesetId: "dominican" },
+    { playerCount: 2, rulesetId: "puertorican" },
+    { playerCount: 3, rulesetId: "allFives" },
+    { playerCount: 3, rulesetId: "haitian" },
+  ];
+  for (const opts of others) {
+    const L = resolveGameplayLayout(phone, opts);
+    assert.equal(
+      L.feltTop,
+      base.feltTop,
+      `${opts.rulesetId} ${opts.playerCount}p phone felt top stays on the shared chrome`
+    );
+    assert.equal(L.feltBottom, base.feltBottom, `${opts.rulesetId} ${opts.playerCount}p bottom stays put`);
+    assert.equal(L.handTop, base.handTop, `${opts.rulesetId} ${opts.playerCount}p hand stays put`);
+  }
 }
 
 console.log("Gameplay layout composition tests passed.");

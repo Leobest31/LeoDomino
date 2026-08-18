@@ -18,7 +18,10 @@ export const PUERTO_RICAN_TEAM_SEATS = Object.freeze([
  * @param {number} seat
  * @returns {number}
  */
-export function puertoRicanPartnerSeat(seat) {
+export function puertoRicanPartnerSeat(seat, playerCount = 4) {
+  if (Math.floor(Number(playerCount)) === 2) {
+    return Math.floor(Number(seat));
+  }
   const s = Math.floor(Number(seat));
   if (s === 0) return 1;
   if (s === 1) return 0;
@@ -31,8 +34,14 @@ export function puertoRicanPartnerSeat(seat) {
  * @param {number} seat
  * @returns {0|1}
  */
-export function puertoRicanTeamIdForSeat(seat) {
+export function puertoRicanTeamIdForSeat(seat, playerCount = 4) {
+  const n = Math.floor(Number(playerCount)) || 4;
   const s = Math.floor(Number(seat));
+  if (n === 2) {
+    if (s === 0) return 0;
+    if (s === 1) return 1;
+    throw new Error(`puertoRicanTeamIdForSeat: invalid 2-player seat ${seat}`);
+  }
   if (s === 0 || s === 1) return 0;
   if (s === 2 || s === 3) return 1;
   throw new Error(`puertoRicanTeamIdForSeat: invalid seat ${seat}`);
@@ -49,7 +58,11 @@ export function getPuertoRicanTeams() {
  * @param {0|1|number} teamId
  * @returns {ReadonlyArray<number>}
  */
-export function puertoRicanSeatsOnTeam(teamId) {
+export function puertoRicanSeatsOnTeam(teamId, playerCount = 4) {
+  if (Math.floor(Number(playerCount)) === 2) {
+    const id = teamId === 0 ? 0 : 1;
+    return Object.freeze([id]);
+  }
   const team = PUERTO_RICAN_TEAM_SEATS[teamId];
   if (!team) throw new Error(`puertoRicanSeatsOnTeam: invalid team ${teamId}`);
   return team;
@@ -59,8 +72,8 @@ export function puertoRicanSeatsOnTeam(teamId) {
  * @param {0|1|number} teamId
  * @returns {number}
  */
-export function puertoRicanTeamLeadSeat(teamId) {
-  return puertoRicanSeatsOnTeam(teamId)[0];
+export function puertoRicanTeamLeadSeat(teamId, playerCount = 4) {
+  return puertoRicanSeatsOnTeam(teamId, playerCount)[0];
 }
 
 /**
@@ -83,8 +96,9 @@ export function puertoRicanArePartners(a, b) {
  * @returns {number}
  */
 export function puertoRicanTeamPipTotal(teamId, players, byId) {
+  const n = Array.isArray(players) ? players.length : 4;
   let total = 0;
-  for (const seat of puertoRicanSeatsOnTeam(teamId)) {
+  for (const seat of puertoRicanSeatsOnTeam(teamId, n)) {
     total += handPipTotal(players[seat]?.hand ?? [], byId);
   }
   return total;

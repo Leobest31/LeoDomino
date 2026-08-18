@@ -44,18 +44,21 @@ export const puertoRicanRuleset = Object.freeze({
   deckType: "double-six",
   pipMax: PIP_MAX,
   tileCount: TILE_COUNT,
-  handSize: HAND_SIZE,
 
   // —— Seats ——
   playerCount: Object.freeze({
-    min: 4,
+    min: 2,
     max: 4,
-    default: 4,
+    default: 2,
   }),
-  supportedPlayerCounts: Object.freeze([4]),
-  /** Opposite partners: 0↔1 and 2↔3 (LeoDomino felt geometry). */
+  /**
+   * V1 product is 1v1. 4-hand partnership remains for engine tests / a future
+   * table. 2-player maps drawless deal to 14 each (full double-six, no boneyard).
+   */
+  supportedPlayerCounts: Object.freeze([2, 4]),
   partnerships: "oppositeSeats",
   teams: getPuertoRicanTeams(),
+  handSize: (playerCount) => (Number(playerCount) === 2 ? 14 : HAND_SIZE),
 
   // —— Opening ——
   round1Starter: "doubleSix",

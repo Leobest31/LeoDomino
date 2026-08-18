@@ -1,24 +1,15 @@
 /**
- * Gameplay orientation — portrait devices should rotate to landscape.
- * Pure helpers so match state is never tied to viewport math.
+ * Gameplay orientation — portrait is first-class V1 play.
+ * Landscape is optional; never block the player behind a rotate prompt.
  */
 
 /**
  * @param {{ width: number, height: number, coarsePointer?: boolean }} viewport
- * @returns {boolean} true when a phone/tablet is in portrait and should
- *   see the rotate prompt instead of a squeezed board.
+ * @returns {boolean} always false — V1 plays in portrait without rotation.
  */
 export function shouldPromptLandscape(viewport) {
-  const width = Number(viewport?.width) || 0;
-  const height = Number(viewport?.height) || 0;
-  if (width < 1 || height < 1) return false;
-  const portrait = height > width;
-  if (!portrait) return false;
-  // Desktop mouse/keyboard windows may be tall; never block them.
-  if (viewport?.coarsePointer === false) return false;
-  if (viewport?.coarsePointer === true) return true;
-  // Unknown pointer: still prompt on compact portrait frames (phones/tablets).
-  return width <= 1200;
+  void viewport;
+  return false;
 }
 
 /**

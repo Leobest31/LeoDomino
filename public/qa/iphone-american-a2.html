@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>QA American A2</title>
+  <style>
+    html, body { margin: 0; min-height: 100%; background: #08110e; color: #e8efe9;
+      font: 16px/1.4 system-ui, sans-serif; }
+    main { padding: 24px; max-width: 36rem; }
+    a { color: #d4b36a; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>American worst-case A2</h1>
+    <p>Injecting the 27-tile visual board, then opening LeoDomino.</p>
+    <p>If nothing happens, <a id="go" href="../">continue</a>.</p>
+  </main>
+  <script>
+    (function () {
+      var payload = {"version":1,"savedAt":1787027941078,"matchStartedAt":1787027941078,"difficulty":"medium","rulesetId":"allFives","selectedId":null,"state":{"players":[{"id":"you","hand":["0-0"]},{"id":"rival","hand":[]},{"id":"rival-2","hand":[]},{"id":"rival-3","hand":[]}],"byId":{"L16":{"id":"L16","a":4,"b":5,"isDouble":false},"L15":{"id":"L15","a":3,"b":4,"isDouble":false},"L14":{"id":"L14","a":2,"b":3,"isDouble":false},"L13":{"id":"L13","a":1,"b":2,"isDouble":false},"L12":{"id":"L12","a":0,"b":1,"isDouble":false},"L11":{"id":"L11","a":0,"b":6,"isDouble":false},"L10":{"id":"L10","a":5,"b":6,"isDouble":false},"L9":{"id":"L9","a":4,"b":5,"isDouble":false},"L8":{"id":"L8","a":3,"b":4,"isDouble":false},"L7":{"id":"L7","a":2,"b":3,"isDouble":false},"L6":{"id":"L6","a":1,"b":2,"isDouble":false},"L5":{"id":"L5","a":0,"b":1,"isDouble":false},"L4":{"id":"L4","a":0,"b":6,"isDouble":false},"L3":{"id":"L3","a":5,"b":6,"isDouble":false},"L2":{"id":"L2","a":4,"b":5,"isDouble":false},"L1":{"id":"L1","a":3,"b":4,"isDouble":false},"3-3":{"id":"3-3","a":3,"b":3,"isDouble":true},"R1":{"id":"R1","a":3,"b":5,"isDouble":false},"R2":{"id":"R2","a":0,"b":5,"isDouble":false},"R3":{"id":"R3","a":0,"b":2,"isDouble":false},"R4":{"id":"R4","a":2,"b":4,"isDouble":false},"N1":{"id":"N1","a":3,"b":6,"isDouble":false},"N2":{"id":"N2","a":2,"b":6,"isDouble":false},"N3":{"id":"N3","a":2,"b":5,"isDouble":false},"S1":{"id":"S1","a":0,"b":3,"isDouble":false},"S2":{"id":"S2","a":0,"b":4,"isDouble":false},"S3":{"id":"S3","a":1,"b":4,"isDouble":false},"0-0":{"id":"0-0","a":0,"b":0,"isDouble":true}},"board":[{"id":"L16","left":5,"right":4,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L15","left":4,"right":3,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L14","left":3,"right":2,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L13","left":2,"right":1,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L12","left":1,"right":0,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L11","left":0,"right":6,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L10","left":6,"right":5,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L9","left":5,"right":4,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L8","left":4,"right":3,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L7","left":3,"right":2,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L6","left":2,"right":1,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L5","left":1,"right":0,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L4","left":0,"right":6,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L3","left":6,"right":5,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L2","left":5,"right":4,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"L1","left":4,"right":3,"orientation":"horizontal","destination":"MAIN_LEFT","branch":"MAIN_LEFT"},{"id":"3-3","left":3,"right":3,"orientation":"vertical","destination":"SPINNER","branch":"SPINNER"},{"id":"R1","left":3,"right":5,"orientation":"horizontal","destination":"MAIN_RIGHT","branch":"MAIN_RIGHT"},{"id":"R2","left":5,"right":0,"orientation":"horizontal","destination":"MAIN_RIGHT","branch":"MAIN_RIGHT"},{"id":"R3","left":0,"right":2,"orientation":"horizontal","destination":"MAIN_RIGHT","branch":"MAIN_RIGHT"},{"id":"R4","left":2,"right":4,"orientation":"horizontal","destination":"MAIN_RIGHT","branch":"MAIN_RIGHT"}],"spinnerId":"3-3","spinnerNorth":[{"id":"N1","left":3,"right":6,"orientation":"vertical","destination":"SPINNER_TOP","branch":"SPINNER_TOP"},{"id":"N2","left":6,"right":2,"orientation":"vertical","destination":"SPINNER_TOP","branch":"SPINNER_TOP"},{"id":"N3","left":2,"right":5,"orientation":"vertical","destination":"SPINNER_TOP","branch":"SPINNER_TOP"}],"spinnerSouth":[{"id":"S1","left":3,"right":0,"orientation":"vertical","destination":"SPINNER_BOTTOM","branch":"SPINNER_BOTTOM"},{"id":"S2","left":0,"right":4,"orientation":"vertical","destination":"SPINNER_BOTTOM","branch":"SPINNER_BOTTOM"},{"id":"S3","left":4,"right":1,"orientation":"vertical","destination":"SPINNER_BOTTOM","branch":"SPINNER_BOTTOM"}],"reserve":[],"scores":[0,0,0,0],"round":1,"phase":"playing","currentPlayer":0,"targetScore":200,"mustPlayTileId":null,"consecutivePasses":0,"roundStarterIndex":0,"roundResult":null,"matchWinner":null,"statusKey":null,"statusVars":null,"seed":20260818,"rulesetId":"allFives"}};
+      try {
+        localStorage.setItem("leodomino.match", JSON.stringify(payload));
+        localStorage.setItem("leodomino.playerCount", "4");
+      } catch (err) {
+        document.querySelector("p").textContent = "Could not write localStorage: " + err;
+        return;
+      }
+      location.replace("../");
+    })();
+  </script>
+</body>
+</html>

@@ -19,6 +19,8 @@ function OpponentPanel({
   isTurn = false,
   position = "top",
   seatIndex = 1,
+  compact = false,
+  avatarTone = "rival",
 }) {
   const { t } = useI18n();
   const resolvedName = name ?? t("game.rival");
@@ -30,15 +32,17 @@ function OpponentPanel({
   return (
     <section
       className={`opponent-panel opponent-panel--${position}${
-        thinking ? " opponent-panel--thinking" : ""
-      }${isTurn && !thinking ? " opponent-panel--turn" : ""}`}
+        compact ? " opponent-panel--compact" : ""
+      }${thinking ? " opponent-panel--thinking" : ""}${
+        isTurn && !thinking ? " opponent-panel--turn" : ""
+      }`}
       aria-label={t("game.handAria", { name: resolvedName })}
     >
       <div className="opponent-panel__meta">
         <div className="opponent-panel__identity">
           <Avatar
             label={resolvedName}
-            tone="rival"
+            tone={avatarTone}
             size="sm"
             active={thinking || isTurn}
           />

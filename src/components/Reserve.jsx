@@ -3,7 +3,7 @@ import { useI18n } from "../i18n";
 import DominoTile from "./DominoTile";
 import "./Reserve.css";
 
-function Reserve({ count = 0, label }) {
+function Reserve({ count = 0, label, compact = false }) {
   const { t } = useI18n();
   const resolvedLabel = label ?? t("game.reserve");
   const visibleStack = Math.min(count, 3);
@@ -17,6 +17,21 @@ function Reserve({ count = 0, label }) {
     const id = window.setTimeout(() => setPulse(false), 420);
     return () => window.clearTimeout(id);
   }, [count]);
+
+  if (compact) {
+    return (
+      <aside
+        className={`reserve reserve--badge${pulse ? " reserve--pulse" : ""}`}
+        aria-label={t("game.reserveAria", { label: resolvedLabel, count })}
+        data-reserve-root="true"
+      >
+        <span className="reserve__badge-text">
+          {t("game.reserveCount", { label: resolvedLabel, count })}
+        </span>
+        <span data-reserve-top="true" className="reserve__badge-origin" />
+      </aside>
+    );
+  }
 
   return (
     <aside

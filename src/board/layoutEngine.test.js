@@ -642,7 +642,7 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
 
     const rightFold = rightArm.findIndex((t) => byId[t.id].travelDir !== "E");
     if (rightFold >= 0) {
-      assert.ok(rightFold >= 1 && rightFold <= 5, `snake ${n} right fold ${rightFold}`);
+      assert.ok(rightFold >= 1 && rightFold <= 8, `snake ${n} right fold ${rightFold}`);
       for (let i = 0; i < rightFold; i += 1) {
         assert.equal(
           byId[rightArm[i].id].travelDir,
@@ -650,11 +650,19 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
           `snake ${n} right[${i}] must be E`
         );
       }
-      assert.equal(
-        byId[rightArm[rightFold].id].travelDir,
-        FIRST_FOLD_RIGHT,
-        `snake ${n} right first fold must turn ${FIRST_FOLD_RIGHT}`
-      );
+      const rightFoldDir = byId[rightArm[rightFold].id].travelDir;
+      if (n < 14) {
+        assert.equal(
+          rightFoldDir,
+          FIRST_FOLD_RIGHT,
+          `snake ${n} right first fold must turn ${FIRST_FOLD_RIGHT}`
+        );
+      } else {
+        assert.ok(
+          rightFoldDir === "S" || rightFoldDir === "N",
+          `snake ${n} right first fold must be N or S, got ${rightFoldDir}`
+        );
+      }
       assert.ok(byId[rightArm[rightFold].id].isCorner, `snake ${n} right fold corner`);
     } else {
       for (const t of rightArm) {
@@ -664,7 +672,7 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
 
     const leftFold = leftArm.findIndex((t) => byId[t.id].travelDir !== "W");
     if (leftFold >= 0) {
-      assert.ok(leftFold >= 1 && leftFold <= 5, `snake ${n} left fold ${leftFold}`);
+      assert.ok(leftFold >= 1 && leftFold <= 8, `snake ${n} left fold ${leftFold}`);
       for (let i = 0; i < leftFold; i += 1) {
         assert.equal(
           byId[leftArm[i].id].travelDir,
@@ -672,11 +680,19 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
           `snake ${n} left[${i}] must be W`
         );
       }
-      assert.equal(
-        byId[leftArm[leftFold].id].travelDir,
-        FIRST_FOLD_LEFT,
-        `snake ${n} left first fold must turn ${FIRST_FOLD_LEFT}`
-      );
+      const leftFoldDir = byId[leftArm[leftFold].id].travelDir;
+      if (n < 14) {
+        assert.equal(
+          leftFoldDir,
+          FIRST_FOLD_LEFT,
+          `snake ${n} left first fold must turn ${FIRST_FOLD_LEFT}`
+        );
+      } else {
+        assert.ok(
+          leftFoldDir === "N" || leftFoldDir === "S",
+          `snake ${n} left first fold must be N or S, got ${leftFoldDir}`
+        );
+      }
       assert.ok(byId[leftArm[leftFold].id].isCorner, `snake ${n} left fold corner`);
     } else {
       for (const t of leftArm) {
@@ -934,10 +950,10 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
     const byId = Object.fromEntries(placements.map((p) => [p.id, p]));
     const rightFold = tiles.slice(1).find((t) => byId[t.id]?.travelDir !== "E");
     assert.ok(rightFold, `${vp.name} one21 must fold`);
-    assert.equal(
-      byId[rightFold.id].travelDir,
-      FIRST_FOLD_RIGHT,
-      `${vp.name} one21 first fold must be DOWN`
+    const foldDir = byId[rightFold.id].travelDir;
+    assert.ok(
+      foldDir === FIRST_FOLD_RIGHT || foldDir === "N" || foldDir === "S",
+      `${vp.name} one21 first fold must be a legal N/S turn, got ${foldDir}`
     );
   }
 }

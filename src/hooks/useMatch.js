@@ -25,8 +25,8 @@ import {
   PLAYER_COUNT_STORAGE_KEY,
   buildOfflinePlayerIds,
   isAiSeat,
-  normalizePlayerCount,
 } from "../game/players.js";
+import { V1_PLAYER_COUNT } from "../game/v1Product.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import { MOTION } from "../utils/motion.js";
 import {
@@ -42,10 +42,6 @@ function readStoredDifficulty() {
   return normalizeDifficulty(readStorage(AI_DIFFICULTY_STORAGE_KEY, DEFAULT_DIFFICULTY));
 }
 
-function readStoredPlayerCount() {
-  return normalizePlayerCount(readStorage(PLAYER_COUNT_STORAGE_KEY, 2));
-}
-
 function readStoredRulesetId() {
   try {
     return normalizeRulesetId(readStorage(RULESET_STORAGE_KEY, DEFAULT_RULESET_ID));
@@ -55,9 +51,7 @@ function readStoredRulesetId() {
 }
 
 function createMatchState(options) {
-  const playerCount = normalizePlayerCount(
-    options.playerCount ?? readStoredPlayerCount()
-  );
+  const playerCount = V1_PLAYER_COUNT;
   const rulesetId = normalizeRulesetId(
     options.rulesetId ?? readStoredRulesetId()
   );
@@ -77,9 +71,9 @@ function createInitialState(options) {
   }
 
   const saved = options.skipResume ? null : loadMatch();
-  if (saved?.state) {
-    // Resume integrity: table size + ruleset come from the saved match, not prefs.
-    const resumedCount = normalizePlayerCount(saved.state.players?.length);
+  if (saved?.state && saved.state.players?.length === V1_PLAYER_COUNT) {
+    // Resume integrity: ruleset comes from the saved match, not prefs.
+    // V1 only resumes 1v1. Old 3P/4P saves fail validation and never reach here.
     const resumedRulesetId =
       typeof saved.state.rulesetId === "string" && saved.state.rulesetId
         ? saved.state.rulesetId
@@ -93,13 +87,11 @@ function createInitialState(options) {
       selectedId: saved.selectedId,
       resumed: true,
       matchStartedAt: saved.matchStartedAt || Date.now(),
-      playerCount: resumedCount,
+      playerCount: V1_PLAYER_COUNT,
       rulesetId: resumedRulesetId,
     };
   }
-  const preferredCount = normalizePlayerCount(
-    options.playerCount ?? readStoredPlayerCount()
-  );
+  const preferredCount = V1_PLAYER_COUNT;
   const preferredDifficulty =
     options.difficulty != null
       ? normalizeDifficulty(options.difficulty)
@@ -133,7 +125,7 @@ function createInitialState(options) {
 
 /**
  * Bridge rules + commercial AI → UI, with offline save / resume / stats.
- * Offline V1: human seat 0, AI on every other seat (2 / 3 / 4 players).
+ * V1 product surface: human seat 0 vs LeoBest (seat 1).
  */
 export function useMatch(options = {}) {
   const targetScore = options.targetScore;
@@ -185,11 +177,10 @@ export function useMatch(options = {}) {
     writeStorage(AI_DIFFICULTY_STORAGE_KEY, normalized);
   }, []);
 
-  const setPlayerCount = useCallback((next) => {
-    const normalized = normalizePlayerCount(next);
-    setPlayerCountState(normalized);
-    playerCountRef.current = normalized;
-    writeStorage(PLAYER_COUNT_STORAGE_KEY, normalized);
+  const setPlayerCount = useCallback(() => {
+    setPlayerCountState(V1_PLAYER_COUNT);
+    playerCountRef.current = V1_PLAYER_COUNT;
+    writeStorage(PLAYER_COUNT_STORAGE_KEY, V1_PLAYER_COUNT);
   }, []);
 
   const restart = useCallback(() => {
@@ -201,7 +192,7 @@ export function useMatch(options = {}) {
     setMatchStartedAt(startedAt);
     matchStartedAtRef.current = startedAt;
     setMatchEndedAt(null);
-    const count = normalizePlayerCount(playerCountRef.current);
+    const count = V1_PLAYER_COUNT;
     // Match keeps its ruleset until the player returns to Setup.
     const matchRulesetId = normalizeRulesetId(
       stateRef.current?.rulesetId ?? rulesetIdRef.current
@@ -280,13 +271,17 @@ export function useMatch(options = {}) {
     }
   }, []);
 
-  const commitDraw = useCallback(() => {
+  const commitDraw = useCallback((tileId = null) => {
     const current = stateRef.current;
     if (!getAvailableActions(current).canDraw) return null;
-    const drawnId = current.reserve[0];
+    const drawnId =
+      typeof tileId === "string" && tileId
+        ? tileId
+        : current.reserve[0];
+    if (!drawnId || !current.reserve.includes(drawnId)) return null;
     const tile = current.byId[drawnId];
     try {
-      const next = drawTile(current);
+      const next = drawTile(current, drawnId);
       stateRef.current = next;
       setState(next);
       setErrorKey(null);

@@ -1,5 +1,5 @@
 /**
- * Portrait orientation guard — phones/tablets rotate to landscape.
+ * V1 plays in portrait without a rotate-to-landscape blocker.
  * Run: node src/ui/gameplayOrientation.test.js
  */
 
@@ -10,11 +10,12 @@ import {
   TABLET_LANDSCAPE_CHROME_BEFORE,
   TABLET_LANDSCAPE_CHROME_AFTER,
 } from "./gameplayOrientation.js";
+import { isPortraitBox, resolveGameplayLayout } from "./gameplayLayout.js";
 
 assert.equal(
   shouldPromptLandscape({ width: 800, height: 1280, coarsePointer: true }),
-  true,
-  "tablet portrait must prompt"
+  false,
+  "tablet portrait must play"
 );
 assert.equal(
   shouldPromptLandscape({ width: 1280, height: 800, coarsePointer: true }),
@@ -23,8 +24,8 @@ assert.equal(
 );
 assert.equal(
   shouldPromptLandscape({ width: 390, height: 844, coarsePointer: true }),
-  true,
-  "phone portrait must prompt"
+  false,
+  "phone portrait must play"
 );
 assert.equal(
   shouldPromptLandscape({ width: 844, height: 390, coarsePointer: true }),
@@ -41,6 +42,15 @@ assert.equal(
   false,
   "desktop landscape must not prompt"
 );
+
+assert.equal(isPortraitBox(390, 844), true);
+assert.equal(isPortraitBox(844, 390), false);
+
+const phonePortrait = resolveGameplayLayout({ width: 390, height: 844 });
+assert.equal(phonePortrait.orientation, "portrait");
+assert.ok(phonePortrait.feltHeight > phonePortrait.chromeHeight, "portrait felt dominates chrome");
+assert.ok(phonePortrait.feltHeight > phonePortrait.dockHeight, "portrait felt dominates dock");
+assert.ok(phonePortrait.playedShort >= 44, `portrait tiles stay readable (${phonePortrait.playedShort})`);
 
 const tabletH = 800;
 const feltBefore = estimateFeltHeight(tabletH, TABLET_LANDSCAPE_CHROME_BEFORE);

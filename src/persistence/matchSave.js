@@ -4,7 +4,6 @@
  */
 
 import { PHASE } from "../game/rules/constants.js";
-import { MAX_PLAYER_COUNT, MIN_PLAYER_COUNT } from "../game/players.js";
 import {
   DEFAULT_RULESET_ID,
   coerceRulesetId,
@@ -67,7 +66,7 @@ export function isValidSavedMatch(value) {
   const s = /** @type {Record<string, unknown>} */ (state);
 
   if (!Array.isArray(s.players)) return false;
-  if (s.players.length < MIN_PLAYER_COUNT || s.players.length > MAX_PLAYER_COUNT) {
+  if (s.players.length !== 2) {
     return false;
   }
 

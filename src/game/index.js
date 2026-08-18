@@ -32,6 +32,14 @@ export {
 } from "./boardTopology.js";
 
 export {
+  V1_PLAYER_COUNT,
+  V1_OPPONENT_ID,
+  V1_HUMAN_ID,
+  normalizeV1PlayerCount,
+  isV1ResumePlayerCount,
+} from "./v1Product.js";
+
+export {
   HUMAN_INDEX,
   MIN_PLAYER_COUNT,
   MAX_PLAYER_COUNT,

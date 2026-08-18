@@ -53,6 +53,12 @@ import {
   GAMEPLAY_REF,
   PLAYED_SHORT_MAX_PX,
 } from "../ui/gameplayLayout.js";
+import {
+  formatLayoutIntegrityError,
+  inspectBoardLayoutIntegrity,
+  layoutDevDiagnosticsEnabled,
+  playedTableTiles,
+} from "./boardIntegrity.js";
 
 /** @typedef {{ id: string, left: number, right: number }} BoardTile */
 /** @typedef {{ width: number, height: number }} Viewport */
@@ -103,11 +109,14 @@ export const RUN_CEILING = 6;
  */
 export const RUN_SEARCH_CEILING = 18;
 /** Expand later-run search only for long boards that already have to shrink. */
-const PACK_EXPAND_MIN_TILES = 15;
-const PACK_EXPAND_SCALE = 0.85;
-const PACK_EXPAND_UNUSED_WIDTH = 0.22;
-/** Expand Spinner N/S wrap search when a long arm is width-bound with unused height. */
-const PACK_EXPAND_UNUSED_HEIGHT = 0.2;
+const PACK_EXPAND_MIN_TILES = 10;
+/**
+ * Leftover felt on either axis that still justifies a full first-run /
+ * later-run search before accepting a uniform shrink. 22% was too strict:
+ * 23-tile American snakes were already axis-capped with ~6–18% unused
+ * felt on the other axis, so the engine scaled instead of rerouting.
+ */
+const PACK_EXPAND_UNUSED_WIDTH = 0.06;
 const PACK_ARM_MIN_LEN = 4;
 const PACK_ARM_SCALE_GAIN = 0.02;
 const PACK_SCALE_TIE = 0.004;
@@ -148,16 +157,72 @@ function packingFittedSlack(picked, safeW, safeH) {
   };
 }
 
-function packingNeedsLaterRunSearch(played, scale, slackFracW, slackFracH) {
+/** Width-bound shrink with leftover felt height: try shorter rails / earlier folds. */
+function packingNeedsTighterRunSearch(played, scale, slackFracW, slackFracH) {
+  if (played < 6 || played > 32) return false;
+  if (!(scale < 0.99)) return false;
+  return slackFracH >= PACK_EXPAND_UNUSED_WIDTH && slackFracW + 0.02 <= slackFracH;
+}
+
+/**
+ * Opposite LEFT↑ / RIGHT↓ folds occupy both halves of a short felt and
+ * height-cap the uniform scale while width is still free. Same-direction
+ * folds let the snake sit in one half, then AABB-recenter into the table.
+ */
+function packingNeedsSameDirFoldSearch(played, scale, _slackFracW, slackFracH, maxArm = 0) {
+  if (played < 18 || played > 32) return false;
+  if (Math.max(0, maxArm) < 8) return false;
+  if (!(scale < 0.99)) return false;
+  return slackFracH <= 0.08;
+}
+
+/** Balanced arms never hit the |L-R|≥3 path; still try independent first-runs. */
+function packingNeedsBalancedFirstRunSearch(
+  played,
+  scale,
+  slackFracW,
+  slackFracH,
+  leftLen,
+  rightLen
+) {
+  if (played < 20 || played > 32) return false;
+  if (!(scale < 0.99)) return false;
+  if (Math.abs(leftLen - rightLen) >= 3) return false;
+  if (Math.max(leftLen, rightLen) < 8) return false;
+  return (
+    slackFracW >= PACK_EXPAND_UNUSED_WIDTH || slackFracH >= PACK_EXPAND_UNUSED_WIDTH
+  );
+}
+
+/**
+ * Default 5-straight packing already had to shrink. Search the full legal
+ * first-run × later-run grid before accepting that uniform scale. Do not
+ * require leftover-felt slack: a medium chain can look "tight" on a bad
+ * route and then a longer chain finds a better snake and appears to grow.
+ */
+function packingNeedsFullRunSearch(played, scale) {
   if (played < PACK_EXPAND_MIN_TILES) return false;
-  if (!(scale < PACK_EXPAND_SCALE)) return false;
-  return slackFracW >= PACK_EXPAND_UNUSED_WIDTH && slackFracH <= slackFracW + 0.02;
+  if (played > 32) return false;
+  return scale < 0.99;
+}
+
+function resolveFirstRunOverride(override, side) {
+  if (override && typeof override === "object") {
+    const n = side === "left" ? override.left : override.right;
+    if (Number.isFinite(n)) return Math.floor(n);
+  }
+  if (Number.isFinite(override)) return Math.floor(override);
+  return null;
 }
 
 function packingNeedsSpinnerArmSearch(northN, southN, scale, slackFracW, slackFracH) {
   if (Math.max(northN, southN) < PACK_ARM_MIN_LEN) return false;
-  if (!(scale < PACK_EXPAND_SCALE)) return false;
-  return slackFracH >= PACK_EXPAND_UNUSED_HEIGHT && slackFracW <= slackFracH + 0.02;
+  // Double-six four-way boards can reach ~11+11. Skip only pathological
+  // stress lengths so 500-move layout runs stay bounded.
+  if (northN + southN > 26) return false;
+  if (Math.max(northN, southN) > 14) return false;
+  if (!(scale < 0.99)) return false;
+  return slackFracH >= PACK_EXPAND_UNUSED_WIDTH && slackFracW <= slackFracH + 0.02;
 }
 
 function spinnerArmRunCandidates(minStraight, maxArm) {
@@ -187,6 +252,92 @@ function packingHasOverlap(picked) {
     }
   }
   return false;
+}
+
+function isCompletePicked(picked, mainTiles, northTiles, southTiles) {
+  if (!picked) return false;
+  return inspectBoardLayoutIntegrity(
+    picked,
+    playedTableTiles(mainTiles, northTiles, southTiles)
+  ).ok;
+}
+
+function forceAttachTile(prev, tile, size, gap, dir, branch) {
+  const travel = dir || prev?.travelDir || "E";
+  const anchor = prev || {
+    id: "__origin",
+    x: 0,
+    y: 0,
+    w: size.w,
+    h: size.h,
+    travelDir: travel,
+  };
+  const box = placeAgainst(anchor, tile, travel, size, gap, travel);
+  return {
+    ...box,
+    travelDir: travel,
+    branch,
+    isCorner: false,
+    isBridge: travel === "N" || travel === "S",
+  };
+}
+
+function fillMissingPlayedTiles(map, chain, size, gap, defaultDir, branchFor, startPrev = null) {
+  if (!chain.length) return;
+  let prev = startPrev && startPrev.id ? startPrev : null;
+  for (const tile of chain) {
+    if (map.has(tile.id)) {
+      prev = map.get(tile.id);
+      continue;
+    }
+    const branch = branchFor?.(tile) || prev?.branch || BRANCH.MAIN_RIGHT;
+    const placed = forceAttachTile(
+      prev,
+      tile,
+      size,
+      gap,
+      prev?.travelDir || defaultDir,
+      branch
+    );
+    map.set(tile.id, placed);
+    prev = placed;
+  }
+}
+
+function takeScreenTile(byId, tile, neighbor, fallback, size, scale, topology) {
+  const hit = byId.get(tile.id);
+  if (
+    hit &&
+    Number.isFinite(hit.x) &&
+    Number.isFinite(hit.y) &&
+    Number.isFinite(hit.w) &&
+    Number.isFinite(hit.h) &&
+    hit.w > 0 &&
+    hit.h > 0 &&
+    (hit.orientation === "horizontal" || hit.orientation === "vertical")
+  ) {
+    return hit;
+  }
+  const src = neighbor ? byId.get(neighbor.id) : null;
+  const w = src?.w || size.w * (scale || 1);
+  const h = src?.h || size.h * (scale || 1);
+  return {
+    tileId: tile.id,
+    valueLeft: Number(tile.left),
+    valueRight: Number(tile.right),
+    x: Number.isFinite(src?.x) ? src.x + src.w + 2 : Number(fallback?.x) || 0,
+    y: Number.isFinite(src?.y) ? src.y : Number(fallback?.y) || 0,
+    w,
+    h,
+    rotation: src?.rotation ?? 0,
+    orientation:
+      src?.orientation ||
+      (Number(tile.left) === Number(tile.right) ? "vertical" : "horizontal"),
+    zIndex: 0,
+    travelDir: src?.travelDir || "E",
+    branch: topology?.membership?.[tile.id] ?? src?.branch,
+    double: Number(tile.left) === Number(tile.right),
+  };
 }
 
 function isBetterPacking(candidate, best, laterRunDefault) {
@@ -749,7 +900,8 @@ function growArm(
   targetRunOverride = null,
   force = false,
   leoLayout = false,
-  firstRunOverride = null
+  firstRunOverride = null,
+  exitOutward = false
 ) {
   void packSize;
   let prev = start;
@@ -763,7 +915,7 @@ function growArm(
     ? Math.max(
         1,
         Math.min(
-          LEO_MAIN_STRAIGHT,
+          28,
           Number.isFinite(firstRunOverride) && firstRunOverride != null
             ? Math.floor(firstRunOverride)
             : LEO_MAIN_STRAIGHT
@@ -814,7 +966,10 @@ function growArm(
       } else if (!straight) {
         wantTurn = true;
       } else if (onVertical && vertRun >= Math.max(1, bridgeTarget)) {
-        if ([OPP[lastH], lastH, foldDir, OPP[foldDir]].some((d) => attempt(d))) {
+        const exitDirs = exitOutward
+          ? [lastH, OPP[lastH], foldDir, OPP[foldDir]]
+          : [OPP[lastH], lastH, foldDir, OPP[foldDir]];
+        if (exitDirs.some((d) => attempt(d))) {
           wantTurn = true;
         }
       } else if (!onVertical && !firstFoldDone && leoLayout && run >= minFirstRun) {
@@ -889,10 +1044,13 @@ function growArm(
       // First main-chain tiles after the spinner stay on the E/W rail.
       // TOP/BOTTOM are spinner-arm directions, never a main-chain fallback.
       const lockMainAxis = leoLayout && !firstFoldDone && !onVertical;
+      const verticalExits = exitOutward
+        ? [lastH, OPP[lastH], foldDir, OPP[foldDir], dir]
+        : [OPP[lastH], lastH, foldDir, OPP[foldDir], dir];
       const primary = lockMainAxis
         ? [dir]
         : onVertical
-          ? [OPP[lastH], lastH, foldDir, OPP[foldDir], dir]
+          ? verticalExits
           : [foldDir, OPP[foldDir], OPP[lastH], lastH, dir];
       const seen = new Set();
       for (const d of primary) {
@@ -930,7 +1088,9 @@ function growArm(
         ? [foldDir]
         : lockMainAxis
           ? [dir]
-          : [dir, foldDir, OPP[foldDir], OPP[dir], "E", "W", "N", "S"];
+          : exitOutward
+            ? [dir, lastH, OPP[lastH], foldDir, OPP[foldDir], "E", "W", "N", "S"]
+            : [dir, foldDir, OPP[foldDir], OPP[dir], "E", "W", "N", "S"];
       for (const d of order) {
         if (!isLegalStep(prev, tile, d, size)) continue;
         const box = placeAgainst(prev, tile, d, size, gap, dir);
@@ -1351,8 +1511,8 @@ function completeMissingTiles(map, tiles, centerIndex, size, gap, opts = {}) {
     let dir = startDir;
     let straight = 0;
     const foldDir = branch === "right" || branch === BRANCH.MAIN_RIGHT
-      ? FIRST_FOLD_RIGHT
-      : FIRST_FOLD_LEFT;
+      ? opts.foldRight || FIRST_FOLD_RIGHT
+      : opts.foldLeft || FIRST_FOLD_LEFT;
     for (let i = from; i !== to; i += step) {
       const tile = tiles[i];
       if (map.has(tile.id)) {
@@ -1365,8 +1525,11 @@ function completeMissingTiles(map, tiles, centerIndex, size, gap, opts = {}) {
       const firstRunCap = Math.max(
         1,
         Math.min(
-          LEO_MAIN_STRAIGHT,
-          Number.isFinite(opts.firstRun) ? Math.floor(opts.firstRun) : LEO_MAIN_STRAIGHT
+          28,
+          resolveFirstRunOverride(
+            opts.firstRun,
+            branch === "right" || branch === BRANCH.MAIN_RIGHT ? "right" : "left"
+          ) ?? LEO_MAIN_STRAIGHT
         )
       );
       const allowed = linear
@@ -1531,7 +1694,8 @@ function placeGraph(
   extraOccupied = [],
   force = false,
   spinnerLayout = false,
-  firstRunOverride = null
+  firstRunOverride = null,
+  exitOutward = false
 ) {
   const opener = tiles[centerIndex];
   const fp = footprintForTravel(opener, "E", size);
@@ -1580,7 +1744,8 @@ function placeGraph(
         targetRunOverride,
         force,
         spinnerLayout,
-        firstRunOverride
+        resolveFirstRunOverride(firstRunOverride, "right"),
+        exitOutward
       );
     const growLeft = () =>
       growArm(
@@ -1602,7 +1767,8 @@ function placeGraph(
         targetRunOverride,
         force,
         spinnerLayout,
-        firstRunOverride
+        resolveFirstRunOverride(firstRunOverride, "left"),
+        exitOutward
       );
 
     const first = swapArms ? growLeft() : growRight();
@@ -1875,6 +2041,14 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
   if (!leoLayout) {
     const map = placeLinearMainChain(tiles, size, gap, topology);
     completeMissingTiles(map, tiles, 0, size, gap, { linear: true, topology });
+    fillMissingPlayedTiles(
+      map,
+      tiles,
+      size,
+      gap,
+      "E",
+      (tile) => topology?.membership?.[tile.id]
+    );
     applyTopologyBranches(map, topology);
     const mainList = tiles.map((t) => map.get(t.id)).filter(Boolean);
     const screen = toScreen(
@@ -1890,15 +2064,27 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       hudBottom
     );
     const byId = new Map(screen.tiles.map((t) => [t.tileId, t]));
-    const orderedMain = tiles.map((t) => byId.get(t.id)).filter(Boolean);
+    const orderedMain = tiles.map((t, i) =>
+      takeScreenTile(byId, t, tiles[i - 1], screen.origin, size, screen.scale, topology)
+    );
     const screenGap = Math.max(MIN_SAFE_GAP_PX, Math.min(2, gap * screen.scale));
-    return {
+    const linearLayout = {
       ...screen,
       tiles: orderedMain,
       armTiles: [],
       scale: screen.scale,
       gap: screenGap,
     };
+    if (layoutDevDiagnosticsEnabled() && !isCompletePicked(linearLayout, tiles, [], [])) {
+      console.error(
+        formatLayoutIntegrityError(
+          inspectBoardLayoutIntegrity(linearLayout, tiles, {
+            failureReason: "linear-complete-fallback",
+          })
+        )
+      );
+    }
+    return linearLayout;
   }
 
   const openerFp = footprintForTravel(tiles[centerIndex], "E", size);
@@ -1915,7 +2101,9 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
   const safeH = Math.max(1, safeEarly.maxY - safeEarly.minY);
   const laterRunDefault = packRunLimit(usableW, size.h, gap, RUN_CEILING);
   const firstRunFloor = packFirstRunLimit(safeW, size.h, size.w, gap);
-  const maxArm = Math.max(centerIndex, tiles.length - centerIndex - 1);
+  const leftLen = Math.max(0, centerIndex);
+  const rightLen = Math.max(0, tiles.length - centerIndex - 1);
+  const maxArm = Math.max(leftLen, rightLen);
   const playedCount = tiles.length + northTiles.length + southTiles.length;
   const armStraight = packSpinnerArmLimit(safeH, size.h, size.w, gap);
   const extraOccupied = spinnerLaneOccupants(
@@ -1928,6 +2116,9 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
   const packSize = { w: baseW, h: baseH };
   const UNBOUNDED = { minX: -1e5, maxX: 1e5, minY: -1e5, maxY: 1e5 };
   let activeArmRun = 0;
+  let activeFoldRight = FIRST_FOLD_RIGHT;
+  let activeFoldLeft = FIRST_FOLD_LEFT;
+  let activeExitOutward = false;
 
   const projectPack = (map, force, packBounds = null) => {
     const armHard = packBounds || UNBOUNDED;
@@ -1965,19 +2156,45 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     }
     applyTopologyBranches(map, topology);
     completeMissingSpinnerArms(map, topology, size, gap, armStraight, activeArmRun);
+    fillMissingPlayedTiles(
+      map,
+      tiles,
+      size,
+      gap,
+      "E",
+      (tile) => topology?.membership?.[tile.id]
+    );
     const expectedArms = northTiles.length + southTiles.length;
     const mainList = tiles.map((t) => map.get(t.id)).filter(Boolean);
     if (mainList.length !== tiles.length) return null;
     let armList = [...northTiles, ...southTiles]
       .map((t) => map.get(t.id))
       .filter(Boolean);
-    if (armList.length !== expectedArms && force) {
+    if (armList.length !== expectedArms) {
       completeMissingSpinnerArms(map, topology, size, gap, armStraight, activeArmRun);
+      fillMissingPlayedTiles(
+        map,
+        northTiles,
+        size,
+        gap,
+        "N",
+        (tile) => topology?.membership?.[tile.id],
+        map.get(layoutSpinnerId)
+      );
+      fillMissingPlayedTiles(
+        map,
+        southTiles,
+        size,
+        gap,
+        "S",
+        (tile) => topology?.membership?.[tile.id],
+        map.get(layoutSpinnerId)
+      );
       armList = [...northTiles, ...southTiles]
         .map((t) => map.get(t.id))
         .filter(Boolean);
     }
-    if (armList.length !== expectedArms && !force) return null;
+    if (armList.length !== expectedArms) return null;
     const combined = [...mainList, ...armList].filter((p) => p && !isReserveId(p.id));
     const linkTiles = [...tiles];
     if (layoutSpinnerId && northTiles[0]) {
@@ -2012,7 +2229,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     const orderedArms = [...northTiles, ...southTiles]
       .map((t) => byId.get(t.id))
       .filter(Boolean);
-    if (orderedArms.length !== northTiles.length + southTiles.length && !force) {
+    if (orderedArms.length !== northTiles.length + southTiles.length) {
       return null;
     }
     let aabbClear = true;
@@ -2051,8 +2268,8 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       gap,
       UNBOUNDED,
       bridgeLen,
-      FIRST_FOLD_RIGHT,
-      FIRST_FOLD_LEFT,
+      activeFoldRight,
+      activeFoldLeft,
       false,
       UNBOUNDED,
       packSize,
@@ -2060,7 +2277,8 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       extraOccupied,
       force,
       leoLayout,
-      firstRun
+      firstRun,
+      activeExitOutward
     );
 
   const pickPacked = (map, firstRun) => {
@@ -2069,6 +2287,8 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       firstRun,
       armStraight,
       armRun: activeArmRun,
+      foldRight: activeFoldRight,
+      foldLeft: activeFoldLeft,
     });
     applyTopologyBranches(map, topology);
     let picked = projectPack(clonePlacementMap(map), false, UNBOUNDED);
@@ -2080,54 +2300,203 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
 
   const scorePicked = (picked, firstRun, laterRunLen) => {
     const slack = packingFittedSlack(picked, safeW, safeH);
+    const left = resolveFirstRunOverride(firstRun, "left");
+    const right = resolveFirstRunOverride(firstRun, "right");
+    const key = Number.isFinite(firstRun)
+      ? Math.floor(firstRun)
+      : Math.max(left || 1, right || 1);
     return {
       picked,
       scale: picked.scale,
-      firstRun,
+      firstRun: key,
+      firstRunLeft: left ?? key,
+      firstRunRight: right ?? key,
       laterRun: laterRunLen,
       armRun: activeArmRun,
+      foldRight: activeFoldRight,
+      foldLeft: activeFoldLeft,
+      exitOutward: activeExitOutward,
       turns: countTurns([...picked.tiles, ...(picked.armTiles || [])]),
       ...slack,
     };
   };
 
-  const searchPackings = (laterRuns) => {
-    let best = null;
+  const considerPacked = (packed, firstRun, laterRunLen, bridgeLen, target) => {
+    if (!packed.ok && packed.map.size !== tiles.length) return target;
+    const picked = pickPacked(packed.map, firstRun);
+    if (!isCompletePicked(picked, tiles, northTiles, southTiles)) return target;
+    if (packingHasOverlap(picked)) return target;
+    const candidate = scorePicked(picked, firstRun, laterRunLen);
+    candidate.bridgeLen = bridgeLen;
+    if (!target || isBetterPacking(candidate, target, laterRunDefault)) return candidate;
+    return target;
+  };
+
+  const searchPackings = (laterRuns, minFirstRun = firstRunFloor, maxFirstRun = LEO_MAIN_STRAIGHT) => {
+    let found = null;
+    const firstMin = Math.max(1, Number(minFirstRun) || 1);
+    const firstMax = Math.max(
+      firstMin,
+      Math.min(Math.max(1, maxArm), Math.floor(Number(maxFirstRun) || LEO_MAIN_STRAIGHT))
+    );
     for (const laterRunLen of laterRuns) {
-      for (let firstRun = LEO_MAIN_STRAIGHT; firstRun >= firstRunFloor; firstRun -= 1) {
+      for (let firstRun = firstMax; firstRun >= firstMin; firstRun -= 1) {
         for (const bridgeLen of bridgeOptions) {
           for (const force of [false, true]) {
             const packed = tryPack(force, firstRun, bridgeLen, laterRunLen);
-            if (!packed.ok && packed.map.size !== tiles.length) continue;
-            const picked = pickPacked(packed.map, firstRun);
-            if (!picked || picked.tiles.length !== tiles.length) continue;
-            if (packingHasOverlap(picked)) continue;
-            const candidate = scorePicked(picked, firstRun, laterRunLen);
-            if (isBetterPacking(candidate, best, laterRunDefault)) best = candidate;
-            break;
+            const next = considerPacked(packed, firstRun, laterRunLen, bridgeLen, found);
+            if (next !== found) {
+              found = next;
+              break;
+            }
           }
         }
       }
     }
-    return best;
+    return found;
+  };
+
+  const restoreFoldsFrom = (candidate) => {
+    if (!candidate) return;
+    activeFoldRight = candidate.foldRight || FIRST_FOLD_RIGHT;
+    activeFoldLeft = candidate.foldLeft || FIRST_FOLD_LEFT;
+    activeExitOutward = Boolean(candidate.exitOutward);
   };
 
   let best = searchPackings([laterRunDefault]);
   if (
     best &&
-    packingNeedsLaterRunSearch(
+    packingNeedsFullRunSearch(playedCount, best.scale)
+  ) {
+    const laterMax = packLaterRunSearchLimit(laterRunDefault, maxArm);
+    const laterRuns = [];
+    for (let r = 2; r <= laterMax; r += 1) laterRuns.push(r);
+    const firstMax = packLaterRunSearchLimit(LEO_MAIN_STRAIGHT, maxArm);
+    const minFirst = playedCount >= 18 ? 1 : Math.max(1, firstRunFloor);
+    const searched = searchPackings(laterRuns, minFirst, firstMax);
+    if (
+      searched &&
+      (searched.scale > best.scale ||
+        isBetterPacking(searched, best, laterRunDefault))
+    ) {
+      best = searched;
+    }
+  }
+  if (
+    best &&
+    Math.abs(leftLen - rightLen) >= 3 &&
+    packingNeedsFullRunSearch(playedCount, best.scale)
+  ) {
+    const longIsLeft = leftLen >= rightLen;
+    const longFirst = longIsLeft
+      ? best.firstRunLeft ?? best.firstRun
+      : best.firstRunRight ?? best.firstRun;
+    const shortMax = Math.max(1, longIsLeft ? rightLen : leftLen);
+    const laterRuns = [...new Set([best.laterRun, laterRunDefault, 2, 3, 4, 5, 6])]
+      .filter((r) => r >= 2)
+      .sort((a, b) => a - b);
+    for (const laterRunLen of laterRuns) {
+      for (let shortFirst = shortMax; shortFirst >= 1; shortFirst -= 1) {
+        const pair = longIsLeft
+          ? { left: longFirst, right: shortFirst }
+          : { left: shortFirst, right: longFirst };
+        for (const bridgeLen of bridgeOptions) {
+          for (const force of [false, true]) {
+            const packed = tryPack(force, pair, bridgeLen, laterRunLen);
+            const next = considerPacked(packed, pair, laterRunLen, bridgeLen, best);
+            if (next !== best) {
+              best = next;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+  if (
+    best &&
+    packingNeedsTighterRunSearch(
       playedCount,
       best.scale,
       best.slackFracW,
       best.slackFracH
     )
   ) {
-    const laterMax = packLaterRunSearchLimit(laterRunDefault, maxArm);
     const laterRuns = [];
-    for (let r = laterRunDefault; r <= laterMax; r += 1) laterRuns.push(r);
-    const expanded = searchPackings(laterRuns);
-    if (expanded) best = expanded;
+    for (let r = laterRunDefault; r >= 2; r -= 1) laterRuns.push(r);
+    const minFirst = playedCount >= 18 ? 1 : Math.max(1, firstRunFloor);
+    const tightened = searchPackings(laterRuns, minFirst);
+    if (tightened && tightened.scale > best.scale + PACK_SCALE_TIE) best = tightened;
   }
+  if (
+    best &&
+    packingNeedsSameDirFoldSearch(
+      playedCount,
+      best.scale,
+      best.slackFracW,
+      best.slackFracH,
+      maxArm
+    )
+  ) {
+    const laterMax = Math.min(8, packLaterRunSearchLimit(laterRunDefault, maxArm));
+    const laterRuns = [];
+    for (let r = 2; r <= laterMax; r += 1) laterRuns.push(r);
+    const firstMax = Math.min(8, packLaterRunSearchLimit(LEO_MAIN_STRAIGHT, maxArm));
+    const foldSpecs = [
+      { right: "S", left: "S", outward: true },
+      { right: "N", left: "N", outward: true },
+    ];
+    for (const spec of foldSpecs) {
+      activeFoldRight = spec.right;
+      activeFoldLeft = spec.left;
+      activeExitOutward = spec.outward;
+      const searched = searchPackings(laterRuns, 1, firstMax);
+      if (
+        searched &&
+        (searched.scale > best.scale ||
+          isBetterPacking(searched, best, laterRunDefault))
+      ) {
+        best = searched;
+      }
+    }
+    restoreFoldsFrom(best);
+  }
+  if (
+    best &&
+    packingNeedsBalancedFirstRunSearch(
+      playedCount,
+      best.scale,
+      best.slackFracW,
+      best.slackFracH,
+      leftLen,
+      rightLen
+    )
+  ) {
+    restoreFoldsFrom(best);
+    const leftMax = Math.max(1, Math.min(leftLen || 1, 6));
+    const rightMax = Math.max(1, Math.min(rightLen || 1, 6));
+    const laterRuns = [...new Set([best.laterRun, 4, 5, 6])]
+      .filter((r) => r >= 2)
+      .sort((a, b) => a - b);
+    for (const laterRunLen of laterRuns) {
+      for (let leftFirst = leftMax; leftFirst >= 1; leftFirst -= 1) {
+        for (let rightFirst = rightMax; rightFirst >= 1; rightFirst -= 1) {
+          if (leftFirst === rightFirst) continue;
+          const pair = { left: leftFirst, right: rightFirst };
+          for (const force of [false, true]) {
+            const packed = tryPack(force, pair, BRIDGE_LEN, laterRunLen);
+            const next = considerPacked(packed, pair, laterRunLen, BRIDGE_LEN, best);
+            if (next !== best) {
+              best = next;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  restoreFoldsFrom(best);
 
   if (
     best &&
@@ -2157,24 +2526,47 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     }
   }
 
-  let picked = best?.picked || null;
-  if (!picked || picked.tiles.length !== tiles.length) {
-    const map = new Map();
+  const materializeComplete = (sourceMap, failureReason) => {
+    const map = sourceMap ? clonePlacementMap(sourceMap) : new Map();
     completeMissingTiles(map, tiles, centerIndex, size, gap, {
       topology,
       firstRun: firstRunFloor,
       armStraight,
+      armRun: activeArmRun,
+      foldRight: activeFoldRight,
+      foldLeft: activeFoldLeft,
     });
-    picked = projectPack(map, true);
-  }
-
-  if (!picked) {
-    const fallback = new Map();
-    completeMissingTiles(fallback, tiles, centerIndex, size, gap, { topology, armStraight });
-    completeMissingSpinnerArms(fallback, topology, size, gap, armStraight);
-    const mainList = tiles.map((t) => fallback.get(t.id)).filter(Boolean);
+    completeMissingSpinnerArms(map, topology, size, gap, armStraight, activeArmRun);
+    fillMissingPlayedTiles(
+      map,
+      tiles,
+      size,
+      gap,
+      "E",
+      (tile) => topology?.membership?.[tile.id]
+    );
+    fillMissingPlayedTiles(
+      map,
+      northTiles,
+      size,
+      gap,
+      "N",
+      (tile) => topology?.membership?.[tile.id],
+      map.get(layoutSpinnerId)
+    );
+    fillMissingPlayedTiles(
+      map,
+      southTiles,
+      size,
+      gap,
+      "S",
+      (tile) => topology?.membership?.[tile.id],
+      map.get(layoutSpinnerId)
+    );
+    applyTopologyBranches(map, topology);
+    const mainList = tiles.map((t) => map.get(t.id)).filter(Boolean);
     const armList = [...northTiles, ...southTiles]
-      .map((t) => fallback.get(t.id))
+      .map((t) => map.get(t.id))
       .filter(Boolean);
     const screen = toScreen(
       [...mainList, ...armList],
@@ -2189,17 +2581,75 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       hudBottom
     );
     const byId = new Map(screen.tiles.map((t) => [t.tileId, t]));
-    return {
+    const orderedMain = tiles.map((t, i) =>
+      takeScreenTile(byId, t, tiles[i - 1], screen.origin, size, screen.scale, topology)
+    );
+    const armChain = [...northTiles, ...southTiles];
+    const orderedArms = armChain.map((t, i) =>
+      takeScreenTile(
+        byId,
+        t,
+        armChain[i - 1] || tiles[centerIndex],
+        screen.origin,
+        size,
+        screen.scale,
+        topology
+      )
+    );
+    const complete = {
       ...screen,
-      tiles: tiles.map((t) => byId.get(t.id)).filter(Boolean),
-      armTiles: [...northTiles, ...southTiles]
-        .map((t) => byId.get(t.id))
-        .filter(Boolean),
-      gap,
+      tiles: orderedMain,
+      armTiles: orderedArms,
+      scale: screen.scale,
+      gap: Math.max(MIN_SAFE_GAP_PX, Math.min(2, gap * screen.scale)),
     };
+    if (layoutDevDiagnosticsEnabled() && !isCompletePicked(complete, tiles, northTiles, southTiles)) {
+      console.error(
+        formatLayoutIntegrityError(
+          inspectBoardLayoutIntegrity(complete, playedTableTiles(tiles, northTiles, southTiles), {
+            failureReason,
+            packing: best?.picked?.packing || null,
+            routingCandidate: {
+              firstRun: best?.firstRun,
+              laterRun: best?.laterRun,
+              foldRight: best?.foldRight,
+              foldLeft: best?.foldLeft,
+            },
+          })
+        )
+      );
+    }
+    return complete;
+  };
+
+  let picked = best?.picked || null;
+  if (!isCompletePicked(picked, tiles, northTiles, southTiles)) {
+    picked = projectPack(new Map(), true);
+  }
+  if (!isCompletePicked(picked, tiles, northTiles, southTiles)) {
+    picked = materializeComplete(null, "guaranteed-complete-fallback");
   }
 
-  return picked;
+  const result = best
+    ? {
+        ...picked,
+        packing: {
+          firstRun: best.firstRun,
+          firstRunLeft: best.firstRunLeft,
+          firstRunRight: best.firstRunRight,
+          laterRun: best.laterRun,
+          foldRight: best.foldRight,
+          foldLeft: best.foldLeft,
+          bridgeLen: best.bridgeLen,
+          slackFracW: best.slackFracW,
+          slackFracH: best.slackFracH,
+        },
+      }
+    : picked;
+  if (!isCompletePicked(result, tiles, northTiles, southTiles)) {
+    return materializeComplete(null, "result-incomplete");
+  }
+  return result;
 }
 
 /* ---------- Compatibility shims for legacy layoutBoard callers ---------- */

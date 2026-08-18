@@ -226,7 +226,7 @@ export function applyPlace(match, playerIndex, tileId, end = END.RIGHT) {
  * @param {number} playerIndex
  * @returns {MatchState|null}
  */
-export function applyDraw(match, playerIndex) {
+export function applyDraw(match, playerIndex, tileId = null) {
   if (!match.reserve.length) {
     return null;
   }
@@ -236,7 +236,16 @@ export function applyDraw(match, playerIndex) {
     throw new Error(`Invalid playerIndex: ${playerIndex}`);
   }
 
-  const [drawnId, ...rest] = match.reserve;
+  let drawnId;
+  let rest;
+  if (typeof tileId === "string" && tileId) {
+    const index = match.reserve.indexOf(tileId);
+    if (index < 0) return null;
+    drawnId = match.reserve[index];
+    rest = match.reserve.filter((_, i) => i !== index);
+  } else {
+    [drawnId, ...rest] = match.reserve;
+  }
 
   const nextPlayers = match.players.map((entry, index) => {
     if (index !== playerIndex) return entry;

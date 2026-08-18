@@ -106,6 +106,15 @@
   color: var(--setup-muted);
 }
 
+.game-setup__vs {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-ui);
+  font-weight: 650;
+  font-size: clamp(0.78rem, 2.3vw, 0.88rem);
+  letter-spacing: 0.08em;
+  color: rgba(232, 197, 71, 0.92);
+}
+
 /* —— Main panel —— */
 .game-setup__panel {
   display: flex;

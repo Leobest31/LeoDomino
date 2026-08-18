@@ -24,7 +24,10 @@ export const DOMINICAN_TEAM_SEATS = Object.freeze([
  * @param {number} seat
  * @returns {number}
  */
-export function partnerSeat(seat) {
+export function partnerSeat(seat, playerCount = 4) {
+  if (Math.floor(Number(playerCount)) === 2) {
+    return Math.floor(Number(seat));
+  }
   const s = Math.floor(Number(seat));
   if (s === 0) return 1;
   if (s === 1) return 0;
@@ -38,8 +41,14 @@ export function partnerSeat(seat) {
  * @param {number} seat
  * @returns {0|1}
  */
-export function teamIdForSeat(seat) {
+export function teamIdForSeat(seat, playerCount = 4) {
+  const n = Math.floor(Number(playerCount)) || 4;
   const s = Math.floor(Number(seat));
+  if (n === 2) {
+    if (s === 0) return 0;
+    if (s === 1) return 1;
+    throw new Error(`teamIdForSeat: invalid 2-player Dominican seat ${seat}`);
+  }
   if (s === 0 || s === 1) return 0;
   if (s === 2 || s === 3) return 1;
   throw new Error(`teamIdForSeat: invalid Dominican seat ${seat}`);
@@ -56,7 +65,11 @@ export function getDominicanTeams() {
  * @param {0|1|number} teamId
  * @returns {ReadonlyArray<number>}
  */
-export function seatsOnTeam(teamId) {
+export function seatsOnTeam(teamId, playerCount = 4) {
+  if (Math.floor(Number(playerCount)) === 2) {
+    const id = teamId === 0 ? 0 : 1;
+    return Object.freeze([id]);
+  }
   const team = DOMINICAN_TEAM_SEATS[teamId];
   if (!team) throw new Error(`seatsOnTeam: invalid team ${teamId}`);
   return team;
@@ -67,8 +80,8 @@ export function seatsOnTeam(teamId) {
  * @param {0|1|number} teamId
  * @returns {number}
  */
-export function teamLeadSeat(teamId) {
-  return seatsOnTeam(teamId)[0];
+export function teamLeadSeat(teamId, playerCount = 4) {
+  return seatsOnTeam(teamId, playerCount)[0];
 }
 
 /**
@@ -92,8 +105,9 @@ export function arePartners(a, b) {
  * @returns {number}
  */
 export function teamPipTotal(teamId, players, byId) {
+  const n = Array.isArray(players) ? players.length : 4;
   let total = 0;
-  for (const seat of seatsOnTeam(teamId)) {
+  for (const seat of seatsOnTeam(teamId, n)) {
     total += handPipTotal(players[seat]?.hand ?? [], byId);
   }
   return total;

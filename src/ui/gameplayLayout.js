@@ -19,6 +19,12 @@
 export const PLAYED_PREFERRED_SCALE = 1.2;
 /** Phone-landscape only. Tablet preferred size is unchanged. */
 export const PHONE_PLAYED_SIZE_BOOST = 1.15;
+/**
+ * Phone preferred bones are computed from this safe-height ceiling (CSS px).
+ * Extra landscape felt on taller phones is used to keep this size longer,
+ * not to inflate the unscaled tile past the approved Android phone band.
+ */
+export const PHONE_PLAYED_SIZE_SAFE_H = 412;
 const PLAYED_SHORT_REF_PX = 99;
 const PLAYED_LONG_REF_PX = 186;
 const PLAYED_LONG_MAX_OF_FELT_H_REF = 0.42;
@@ -66,11 +72,27 @@ export const DOCK_PAD_PX = 4;
 /** Felt-to-hand gap after unused dock reservation is removed. */
 export const FELT_HAND_GAP_MIN_PX = 4;
 export const FELT_HAND_GAP_MAX_PX = 8;
-/** Phone American 4-player: small Rival 1 → table-frame gap. Bottom edge stays put. */
-export const AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX = 2;
-export const AMERICAN_4P_PHONE_CHROME_MIN_PX = 64;
-/** Product American (All Fives spinner). Not the legacy Classic Draw `american` id. */
-const AMERICAN_SPINNER_RULESET_ID = "allFives";
+/** 4-player phone landscape: small Rival 1 → table-frame gap. Bottom edge stays put. */
+export const FOUR_PLAYER_PHONE_CHROME_FELT_GAP_PX = 2;
+export const FOUR_PLAYER_PHONE_CHROME_MIN_PX = 64;
+/** @deprecated Same values as FOUR_PLAYER_PHONE_* — kept for existing tests. */
+export const AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX = FOUR_PLAYER_PHONE_CHROME_FELT_GAP_PX;
+export const AMERICAN_4P_PHONE_CHROME_MIN_PX = FOUR_PLAYER_PHONE_CHROME_MIN_PX;
+/**
+ * Phone-landscape height ceiling (CSS px). Covers short/wide safes after
+ * notch/home-indicator insets, without treating tablet landscape (~768+) as
+ * a phone. Aspect still qualifies very wide canvases.
+ */
+export const PHONE_LANDSCAPE_MAX_H = 480;
+export const PHONE_LANDSCAPE_MIN_AR = 2.05;
+/** Portrait occupancy: played short side as a fraction of felt width. */
+export const PLAYED_SHORT_OF_FELT_W_PORTRAIT = 0.165;
+/** One vertical bone may occupy this fraction of portrait felt height before wrap. */
+export const PLAYED_LONG_MAX_OF_FELT_H_PORTRAIT = 0.28;
+export const PORTRAIT_CHROME_MIN_PX = 88;
+export const PORTRAIT_CHROME_MAX_PX = 128;
+export const PORTRAIT_DOCK_MIN_PX = 92;
+export const PORTRAIT_DOCK_MAX_PX = 148;
 export const HAND_LONG_MIN_PX = 36;
 export const HAND_LONG_MAX_PX = 64;
 /** Player 1 unplayed tiles only — does not change dock/felt reservation. */
@@ -124,21 +146,74 @@ function clamp(n, lo, hi) {
 function occupancyLongCap(usableH, usableW) {
   const h = Math.max(1, Number(usableH) || 0);
   const w = Math.max(1, Number(usableW) || 0);
-  const short = h <= 430 || w / h >= 2.05;
-  return h * (short ? PLAYED_LONG_MAX_OF_FELT_H_SHORT : PLAYED_LONG_MAX_OF_FELT_H);
+  if (h > w) return h * PLAYED_LONG_MAX_OF_FELT_H_PORTRAIT;
+  return h * (isPhoneLandscapeBox(w, h) ? PLAYED_LONG_MAX_OF_FELT_H_SHORT : PLAYED_LONG_MAX_OF_FELT_H);
+}
+
+/** True when the safe box is taller than it is wide. */
+export function isPortraitBox(width, height) {
+  const w = Number(width) || 0;
+  const h = Number(height) || 0;
+  return h > w;
+}
+
+/** True for short/wide phone-landscape safes — never a device name. */
+export function isPhoneLandscapeBox(width, height) {
+  const w = Number(width) || 0;
+  const h = Number(height) || 0;
+  if (h < 1) return false;
+  return h <= PHONE_LANDSCAPE_MAX_H || w / h >= PHONE_LANDSCAPE_MIN_AR;
 }
 
 /**
- * Phone-landscape American 4-player only: grow felt upward under Rival 1.
- * Tablet, Classic, and 2p/3p keep the shared chrome reservation.
+ * Phone-landscape 4-player: grow felt upward under Rival 1.
+ * Tablet keeps the shared chrome reservation. Classic 2-player and 3-player
+ * phone use the same upward hug; other 2p/3p rulesets do not.
  */
-export function isAmericanFourPhoneLayout(layout, options = {}) {
+export function isFourPlayerPhoneLayout(layout, options = {}) {
   const w = Number(layout?.safeW ?? layout?.width) || 0;
   const h = Number(layout?.safeH ?? layout?.height) || 0;
   return (
     gameplayDensityClass({ safeW: w, safeH: h }) === "short" &&
-    Number(options.playerCount) === 4 &&
-    options.rulesetId === AMERICAN_SPINNER_RULESET_ID
+    Number(options.playerCount) === 4
+  );
+}
+
+/** @deprecated Use isFourPlayerPhoneLayout. */
+export function isAmericanFourPhoneLayout(layout, options = {}) {
+  return isFourPlayerPhoneLayout(layout, options);
+}
+
+/** Engine id for Classic. UI never shows this string. */
+export function isClassicRulesetId(rulesetId) {
+  return String(rulesetId || "") === "legacy";
+}
+
+/**
+ * Classic 2-player phone-landscape: same Rival 1 upward hug as 4-player
+ * phone. Derived from the short/wide safe box, never a device name.
+ */
+export function isClassicTwoPlayerPhoneLayout(layout, options = {}) {
+  const w = Number(layout?.safeW ?? layout?.width) || 0;
+  const h = Number(layout?.safeH ?? layout?.height) || 0;
+  return (
+    gameplayDensityClass({ safeW: w, safeH: h }) === "short" &&
+    Number(options.playerCount) === 2 &&
+    isClassicRulesetId(options.rulesetId)
+  );
+}
+
+/**
+ * Classic 3-player phone-landscape: same Rival 1 upward hug as Classic 2p.
+ * Tablet and other rulesets keep the shared chrome reservation.
+ */
+export function isClassicThreePlayerPhoneLayout(layout, options = {}) {
+  const w = Number(layout?.safeW ?? layout?.width) || 0;
+  const h = Number(layout?.safeH ?? layout?.height) || 0;
+  return (
+    gameplayDensityClass({ safeW: w, safeH: h }) === "short" &&
+    Number(options.playerCount) === 3 &&
+    isClassicRulesetId(options.rulesetId)
   );
 }
 
@@ -150,6 +225,7 @@ export function isAmericanFourPhoneLayout(layout, options = {}) {
 export function resolveGameplayLayout(viewport, options = {}) {
   const safeW = Math.max(160, Number(viewport?.width) || 0);
   const safeH = Math.max(160, Number(viewport?.height) || 0);
+  const portrait = isPortraitBox(safeW, safeH);
   const uiScale = clamp(
     Math.min(safeW / GAMEPLAY_REF.width, safeH / GAMEPLAY_REF.height),
     UI_SCALE_MIN,
@@ -173,12 +249,16 @@ export function resolveGameplayLayout(viewport, options = {}) {
     safeW - passWidth - matchWidth - 2 * DOCK_COL_GAP_PX
   );
   const maxHandShort = (handBudget - 6 * 6) / 7;
-  if (handShort > maxHandShort) {
+  if (!portrait && handShort > maxHandShort) {
     handShort = Math.max(18, maxHandShort);
     handLong = handShort * HAND_RATIO;
   }
   const handPip = Math.max(3, 5.5 * uiScale);
-  const playerRow = fitPlayerHandRow(handShort * PLAYER_HAND_SCALE, handBudget);
+  let playerRow = fitPlayerHandRow(handShort * PLAYER_HAND_SCALE, handBudget);
+  if (portrait) {
+    const readable = clamp(handShort * PLAYER_HAND_SCALE, 28, 40);
+    playerRow = { short: readable, gap: PLAYER_HAND_GAP_PX, overlap: 0 };
+  }
   let playerHandShort = playerRow.short;
   let playerHandLong = playerHandShort * HAND_RATIO;
   let playerHandPip = Math.max(3.2, handPip * (playerHandShort / Math.max(handShort, 1)));
@@ -187,39 +267,54 @@ export function resolveGameplayLayout(viewport, options = {}) {
 
   const dockFromHand = handLong + statusBand + DOCK_PAD_PX;
   const dockFromActions = actionHeight + DOCK_PAD_PX;
-  const dockHeight = clamp(
+  let dockHeight = clamp(
     Math.max(dockFromHand, dockFromActions),
     DOCK_MIN_PX,
     DOCK_MAX_PX
   );
   // Keep the +20% hand inside the existing dock so the felt cannot move.
-  const maxPlayerLong = Math.max(HAND_LONG_MIN_PX, dockHeight - 8);
-  if (playerHandLong > maxPlayerLong) {
-    const fit = maxPlayerLong / playerHandLong;
-    playerHandLong = maxPlayerLong;
-    playerHandShort *= fit;
-    playerHandPip = Math.max(3.2, playerHandPip * fit);
+  if (!portrait) {
+    const maxPlayerLong = Math.max(HAND_LONG_MIN_PX, dockHeight - 8);
+    if (playerHandLong > maxPlayerLong) {
+      const fit = maxPlayerLong / playerHandLong;
+      playerHandLong = maxPlayerLong;
+      playerHandShort *= fit;
+      playerHandPip = Math.max(3.2, playerHandPip * fit);
+    }
   }
 
   const scoreRowHeight = clamp(Math.round(28 * uiScale + 10), 28, 42);
   const menuGap = clamp(Math.round(GAMEPLAY_REF.regionGap * uiScale), 3, 6);
-  const americanFourPhone = isAmericanFourPhoneLayout(
-    { safeW, safeH },
-    options
-  );
-  if (americanFourPhone) {
+  const fourPlayerPhone = !portrait && isFourPlayerPhoneLayout({ safeW, safeH }, options);
+  const classicTwoPhone = !portrait && isClassicTwoPlayerPhoneLayout({ safeW, safeH }, options);
+  const classicThreePhone = !portrait && isClassicThreePlayerPhoneLayout({ safeW, safeH }, options);
+  if (fourPlayerPhone || classicTwoPhone || classicThreePhone) {
     // Hug Rival 1 / HUD content. Dock and feltDockGap stay put so the
-    // felt BOTTOM and Player 1 hand do not move.
+    // felt BOTTOM and Player 1 hand do not move. Top edge rises; bottom
+    // does not translate.
     const menuStack = headerHeight + menuGap + menuHeight;
     const rivalTray = Math.round(handLong * 0.52) + 20;
     const centerStack = headerHeight + rivalTray;
     const contentChrome = Math.max(menuStack, centerStack, scoreRowHeight);
     chromeHeight = clamp(
       Math.ceil(contentChrome),
-      AMERICAN_4P_PHONE_CHROME_MIN_PX,
+      FOUR_PLAYER_PHONE_CHROME_MIN_PX,
       chromeHeight
     );
-    chromeFeltGap = AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX;
+    chromeFeltGap = FOUR_PLAYER_PHONE_CHROME_FELT_GAP_PX;
+  }
+  if (portrait) {
+    chromeHeight = clamp(
+      Math.round(safeH * 0.155),
+      PORTRAIT_CHROME_MIN_PX,
+      PORTRAIT_CHROME_MAX_PX
+    );
+    chromeFeltGap = 4;
+    dockHeight = clamp(
+      Math.max(playerHandLong + statusBand + 12, actionHeight + 12, PORTRAIT_DOCK_MIN_PX),
+      PORTRAIT_DOCK_MIN_PX,
+      PORTRAIT_DOCK_MAX_PX
+    );
   }
 
   const feltHeight = Math.max(
@@ -232,7 +327,13 @@ export function resolveGameplayLayout(viewport, options = {}) {
   let playedLong = GAMEPLAY_REF.playedLong * heightScale;
   let playedShort = playedLong / TILE_RATIO;
   if (gameplayDensityClass({ safeW, safeH }) === "short") {
-    playedLong *= PHONE_PLAYED_SIZE_BOOST;
+    const phoneH = Math.min(safeH, PHONE_PLAYED_SIZE_SAFE_H);
+    const phoneHeightScale = clamp(
+      phoneH / GAMEPLAY_REF.height,
+      UI_SCALE_MIN,
+      UI_SCALE_MAX
+    );
+    playedLong = GAMEPLAY_REF.playedLong * phoneHeightScale * PHONE_PLAYED_SIZE_BOOST;
     playedShort = playedLong / TILE_RATIO;
   }
   const maxLongUsable = occupancyLongCap(usableBoardHeight, feltWidth);
@@ -245,7 +346,7 @@ export function resolveGameplayLayout(viewport, options = {}) {
     playedLong = maxOneTile;
     playedShort = playedLong / TILE_RATIO;
   }
-  const maxShort = feltWidth * PLAYED_SHORT_OF_FELT_W;
+  const maxShort = feltWidth * (portrait ? PLAYED_SHORT_OF_FELT_W_PORTRAIT : PLAYED_SHORT_OF_FELT_W);
   if (playedShort > maxShort) {
     playedShort = maxShort;
     playedLong = playedShort * TILE_RATIO;
@@ -305,6 +406,7 @@ export function resolveGameplayLayout(viewport, options = {}) {
     handRight: safeW - matchWidth - DOCK_COL_GAP_PX,
     handExclusion: 0,
     density: gameplayDensityClass({ safeW, safeH }),
+    orientation: portrait ? "portrait" : "landscape",
   };
 }
 
@@ -365,9 +467,8 @@ export function gameplayDensityClass(layout) {
   const w = Number(layout?.safeW) || 0;
   const h = Number(layout?.safeH) || 0;
   if (h < 1) return "standard";
-  const ar = w / h;
-  if (h <= 430 || ar >= 2.05) return "short";
-  if (ar < 1.45) return "square";
+  if (isPhoneLandscapeBox(w, h)) return "short";
+  if (w / h < 1.45) return "square";
   return "standard";
 }
 
@@ -379,7 +480,9 @@ export function capPlayedShortPx(stage) {
   const usableH = Math.max(120, h - hudBottom);
   const occupancyCap = occupancyLongCap(usableH, w) / TILE_RATIO;
   const maxOneTile = (usableH * 0.92) / TILE_RATIO;
-  const maxFromW = w * PLAYED_SHORT_OF_FELT_W;
+  const maxFromW = isPortraitBox(w, h)
+    ? w * PLAYED_SHORT_OF_FELT_W_PORTRAIT
+    : w * PLAYED_SHORT_OF_FELT_W;
   return Math.max(
     PLAYED_SHORT_MIN_PX,
     Math.min(PLAYED_SHORT_MAX_PX, occupancyCap, maxOneTile, maxFromW)
@@ -442,5 +545,29 @@ export function measureSafeGameplayBox(element) {
   return {
     width: Math.max(160, (element.clientWidth || 0) - pl - pr),
     height: Math.max(160, (element.clientHeight || 0) - pt - pb),
+  };
+}
+
+/**
+ * Usable gameplay box inside the environment viewport after CSS safe-area
+ * insets. No extra application gutters — the composition then fills this box.
+ *
+ * @param {{ width: number, height: number }} viewport
+ * @param {{ top?: number, right?: number, bottom?: number, left?: number }} [insets]
+ */
+export function usableGameplayViewport(viewport, insets = {}) {
+  const width = Math.max(0, Number(viewport?.width) || 0);
+  const height = Math.max(0, Number(viewport?.height) || 0);
+  const top = Math.max(0, Number(insets.top) || 0);
+  const right = Math.max(0, Number(insets.right) || 0);
+  const bottom = Math.max(0, Number(insets.bottom) || 0);
+  const left = Math.max(0, Number(insets.left) || 0);
+  return {
+    width: Math.max(0, width - left - right),
+    height: Math.max(0, height - top - bottom),
+    top,
+    right,
+    bottom,
+    left,
   };
 }

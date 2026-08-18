@@ -3,6 +3,12 @@ import { useI18n } from "../i18n";
 import { useAudio } from "../audio";
 import { IconHome } from "../components/Icon";
 import {
+  AI_DIFFICULTY_STORAGE_KEY,
+  DEFAULT_DIFFICULTY,
+  normalizeDifficulty,
+} from "../game/ai/difficulties.js";
+import { V1_PLAYER_COUNT } from "../game/v1Product.js";
+import {
   DEFAULT_GAME_STYLE_ID,
   DEFAULT_RULESET_ID,
   RULESET_STORAGE_KEY,
@@ -19,9 +25,11 @@ import "./GameStylePage.css";
 const GAME_STYLES = listAvailableGameStyles();
 
 /**
- * Dedicated Game Style picker — preference only; does not start a match.
+ * Game Style picker for Play vs LeoBest.
+ * Select a style, then PLAY to start Human vs LeoBest.
+ * No player-count selector — V1 is permanently 1v1.
  */
-function GameStylePage({ onBack, onMainMenu }) {
+function GameStylePage({ onBack, onMainMenu, onPlay }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
   const [selectedId, setSelectedId] = useState(() =>
@@ -34,14 +42,31 @@ function GameStylePage({ onBack, onMainMenu }) {
     fn?.();
   };
 
-  const persistAndReturn = (styleId) => {
+  const persistStyle = (styleId) => {
     const id = normalizeGameStyleId(styleId);
     const rulesetId = normalizeRulesetId(
       gameStyleToRulesetId(id) ?? DEFAULT_RULESET_ID
     );
     writeStorage(RULESET_STORAGE_KEY, rulesetId);
     setSelectedId(id);
-    onBack?.();
+    return rulesetId;
+  };
+
+  const handleSelect = (styleId) => {
+    tap(() => persistStyle(styleId));
+  };
+
+  const handlePlay = () => {
+    tap(() => {
+      const rulesetId = persistStyle(selectedId);
+      onPlay?.({
+        playerCount: V1_PLAYER_COUNT,
+        difficulty: normalizeDifficulty(
+          readStorage(AI_DIFFICULTY_STORAGE_KEY, DEFAULT_DIFFICULTY)
+        ),
+        rulesetId,
+      });
+    });
   };
 
   const handleBack = () => {
@@ -51,6 +76,9 @@ function GameStylePage({ onBack, onMainMenu }) {
   const handleMainMenu = () => {
     tap(() => onMainMenu?.());
   };
+
+  const selectedStyle = GAME_STYLES.find((style) => style.id === selectedId);
+  const playReady = Boolean(selectedStyle) && selectedStyle.enabled !== false && selectedStyle.available;
 
   return (
     <main className="game-style" aria-label={t("setup.gameStyle.screenAria")}>
@@ -82,6 +110,8 @@ function GameStylePage({ onBack, onMainMenu }) {
           </button>
         </header>
 
+        <p className="game-style__hint">{t("setup.gameStyle.chooseThenPlay")}</p>
+
         <section
           className="game-style__panel"
           role="listbox"
@@ -109,7 +139,7 @@ function GameStylePage({ onBack, onMainMenu }) {
                 disabled={disabled}
                 onClick={() => {
                   if (disabled) return;
-                  tap(() => persistAndReturn(style.id));
+                  handleSelect(style.id);
                 }}
               >
                 <div className="game-style__card-main">
@@ -141,6 +171,19 @@ function GameStylePage({ onBack, onMainMenu }) {
             );
           })}
         </section>
+      </div>
+
+      <div className="game-style__playbar">
+        <button
+          type="button"
+          className="game-style__play"
+          data-game-style-play="true"
+          onClick={handlePlay}
+          disabled={!playReady}
+          aria-disabled={!playReady}
+        >
+          {t("game.play")}
+        </button>
       </div>
     </main>
   );

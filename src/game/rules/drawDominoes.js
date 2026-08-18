@@ -619,7 +619,7 @@ export function playTile(state, tileId, end = END.RIGHT) {
  * @param {GameState} state
  * @returns {GameState}
  */
-export function drawTile(state) {
+export function drawTile(state, tileId = null) {
   if (state.phase !== PHASE.PLAYING) {
     throw new Error("Cannot draw: round is not active");
   }
@@ -629,7 +629,7 @@ export function drawTile(state) {
     throw new Error("Draw is not allowed now");
   }
 
-  const drawn = applyDraw(state, state.currentPlayer);
+  const drawn = applyDraw(state, state.currentPlayer, tileId);
   if (!drawn) {
     throw new Error("Reserve is empty");
   }

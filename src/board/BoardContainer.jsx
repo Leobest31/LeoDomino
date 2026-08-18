@@ -18,6 +18,12 @@ import {
 } from "../game/boardTopology.js";
 import { displayGlowHalves, mergeScoreHighlights } from "./scoreGlow.js";
 import { measureHandExclusionPx } from "./handExclusion.js";
+import {
+  formatLayoutIntegrityError,
+  inspectBoardLayoutIntegrity,
+  layoutDevDiagnosticsEnabled,
+  playedTableTiles,
+} from "./boardIntegrity.js";
 import "./BoardContainer.css";
 
 /**
@@ -182,8 +188,12 @@ function BoardContainer({
     // the green table. Pass 0 (not null) so the engine does not revive the
     // legacy right-rail estimate.
     const preferred = build(0);
-    const resolved =
-      preferred.tiles.length > 0 ? preferred : build(null);
+    const played = playedTableTiles(tiles, spinnerNorth, spinnerSouth);
+    const preferredReport = inspectBoardLayoutIntegrity(preferred, played);
+    if (!preferredReport.ok && layoutDevDiagnosticsEnabled()) {
+      console.error(formatLayoutIntegrityError(preferredReport));
+    }
+    const resolved = preferredReport.ok || preferred.tiles.length > 0 ? preferred : build(null);
 
     return resolved;
   }, [tiles, centerIndex, area, tileSize, newestId, spinnerId, spinnerNorth, spinnerSouth, handExclusionPx]);
@@ -353,8 +363,30 @@ function BoardContainer({
           }}
         >
           {[...displays, ...armDisplays].map((entry) => {
-            if (!entry?.pos || !entry.display) return null;
-            const { tile, pos, display } = entry;
+            const tile = entry?.tile;
+            if (!tile?.id) return null;
+            let pos = entry?.pos;
+            let display = entry?.display;
+            if (!pos || !display) {
+              if (layoutDevDiagnosticsEnabled()) {
+                console.error(
+                  `[LeoDomino] Renderer refused to drop tile ${tile.id}: missing ${!pos ? "position" : "display"}`
+                );
+              }
+              pos = pos || {
+                id: tile.id,
+                x: 0,
+                y: 0,
+                w: paintW,
+                h: paintH,
+                orientation: Number(tile.left) === Number(tile.right) ? "vertical" : "horizontal",
+              };
+              display = display || {
+                left: Number(tile.left),
+                right: Number(tile.right),
+                orientation: pos.orientation,
+              };
+            }
             const glow = scoreGlowById.get(tile.id);
             const halves = glow
               ? displayGlowHalves(display, glow.scoringSides)

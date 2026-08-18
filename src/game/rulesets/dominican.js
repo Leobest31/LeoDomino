@@ -30,7 +30,7 @@ export { DOMINICAN_MATCH_TARGET, DOMINICAN_OPENING_TILE_ID };
 
 /**
  * Frozen config + policies for Dominican Standard V1.
- * Exactly 4 players; opposite-seat partnerships; no boneyard draws.
+ * V1 product: 2-player drawless (14 each). 4-hand partnership remains in-engine.
  */
 export const dominicanRuleset = Object.freeze({
   id: DOMINICAN_RULESET_ID,
@@ -44,21 +44,21 @@ export const dominicanRuleset = Object.freeze({
   deckType: "double-six",
   pipMax: PIP_MAX,
   tileCount: TILE_COUNT,
-  handSize: HAND_SIZE,
 
   // —— Seats ——
   playerCount: Object.freeze({
-    min: 4,
+    min: 2,
     max: 4,
-    default: 4,
+    default: 2,
   }),
-  /** Dominican Standard is 4-hand partnership only. */
-  supportedPlayerCounts: Object.freeze([4]),
-  /** Physically opposite partners: 0↔1 and 2↔3 (see dominicanTeams.js). */
+  /**
+   * V1 product is 1v1. 4-hand partnership remains for engine tests / a future
+   * table. 2-player maps drawless deal to 14 each (full double-six, no boneyard).
+   */
+  supportedPlayerCounts: Object.freeze([2, 4]),
   partnerships: "oppositeSeats",
   teams: getDominicanTeams(),
-
-  // —— Opening ——
+  handSize: (playerCount) => (Number(playerCount) === 2 ? 14 : HAND_SIZE),
   /** Round 1: seat holding 6-6 must open with it. */
   round1Starter: "doubleSix",
   forceOpeningTile: true,

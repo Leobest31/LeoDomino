@@ -34,6 +34,7 @@ import {
   isKnownRulesetId,
   isPlayerCountSupported,
   listAvailableGameStyles,
+  resolveHandSize,
   nextPlayerIndex,
   partnerSeat,
   passTurn,
@@ -129,7 +130,9 @@ function playingState({
   assert.equal(dominican.id, DOMINICAN_RULESET_ID);
   assert.equal(dominican.deckType, "double-six");
   assert.equal(dominican.tileCount, 28);
-  assert.equal(dominican.handSize, 7);
+  assert.equal(typeof dominican.handSize, "function");
+  assert.equal(resolveHandSize(dominican, 4), 7);
+  assert.equal(resolveHandSize(dominican, 2), 14);
   assert.equal(dominican.defaultTargetScore, 100);
   assert.equal(dominican.defaultTargetScore, DOMINICAN_MATCH_TARGET);
   assert.equal(dominican.drawPolicy, "none");
@@ -141,9 +144,9 @@ function playingState({
   assert.equal(dominican.capicua?.enabled, false);
   assert.equal(dominican.capicua?.awardBonus, false);
   assert.equal(isCapicua(), false);
-  assert.deepEqual(dominican.supportedPlayerCounts, [4]);
+  assert.deepEqual(dominican.supportedPlayerCounts, [2, 4]);
   assert.equal(isPlayerCountSupported(dominican, 4), true);
-  assert.equal(isPlayerCountSupported(dominican, 2), false);
+  assert.equal(isPlayerCountSupported(dominican, 2), true);
   assert.equal(isPlayerCountSupported(dominican, 3), false);
 
   const styles = listAvailableGameStyles();
@@ -154,9 +157,9 @@ function playingState({
   assert.ok(gameStyleFlagDataUrl(style).startsWith("data:image/svg+xml"));
   assert.equal(gameStyleFlagEmoji(style), "🇩🇴");
   assert.equal(isGameStyleCompatibleWithPlayerCount("dominican", 4), true);
-  assert.equal(isGameStyleCompatibleWithPlayerCount("dominican", 2), false);
+  assert.equal(isGameStyleCompatibleWithPlayerCount("dominican", 2), true);
   assert.equal(isGameStyleCompatibleWithPlayerCount("dominican", 3), false);
-  section("Dominican registration + 4p-only + DO flag");
+  section("Dominican registration + V1 2p + 4p partnership engine + DO flag");
 }
 
 // --- Deal / reserve empty / no-draw / pass ---
@@ -177,16 +180,6 @@ function playingState({
   assert.throws(
     () =>
       startMatch({
-        seed: 2,
-        playerCount: 2,
-        playerIds: ["a", "b"],
-        rulesetId: "dominican",
-      }),
-    /does not support 2-player/
-  );
-  assert.throws(
-    () =>
-      startMatch({
         seed: 3,
         playerCount: 3,
         playerIds: ["a", "b", "c"],
@@ -194,7 +187,17 @@ function playingState({
       }),
     /does not support 3-player/
   );
-  section("4p deal 7 each, reserve empty, no-draw; 2p/3p rejected");
+  const two = startMatch({
+    seed: 2,
+    playerCount: 2,
+    playerIds: ["you", "leoBest"],
+    rulesetId: "dominican",
+  });
+  assert.equal(two.players.length, 2);
+  assert.equal(two.players.every((p) => p.hand.length === 14), true);
+  assert.equal(two.reserve.length, 0);
+  assert.equal(getAvailableActions(two).canDraw, false);
+  section("4p deal 7 each; 2p deal 14 each, reserve empty, no-draw; 3p rejected");
 }
 
 // --- Opening 6-6 ---
@@ -500,16 +503,27 @@ function playingState({
 
 // --- Persistence ---
 {
-  const state = dominicanMatch({ seed: 4242 });
+  const state = startMatch({
+    seed: 4242,
+    playerCount: 2,
+    playerIds: ["you", "leoBest"],
+    rulesetId: "dominican",
+  });
   assert.equal(state.rulesetId, "dominican");
-  const withScores = { ...state, scores: [30, 30, 12, 12] };
+  const withScores = { ...state, scores: [30, 12] };
   assert.equal(
     isValidSavedMatch({ version: MATCH_SAVE_VERSION, state: withScores }),
     true
   );
   assert.equal(normalizeSaveRuleset(withScores).rulesetId, "dominican");
-  assert.deepEqual(normalizeSaveRuleset(withScores).scores, [30, 30, 12, 12]);
-  section("Persistence: dominican rulesetId + mirrored team scores");
+  assert.deepEqual(normalizeSaveRuleset(withScores).scores, [30, 12]);
+  const four = dominicanMatch({ seed: 4242 });
+  assert.equal(
+    isValidSavedMatch({ version: MATCH_SAVE_VERSION, state: four }),
+    false,
+    "V1 does not resume 4-hand Dominican tables"
+  );
+  section("Persistence: dominican 1v1 rulesetId + scores; 4p saves reset");
 }
 
 // --- CCW turn order unchanged ---

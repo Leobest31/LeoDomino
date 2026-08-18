@@ -12,10 +12,8 @@ import {
   setupDifficultyLabelKey,
   toSetupDifficulty,
 } from "../game/ai/setupDifficulties.js";
-import {
-  PLAYER_COUNT_STORAGE_KEY,
-  normalizePlayerCount,
-} from "../game/players.js";
+import { V1_PLAYER_COUNT } from "../game/v1Product.js";
+import { PLAYER_COUNT_STORAGE_KEY } from "../game/players.js";
 import {
   DEFAULT_GAME_STYLE_ID,
   DEFAULT_RULESET_ID,
@@ -33,8 +31,6 @@ import { LEGAL_URLS } from "../legal/urls.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import "./GameSetupPage.css";
 
-const PLAYER_COUNTS = Object.freeze([2, 3, 4]);
-
 /** Shorter native labels for the setup language row (codes unchanged). */
 const SETUP_LOCALE_LABEL = Object.freeze({
   ht: "Kreyòl",
@@ -45,16 +41,13 @@ const SETUP_LOCALE_LABEL = Object.freeze({
 });
 
 /**
- * Pre-game configuration — language, seats, sound, AI.
- * Table composition is always 1 human + (N−1) AI.
+ * Pre-game configuration — language, style, sound, AI.
+ * V1 table is always 1 human vs LeoBest.
  */
 function GameSetupPage({ onPlay, onResume, onOpenGameStyle }) {
   const { t, locale, setLocale, locales } = useI18n();
   const { muted, setMuted, play, unlock } = useAudio();
 
-  const [playerCount, setPlayerCountState] = useState(() =>
-    normalizePlayerCount(readStorage(PLAYER_COUNT_STORAGE_KEY, 2))
-  );
   const [difficulty, setDifficulty] = useState(() =>
     toSetupDifficulty(readStorage(AI_DIFFICULTY_STORAGE_KEY, DEFAULT_DIFFICULTY))
   );
@@ -69,13 +62,8 @@ function GameSetupPage({ onPlay, onResume, onOpenGameStyle }) {
   const selectedStyleFlag = gameStyleFlagEmoji(selectedStyle);
   const styleCompatible = isGameStyleCompatibleWithPlayerCount(
     gameStyleId,
-    playerCount
+    V1_PLAYER_COUNT
   );
-
-  const setPlayerCount = (count) => {
-    // Never silently rewrite the selected game style when seats change.
-    setPlayerCountState(normalizePlayerCount(count));
-  };
 
   const tap = (fn) => {
     unlock();
@@ -86,7 +74,7 @@ function GameSetupPage({ onPlay, onResume, onOpenGameStyle }) {
   const handlePlay = () => {
     if (!styleCompatible) return;
     tap(() => {
-      const count = normalizePlayerCount(playerCount);
+      const count = V1_PLAYER_COUNT;
       const level = normalizeDifficulty(difficulty);
       const styleId = normalizeGameStyleId(gameStyleId);
       if (!isGameStyleCompatibleWithPlayerCount(styleId, count)) return;
@@ -131,6 +119,7 @@ function GameSetupPage({ onPlay, onResume, onOpenGameStyle }) {
           />
           <p className="game-setup__brand-name">{t("common.brand")}</p>
           <h1 className="game-setup__title">{t("setup.title")}</h1>
+          <p className="game-setup__vs">{t("setup.vsLeoBest")}</p>
         </header>
 
         <section className="game-setup__panel" aria-label={t("setup.title")}>
@@ -152,30 +141,6 @@ function GameSetupPage({ onPlay, onResume, onOpenGameStyle }) {
                     onClick={() => tap(() => setLocale(entry.code))}
                   >
                     {SETUP_LOCALE_LABEL[entry.code] ?? entry.nativeName}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          <fieldset className="game-setup__field">
-            <legend className="game-setup__legend">{t("game.playerCount")}</legend>
-            <div
-              className="game-setup__segment game-setup__segment--thirds"
-              role="group"
-              aria-label={t("game.playerCountAria")}
-            >
-              {PLAYER_COUNTS.map((count) => {
-                const selected = count === playerCount;
-                return (
-                  <button
-                    key={count}
-                    type="button"
-                    className={`game-setup__chip${selected ? " game-setup__chip--on" : ""}`}
-                    aria-pressed={selected}
-                    onClick={() => tap(() => setPlayerCount(count))}
-                  >
-                    {t("game.playersN", { n: count })}
                   </button>
                 );
               })}
@@ -213,7 +178,7 @@ function GameSetupPage({ onPlay, onResume, onOpenGameStyle }) {
             {!styleCompatible ? (
               <p className="game-setup__style-warn" role="status">
                 {t("setup.gameStyle.unsupportedPlayerCount", {
-                  n: playerCount,
+                  n: V1_PLAYER_COUNT,
                   style: selectedStyle
                     ? t(selectedStyle.nameKey)
                     : t("setup.gameStyle.classic"),

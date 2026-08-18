@@ -36,7 +36,10 @@ export function choosePuertoRicanBlockedStarter({
   players,
   byId,
 }) {
-  const seats = puertoRicanSeatsOnTeam(winningTeamId);
+  const seats = puertoRicanSeatsOnTeam(
+    winningTeamId,
+    Array.isArray(players) ? players.length : 4
+  );
   let bestSeat = seats[0];
   let bestPips = Infinity;
   for (const seat of seats) {

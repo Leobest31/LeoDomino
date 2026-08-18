@@ -74,3 +74,10 @@ export {
   validateBoardPresentation,
   reportBoardPresentation,
 } from "./connectionDisplay.js";
+export {
+  playedTableTiles,
+  layoutRenderedBoxes,
+  inspectBoardLayoutIntegrity,
+  formatLayoutIntegrityError,
+  assertBoardLayoutIntegrity,
+} from "./boardIntegrity.js";

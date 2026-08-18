@@ -78,6 +78,8 @@ const opponent = read("../components/OpponentPanel.jsx");
   assert.match(opponent, /faceDown/);
   assert.match(opponent, /real tile id, which the UI must never learn/);
   assert.doesNotMatch(gamePage, /Board tiles stay visible always/);
+  assert.match(gamePage, /if \(!launched\) showTile\(tileId\)/);
+  assert.match(gamePage, /toFallbackSelector: attachId/);
   section("AI/opponent play flies from seat origin to the real board slot");
 }
 

@@ -35,3 +35,10 @@ export {
   applyTileSkin,
   vibrate,
 } from "./prefs.js";
+
+export {
+  HOME_PROFILE_KEY,
+  DEFAULT_HOME_PROFILE,
+  loadHomeProfile,
+  saveHomeProfile,
+} from "./homeProfile.js";

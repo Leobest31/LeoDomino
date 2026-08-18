@@ -6,14 +6,13 @@ import OpponentPanel from "../components/OpponentPanel";
 import GameTable from "../components/GameTable";
 import PlayerPanel from "../components/PlayerPanel";
 import Reserve from "../components/Reserve";
+import ReservePicker from "../components/ReservePicker";
 import ScoreBoard from "../components/ScoreBoard";
 import BottomBar from "../components/BottomBar";
 import FlyingDomino from "../components/FlyingDomino";
 import DragGhost from "../components/DragGhost";
 import GameBanner from "../components/GameBanner";
 import MatchOverModal from "../components/MatchOverModal";
-import LandscapePrompt from "../components/LandscapePrompt";
-import { shouldPromptLandscape } from "../ui/gameplayOrientation.js";
 import {
   applyGameplayLayoutVars,
   gameplayDensityClass,
@@ -40,7 +39,7 @@ import {
   resolveDestinationOutward,
   DESTINATION_TAP_SLOP_PX,
 } from "../game/destinationTarget.js";
-import { MOTION, wait } from "../utils/motion.js";
+import { MOTION } from "../utils/motion.js";
 import {
   hudScoresDuringHold,
   shouldShowPlayScorePopup,
@@ -54,9 +53,8 @@ import {
 } from "../game/rules/allFivesRoundSummary.js";
 import "./GamePage.css";
 
-function seatDisplayName(t, seatOrder, opponentCount) {
-  if (opponentCount <= 1) return t("game.rival");
-  return t("game.aiSeat", { n: seatOrder + 1 });
+function seatDisplayName(t) {
+  return t("game.leoBest");
 }
 
 function collectDestinationTargets(legalEnds, layout) {
@@ -82,35 +80,6 @@ function allTableTiles(board, north = [], south = []) {
   return [...board, ...north, ...south];
 }
 
-function useLandscapePrompt() {
-  const [prompt, setPrompt] = useState(false);
-
-  useEffect(() => {
-    const read = () => {
-      setPrompt(
-        shouldPromptLandscape({
-          width: window.innerWidth,
-          height: window.innerHeight,
-          coarsePointer: window.matchMedia("(pointer: coarse)").matches,
-        })
-      );
-    };
-    read();
-    const portrait = window.matchMedia("(orientation: portrait)");
-    const coarse = window.matchMedia("(pointer: coarse)");
-    portrait.addEventListener("change", read);
-    coarse.addEventListener("change", read);
-    window.addEventListener("resize", read);
-    return () => {
-      portrait.removeEventListener("change", read);
-      coarse.removeEventListener("change", read);
-      window.removeEventListener("resize", read);
-    };
-  }, []);
-
-  return prompt;
-}
-
 function useGameplayLayout(layoutOptions = {}) {
   const pageRef = useRef(null);
   const playerCount = Number(layoutOptions.playerCount) || 0;
@@ -128,6 +97,7 @@ function useGameplayLayout(layoutOptions = {}) {
       applyGameplayLayoutVars(el, layout);
       el.dataset.layoutDensity = gameplayDensityClass(layout);
       el.dataset.ruleset = rulesetId;
+      el.dataset.orientation = layout.orientation || "";
     };
 
     apply();
@@ -173,8 +143,6 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     lastPlayScoreTerminals,
     humanHand,
     thinkingSeat,
-    playerCount,
-    setPlayerCount,
     matchDurationSeconds,
     selectTile,
     clearSelection,
@@ -187,7 +155,6 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     HUMAN_INDEX,
   } = useMatch(matchOptions ?? {});
 
-  const rotatePrompt = useLandscapePrompt();
   const pageRef = useGameplayLayout({
     playerCount: state.players.length,
     rulesetId: state.rulesetId,
@@ -219,7 +186,6 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const dragRef = useRef(null);
   const drawingRef = useRef(false);
   const skipClickRef = useRef(false);
-  const autoDrawKeyRef = useRef("");
   hiddenIdsRef.current = hiddenIds;
   dragRef.current = drag;
 
@@ -628,75 +594,18 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     );
   };
 
-  const runDrawSequence = useCallback(async () => {
-    if (drawingRef.current) return;
-    drawingRef.current = true;
-    setMotionLock(true);
-
-    try {
-      while (getAvailableActions(stateRef.current).canDraw) {
-        const snap = stateRef.current;
-        const drawnId = snap.reserve[0];
-        if (!drawnId) break;
-        const tile = snap.byId[drawnId];
-
-        play("draw");
-        await runFlight({
-          tileId: drawnId,
-          left: tile.a,
-          right: tile.b,
-          faceDown: true,
-          fromSelector: '[data-reserve-top="true"]',
-          toSelector: `[data-tile-id="${drawnId}"]`,
-          startOrientation: "vertical",
-          endOrientation: "vertical",
-          durationMs: MOTION.drawFlightMs,
-          arcLiftPx: MOTION.drawArcLiftPx,
-          apply: () => {
-            commitDraw();
-          },
-        });
-
-        await wait(40);
-
-        const after = stateRef.current;
-        const legalMoves = getAvailableActions(after).legalMoves;
-        const ends = legalEndsForTile(legalMoves, drawnId);
-
-        // Tabletop rule: a drawn tile always lands in the hand and waits for
-        // the player — it is never auto-played, even when only one end is
-        // legal. When it's playable on more than one destination, pre-select
-        // it so the player can drag to the chosen chain endpoint.
-        if (ends.length > 0) {
-          if (ends.length > 1) {
-            selectTile(drawnId);
-          }
-          play("pickup");
-          break;
-        }
-      }
-    } finally {
-      drawingRef.current = false;
-      setMotionLock(false);
-    }
-  }, [commitDraw, play, runFlight, selectTile, setMotionLock, stateRef]);
-
-  // Auto-start sequential draw when the human begins a turn with no legal play.
-  useEffect(() => {
-    if (!isHumanTurn || !actions.canDraw || drag) return;
-    const key = `${state.round}:${state.board.map((tile) => tile.id).join(",")}:${state.reserve.length}`;
-    if (autoDrawKeyRef.current === key) return;
-    autoDrawKeyRef.current = key;
-    void runDrawSequence();
-  }, [
-    actions.canDraw,
-    drag,
-    isHumanTurn,
-    runDrawSequence,
-    state.board,
-    state.round,
-    state.reserve.length,
-  ]);
+  const handleReservePick = useCallback(
+    (tileId) => {
+      if (!isHumanTurn || drawingRef.current) return;
+      const snap = stateRef.current;
+      if (!getAvailableActions(snap).canDraw) return;
+      if (!snap.reserve.includes(tileId)) return;
+      play("draw");
+      commitDraw(tileId);
+      play("pickup");
+    },
+    [commitDraw, isHumanTurn, play, stateRef]
+  );
 
   // AI / opponent board additions — fly from that seat's hand area to the
   // exact laid-out destination. Face is revealed only on this played flight;
@@ -726,8 +635,11 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     prevHandCountsRef.current = nextCounts;
 
     const tileId = added[added.length - 1];
-    // Human plays already animate via placeTileOnBoard — skip duplicate flight.
-    if (hiddenIdsRef.current.has(tileId)) {
+    const fromSeat = nextCounts.findIndex(
+      (count, index) => index !== HUMAN_INDEX && count < (prevCounts[index] ?? count)
+    );
+    // Human plays already animate via placeTileOnBoard.
+    if (fromSeat < 0) {
       return undefined;
     }
 
@@ -737,16 +649,24 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       spinnerSouth.find((tile) => tile.id === tileId);
     if (!placed) return undefined;
 
-    const fromSeat = nextCounts.findIndex(
-      (count, index) => index !== HUMAN_INDEX && count < (prevCounts[index] ?? count)
-    );
-    const fromSelector =
-      fromSeat >= 0
-        ? `[data-opponent-origin][data-seat-index="${fromSeat}"]`
-        : "[data-opponent-origin]";
+    const fromSelector = `[data-opponent-origin][data-seat-index="${fromSeat}"]`;
+    const attachId =
+      destinationTileId(placed.destination || placed.branch, {
+        board: state.board,
+        spinnerId: state.spinnerId,
+        spinnerNorth,
+        spinnerSouth,
+      }) ||
+      (state.board[0]?.id === tileId
+        ? state.board[1]?.id
+        : state.board[state.board.length - 1]?.id === tileId
+          ? state.board[state.board.length - 2]?.id
+          : state.spinnerId);
 
     hideTile(tileId);
+    let launched = false;
     const timer = window.setTimeout(() => {
+      launched = true;
       setMotionLock(true);
       runFlight({
         tileId,
@@ -755,6 +675,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
         faceDown: false,
         fromSelector,
         toSelector: `[data-board-tile="${tileId}"]`,
+        toFallbackSelector: attachId ? `[data-board-tile="${attachId}"]` : undefined,
         startOrientation: "vertical",
         endOrientation: placed.orientation || "horizontal",
         durationMs: MOTION.tileFlightMs,
@@ -771,8 +692,13 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       });
     }, 0);
 
-    return () => window.clearTimeout(timer);
-  }, [boardSignature, handCountsSignature, HUMAN_INDEX, hideTile, play, runFlight, setMotionLock, showTile, spinnerNorth, spinnerSouth, state.board, state.players]);
+    return () => {
+      window.clearTimeout(timer);
+      // React Strict Mode re-runs this effect in DEV. If the flight never
+      // launched, the played tile must not stay hidden.
+      if (!launched) showTile(tileId);
+    };
+  }, [boardSignature, handCountsSignature, HUMAN_INDEX, hideTile, play, runFlight, setMotionLock, showTile, spinnerNorth, spinnerSouth, state.board, state.players, state.spinnerId]);
 
   // Keep an in-flight board tile hidden until the hand-to-slot animation lands.
   useEffect(() => {
@@ -880,11 +806,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       else vibrate(30);
       const winnerName = humanWon
         ? t("game.you")
-        : seatDisplayName(
-            t,
-            Math.max(0, winnerIndex - 1),
-            Math.max(1, state.players.length - 1)
-          );
+        : seatDisplayName(t);
       const pointsLabel =
         state.roundResult.reason === ROUND_END_REASON.DEKABES
           ? t("rules.dekabesAwarded", { points: state.roundResult.points })
@@ -919,7 +841,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const humanWonMatch = state.matchWinner === HUMAN_INDEX;
   const playerNames = state.players.map((_, index) => {
     if (index === HUMAN_INDEX) return t("game.you");
-    return seatDisplayName(t, index - 1, state.players.length - 1);
+    return seatDisplayName(t);
   });
   const displayScores = summaryView
     ? hudScoresDuringRoundSummary({
@@ -949,14 +871,14 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const opponentSeats = state.players
     .map((player, index) => ({ player, index }))
     .filter(({ index }) => index !== HUMAN_INDEX)
-    .map(({ player, index }, seatOrder, seats) => {
+    .map(({ player, index }) => {
       const position = opponentFeltPosition(index, state.players.length) ?? "top";
       const thinking = thinkingSeat === index;
       const isTurn = state.currentPlayer === index && state.phase === PHASE.PLAYING;
       return {
         index,
         position,
-        name: seatDisplayName(t, seatOrder, seats.length),
+        name: seatDisplayName(t),
         status: thinking || isTurn ? t("game.thinking") : t("game.waiting"),
         tileCount: player.hand.length,
         thinking,
@@ -964,16 +886,10 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       };
     });
   const topSeats = opponentSeats.filter((seat) => seat.position === "top");
-  const leftSeats = opponentSeats.filter((seat) => seat.position === "left");
-  const rightSeats = opponentSeats.filter((seat) => seat.position === "right");
 
   const handleNewMatch = () => {
     play("button");
     restart();
-  };
-
-  const handlePlayerCountChange = (next) => {
-    setPlayerCount(next);
   };
 
   const handleMatchStats = () => {
@@ -986,30 +902,30 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     onMainMenu?.();
   };
 
+  const showReservePicker =
+    isHumanTurn && actions.canDraw && !drag && !matchOver && !summaryActive;
+
   return (
     <div
       ref={pageRef}
-      className={`game-page game-page--players-${state.players.length}${
+      className={`game-page game-page--v1${
         celebrating ? " game-page--celebrate" : ""
       }${matchOver ? " game-page--match-over" : ""}${
         summaryActive ? " game-page--round-summary" : ""
-      }${rotatePrompt ? " game-page--rotate-prompt" : ""}`}
+      }`}
     >
-      {rotatePrompt ? <LandscapePrompt /> : null}
-      <div className="game-page__shell" hidden={rotatePrompt}>
+      <div className="game-page__shell">
         <div className="game-page__chrome" {...(matchOver ? { inert: true } : {})}>
           <Header
             difficulty={difficulty}
             onDifficultyChange={setDifficulty}
-            playerCount={playerCount}
-            onPlayerCountChange={handlePlayerCountChange}
             settingsOpen={settingsOpen}
             onSettingsOpenChange={setSettingsOpen}
             onMainMenu={() => onMainMenu?.()}
             compact
             endBefore={
               <div className="game-page__hud-reserve">
-                <Reserve count={state.reserve.length} />
+                <Reserve count={state.reserve.length} compact />
               </div>
             }
             startBelow={
@@ -1034,10 +950,18 @@ function GamePage({ onMainMenu, matchOptions = null }) {
                     position="top"
                     seatIndex={seat.index}
                     name={seat.name}
-                    status={seat.status}
+                    status={
+                      seat.thinking || seat.isTurn
+                        ? actions.canDraw && state.currentPlayer === seat.index
+                          ? t("game.leoBestDrawing")
+                          : seat.status
+                        : seat.status
+                    }
                     tileCount={seat.tileCount}
                     thinking={seat.thinking}
                     isTurn={seat.isTurn}
+                    compact
+                    avatarTone="leoBest"
                   />
                 ))}
               </div>
@@ -1047,23 +971,6 @@ function GamePage({ onMainMenu, matchOptions = null }) {
 
         <div className="game-page__body" {...(matchOver ? { inert: true } : {})}>
           <div className="game-page__mid">
-            {leftSeats.length > 0 ? (
-              <div className="game-page__side-seats game-page__side-seats--left">
-                {leftSeats.map((seat) => (
-                  <OpponentPanel
-                    key={seat.index}
-                    position="left"
-                    seatIndex={seat.index}
-                    name={seat.name}
-                    status={seat.status}
-                    tileCount={seat.tileCount}
-                    thinking={seat.thinking}
-                    isTurn={seat.isTurn}
-                  />
-                ))}
-              </div>
-            ) : null}
-
             <div className="game-page__table-stage" ref={tableStageRef}>
               <GameTable
                 tiles={boardTiles}
@@ -1079,24 +986,14 @@ function GamePage({ onMainMenu, matchOptions = null }) {
                 playerNames={playerNames}
                 hiddenIds={hiddenIds}
               />
+              {showReservePicker ? (
+                <ReservePicker
+                  tileIds={state.reserve}
+                  onPick={handleReservePick}
+                  disabled={!isHumanTurn}
+                />
+              ) : null}
             </div>
-
-            {rightSeats.length > 0 ? (
-              <div className="game-page__side-seats game-page__side-seats--right">
-                {rightSeats.map((seat) => (
-                  <OpponentPanel
-                    key={seat.index}
-                    position="right"
-                    seatIndex={seat.index}
-                    name={seat.name}
-                    status={seat.status}
-                    tileCount={seat.tileCount}
-                    thinking={seat.thinking}
-                    isTurn={seat.isTurn}
-                  />
-                ))}
-              </div>
-            ) : null}
           </div>
         </div>
 

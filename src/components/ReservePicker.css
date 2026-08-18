@@ -1,0 +1,77 @@
+.reserve-picker {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  padding: 0.6rem;
+}
+
+.reserve-picker__well {
+  pointer-events: auto;
+  width: min(92%, 22rem);
+  max-height: min(46%, 16.5rem);
+  overflow: auto;
+  padding: 0.7rem 0.75rem 0.8rem;
+  border-radius: 14px;
+  border: 1px solid rgba(201, 162, 39, 0.38);
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 0%, rgba(47, 125, 255, 0.1), transparent 55%),
+    linear-gradient(180deg, rgba(10, 16, 18, 0.94) 0%, rgba(4, 8, 10, 0.96) 100%);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.reserve-picker__title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(232, 197, 71, 0.94);
+  text-align: center;
+}
+
+.reserve-picker__count {
+  margin: 0.18rem 0 0.55rem;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.reserve-picker__grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.38rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reserve-picker__cell {
+  flex: 0 0 auto;
+}
+
+.reserve-picker__tile {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  border-radius: 6px;
+}
+
+.reserve-picker__tile:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.reserve-picker__tile:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}

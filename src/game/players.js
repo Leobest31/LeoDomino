@@ -1,15 +1,18 @@
 /**
  * Offline seat helpers — human at index 0, AI on remaining seats.
  *
+ * V1 product surface is always 2 seats (Human vs LeoBest).
+ * 3/4-seat helpers remain for engine tests and a future version.
+ *
  * Table positions (UI):
  *   2p: Top=1, Bottom=0
  *   3p: Top=1, Left=2, Bottom=0
  *   4p: Top=1, Left=2, Bottom=0, Right=3
  *
  * Turn direction is counter-clockwise around the felt.
- * For 2p/3p, sequential indices (i+1)%n already match CCW.
- * For 4p, sequential order is NOT CCW — use NEXT_PLAYER_4P.
  */
+
+import { V1_HUMAN_ID, V1_OPPONENT_ID } from "./v1Product.js";
 
 export const HUMAN_INDEX = 0;
 export const MIN_PLAYER_COUNT = 2;
@@ -45,16 +48,17 @@ export function normalizePlayerCount(value) {
 }
 
 /**
- * Stable offline ids: seat 0 = you, others = rival / rival-2 / rival-3.
+ * Stable offline ids: seat 0 = you, seat 1 = LeoBest.
+ * Extra seats keep rival-N ids for engine tests / future tables.
  * @param {number} playerCount
  * @returns {string[]}
  */
 export function buildOfflinePlayerIds(playerCount) {
   const count = normalizePlayerCount(playerCount);
   /** @type {string[]} */
-  const ids = ["you"];
+  const ids = [V1_HUMAN_ID];
   for (let i = 1; i < count; i += 1) {
-    ids.push(i === 1 ? "rival" : `rival-${i}`);
+    ids.push(i === 1 ? V1_OPPONENT_ID : `rival-${i}`);
   }
   return ids;
 }
