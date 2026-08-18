@@ -251,14 +251,23 @@ function advancePlayer(state) {
 function finishRound(state, winnerIndex, reason, extras = {}) {
   const ruleset = rulesetOf(state);
   const isDekabes = reason === ROUND_END_REASON.DEKABES;
+  const winnerIndices = Array.isArray(extras.winnerIndices) && extras.winnerIndices.length
+    ? extras.winnerIndices.filter((index) => Number.isInteger(index) && index >= 0)
+    : winnerIndex != null
+      ? [winnerIndex]
+      : [];
+  const primaryWinner =
+    winnerIndices.length === 1 ? winnerIndices[0] : winnerIndex ?? null;
+  const tiedWinners = winnerIndices.length !== 1;
   const explainRoundEnd =
     typeof ruleset.policies.explainRoundEnd === "function"
       ? ruleset.policies.explainRoundEnd
       : null;
   const explanation =
-    explainRoundEnd && winnerIndex != null
+    explainRoundEnd && winnerIndices.length
       ? explainRoundEnd({
-          winnerIndex,
+          winnerIndex: primaryWinner,
+          winnerIndices,
           players: state.players,
           byId: state.byId,
           reason,
@@ -274,7 +283,8 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
     ruleset.roundScoreMode === "matchPoints"
   ) {
     points = ruleset.policies.calculateRoundPoints({
-      winnerIndex,
+      winnerIndex: primaryWinner,
+      winnerIndices,
       players: state.players,
       byId: state.byId,
       reason,
@@ -289,17 +299,26 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
   if (typeof ruleset.policies.afterRoundScoreUpdate === "function") {
     scores = ruleset.policies.afterRoundScoreUpdate({
       scores: state.scores,
-      winnerIndex,
+      winnerIndex: primaryWinner,
       points,
       targetScore: state.targetScore,
     });
   } else {
     scores = state.scores.slice();
-    scores[winnerIndex] += points;
+    const recipients = winnerIndices.length
+      ? winnerIndices
+      : primaryWinner != null
+        ? [primaryWinner]
+        : [];
+    for (const seat of recipients) {
+      if (seat >= 0 && seat < scores.length) scores[seat] += points;
+    }
   }
 
   const nextStarterIndex =
-    extras.nextStarterIndex != null ? extras.nextStarterIndex : winnerIndex;
+    extras.nextStarterIndex != null
+      ? extras.nextStarterIndex
+      : primaryWinner;
 
   /** @type {number|null} */
   let matchWinner = null;
@@ -307,7 +326,7 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
     if (
       ruleset.policies.isMatchWon({
         scores,
-        winnerIndex,
+        winnerIndex: primaryWinner,
         targetScore: state.targetScore,
       })
     ) {
@@ -315,10 +334,10 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
         typeof ruleset.policies.resolveMatchWinner === "function"
           ? ruleset.policies.resolveMatchWinner({
               scores,
-              winnerIndex,
+              winnerIndex: primaryWinner,
               targetScore: state.targetScore,
             })
-          : winnerIndex;
+          : primaryWinner;
     }
   } else if (ruleset.matchWinMode === "firstToReach") {
     const reached = scores.findIndex((score) => score >= state.targetScore);
@@ -331,7 +350,14 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
   let statusKey = matchOver && !usesSummary ? "rules.matchWon" : "rules.roundWon";
   if (!matchOver && isDekabes) {
     statusKey = "rules.dekabes";
+  } else if (!matchOver && tiedWinners && points <= 0) {
+    statusKey = "rules.roundTied";
   }
+
+  const statusSeat =
+    nextStarterIndex != null
+      ? nextStarterIndex
+      : primaryWinner ?? winnerIndices[0];
 
   return {
     ...state,
@@ -342,9 +368,11 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
     consecutivePasses: 0,
     roundResult: {
       reason,
-      winnerIndex,
+      winnerIndex: primaryWinner,
+      winnerIndices,
       points,
       nextStarterIndex,
+      ...(tiedWinners ? { tied: true } : {}),
       ...(isDekabes ? { dekabes: true } : {}),
       ...(usesSummary
         ? {
@@ -357,7 +385,7 @@ function finishRound(state, winnerIndex, reason, extras = {}) {
     },
     statusKey,
     statusVars: {
-      name: state.players[winnerIndex].id,
+      name: state.players[statusSeat]?.id,
       points,
     },
   };
@@ -439,6 +467,13 @@ function resolveBlockedWinnerLowestPips(state) {
  */
 function resolveBlockedOutcome(state, blockCauserIndex = null) {
   const ruleset = rulesetOf(state);
+
+  if (typeof ruleset.policies.resolveBlockedOutcome === "function") {
+    return ruleset.policies.resolveBlockedOutcome({
+      state,
+      blockCauserIndex,
+    });
+  }
 
   if (ruleset.blockedWinnerMode === "lowestPips") {
     const winnerIndex = resolveBlockedWinnerLowestPips(state);
@@ -582,6 +617,7 @@ export function playTile(state, tileId, end = END.RIGHT) {
     const reason = dekabes ? ROUND_END_REASON.DEKABES : ROUND_END_REASON.DOMINO;
     return finishRound(next, state.currentPlayer, reason, {
       nextStarterIndex: state.currentPlayer,
+      winnerIndices: [state.currentPlayer],
     });
   }
 
@@ -692,7 +728,7 @@ export function passTurn(state) {
 
   if (blockedByStuck || blockedByPasses) {
     const outcome = resolveBlockedOutcome(next, passer);
-    if (outcome.tied) {
+    if (outcome.tied && !outcome.winnerIndices?.length) {
       return finishTiedRound({
         ...next,
         statusKey: "rules.roundTied",
@@ -703,7 +739,10 @@ export function passTurn(state) {
       { ...next, statusKey: "rules.roundBlocked", statusVars: null },
       outcome.winnerIndex,
       ROUND_END_REASON.BLOCKED,
-      { nextStarterIndex: outcome.nextStarterIndex }
+      {
+        nextStarterIndex: outcome.nextStarterIndex,
+        winnerIndices: outcome.winnerIndices,
+      }
     );
   }
 
@@ -727,7 +766,10 @@ export function startNextRound(state, dealOptions = {}) {
     throw new Error("Cannot start next round without a round result");
   }
   const tied = Boolean(state.roundResult.tied);
-  if (state.roundResult.winnerIndex == null && !tied) {
+  const hasWinners = Array.isArray(state.roundResult.winnerIndices)
+    ? state.roundResult.winnerIndices.length > 0
+    : false;
+  if (state.roundResult.winnerIndex == null && !tied && !hasWinners) {
     throw new Error("Cannot start next round without a round winner");
   }
 

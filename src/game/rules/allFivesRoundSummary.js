@@ -138,14 +138,21 @@ export function roundSummaryView(explanation, elapsedMs, timing = {}) {
 export function hudScoresDuringRoundSummary({
   scores,
   winnerIndex = null,
+  winnerIndices = null,
   points = 0,
   hudLag = false,
 }) {
   if (!Array.isArray(scores)) return [];
   const pts = Number(points) || 0;
-  if (!hudLag || winnerIndex == null || pts <= 0) return scores.slice();
+  const winners = Array.isArray(winnerIndices) && winnerIndices.length
+    ? winnerIndices
+    : winnerIndex == null
+      ? []
+      : [winnerIndex];
+  if (!hudLag || !winners.length || pts <= 0) return scores.slice();
+  const set = new Set(winners);
   return scores.map((score, index) =>
-    index === winnerIndex ? score - pts : score
+    set.has(index) ? score - pts : score
   );
 }
 

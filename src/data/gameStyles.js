@@ -1,9 +1,10 @@
 /**
  * UI game-style catalog — single import path for Setup / Game Style screens.
  * Source of truth remains `game/rulesets`
- * (classic→legacy, haitian→haitian, allFives→allFives,
+ * (classic→legacy, haitian→haitian, american→allFives,
  *  dominican→dominican, puertorican→puertorican).
- * American Draw remains registered for resume but is not selectable.
+ * Classic Draw engine id `american` stays registered for old match resume.
+ * The withdrawn `allFives` style id normalizes to American.
  * Add future regional variants in the registry only; Configuration stays a single row.
  */
 

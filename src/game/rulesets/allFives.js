@@ -1,11 +1,16 @@
 /**
- * All Fives (American All Fives / count) ruleset — engine id "allFives".
+ * All Fives count ruleset — engine id "allFives".
+ *
+ * Product-facing Game Style is American. This id is the internal match
+ * ruleset so in-progress allFives saves resume without a rename.
  *
  * Play scoring: exact terminal-end total; award that total only when it is
  * >= 10 and a multiple of 5. Live 5 does not score. No live-play rounding.
  * Target 200.
  *
- * Round-end: opponents' remaining pips rounded to nearest 5 (not Classic raw).
+ * Round-end (domino-out): opponents' remaining pips rounded to nearest 5.
+ * Blocked: every seat at the minimum remaining hand-pip total wins; loser
+ * pips are shared (nearest-5 for one winner, floored 5-point shares for ties).
  * Deal / draw / pass chassis matches Classic draw-dominoes.
  */
 
@@ -17,6 +22,7 @@ import {
   explainAllFivesRoundEnd,
   calculateAllFivesRoundPoints,
 } from "../rules/allFivesScoring.js";
+import { resolveAllFivesBlockedOutcome } from "../rules/allFivesBlocked.js";
 
 /** Engine ruleset id. */
 export const ALL_FIVES_RULESET_ID = "allFives";
@@ -31,9 +37,9 @@ export const allFivesRuleset = Object.freeze({
   id: ALL_FIVES_RULESET_ID,
   version: 1,
 
-  nameKey: "setup.gameStyle.allFives",
-  descriptionKey: "setup.gameStyle.allFivesDescription",
-  summaryKey: "setup.gameStyle.allFivesSummary",
+  nameKey: "setup.gameStyle.american",
+  descriptionKey: "setup.gameStyle.americanDescription",
+  summaryKey: "setup.gameStyle.americanSummary",
 
   supportedPlayerCounts: Object.freeze([2, 3, 4]),
 
@@ -55,5 +61,6 @@ export const allFivesRuleset = Object.freeze({
     explainPlayScore: explainAllFivesScore,
     explainRoundEnd: explainAllFivesRoundEnd,
     calculateRoundPoints: calculateAllFivesRoundPoints,
+    resolveBlockedOutcome: resolveAllFivesBlockedOutcome,
   }),
 });

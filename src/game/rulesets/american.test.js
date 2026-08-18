@@ -13,7 +13,6 @@ import assert from "node:assert/strict";
 import {
   AMERICAN_RULESET_ID,
   DEFAULT_DIFFICULTY,
-  DEFAULT_GAME_STYLE_ID,
   END,
   HAITIAN_RULESET_ID,
   LEGACY_RULESET_ID,
@@ -164,24 +163,25 @@ function blockedState(scores = [0, 0]) {
 
   const style = getGameStyle("american");
   assert.ok(style);
-  assert.equal(style.rulesetId, "american");
+  assert.equal(style.rulesetId, "allFives");
   assert.equal(style.countryCode, "US");
-  assert.equal(style.enabled, false);
-  assert.equal(style.available, false);
-  assert.equal(gameStyleToRulesetId("american"), null);
-  assert.equal(gameStyleForRulesetId("american")?.id, "american");
-  assert.equal(normalizeGameStyleId("american"), DEFAULT_GAME_STYLE_ID);
+  assert.equal(style.enabled, true);
+  assert.equal(style.available, true);
+  assert.equal(gameStyleToRulesetId("american"), "allFives");
+  assert.equal(gameStyleForRulesetId("allFives")?.id, "american");
+  assert.equal(normalizeGameStyleId("american"), "american");
+  assert.equal(normalizeGameStyleId("allFives"), "american");
   assert.ok(flagDataUrl(style).startsWith("data:image/svg+xml"));
   assert.equal(flagEmoji(style), "🇺🇸");
 
   const styles = listAvailableGameStyles();
   assert.equal(styles.length, 5);
-  assert.equal(styles.some((s) => s.id === "american"), false);
-  assert.ok(styles.some((s) => s.id === "allFives"));
+  assert.ok(styles.some((s) => s.id === "american"));
+  assert.equal(styles.some((s) => s.id === "allFives"), false);
   assert.ok(styles.some((s) => s.id === "dominican"));
   assert.ok(styles.some((s) => s.id === "puertorican"));
-  assert.equal(isGameStyleCompatibleWithPlayerCount("american", 3), false);
-  section("registry + GAME_STYLES american withdrawn; All Fives remains");
+  assert.equal(isGameStyleCompatibleWithPlayerCount("american", 3), true);
+  section("registry + GAME_STYLES American maps to allFives; duplicate All Fives hidden");
 }
 
 // --- Deal 7 for 2/3/4 ---

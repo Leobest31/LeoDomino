@@ -326,6 +326,7 @@ export function getSpinnerPortStates(options = {}) {
 
   const port = (status, extra = {}) => ({ status, value: null, tileId: null, ...extra });
 
+  // pip 0 is a real spinner value (0-0); only null/undefined skip N/S moves.
   if (!spinner || pip == null) {
     return {
       left: port(board.length ? "open" : "inactive"),
@@ -441,7 +442,8 @@ export function spinnerBranchesAvailable(handIds, state) {
 
 function branchOpenPip(branchTiles, spinnerPip) {
   if (!branchTiles.length) return spinnerPip;
-  return Number(branchTiles[branchTiles.length - 1].right);
+  const pip = Number(branchTiles[branchTiles.length - 1].right);
+  return Number.isFinite(pip) ? pip : spinnerPip;
 }
 
 /**
@@ -470,6 +472,7 @@ export function resolveSpinnerBranchPlacement(tile, endPip, end = END.NORTH) {
 
 function spinnerBranchMoves(handIds, state) {
   const { id, pip, north, south } = readSpinnerLayout(state);
+  // Spinner id "0-0" is truthy; pip 0 must not be treated as missing.
   if (!id || pip == null) return [];
   const northPip = branchOpenPip(north, pip);
   const southPip = branchOpenPip(south, pip);

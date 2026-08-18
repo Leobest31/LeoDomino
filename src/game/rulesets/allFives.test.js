@@ -22,6 +22,7 @@ import {
   normalizeGameStyleId,
   playTile,
   resolveRuleset,
+  rulesetIdForNewMatchPreference,
   startMatch,
 } from "../index.js";
 import {
@@ -42,29 +43,32 @@ function section(title) {
 
 {
   assert.equal(isKnownRulesetId(ALL_FIVES_RULESET_ID), true);
-  const style = getGameStyle("allFives");
+  const style = getGameStyle("american");
   assert.ok(style);
   assert.equal(style.rulesetId, ALL_FIVES_RULESET_ID);
   assert.equal(style.available, true);
   assert.equal(style.enabled, true);
   assert.equal(style.countryCode, "US");
-  assert.equal(style.nameKey, "setup.gameStyle.allFives");
-  assert.equal(style.descriptionKey, "setup.gameStyle.allFivesDescription");
-  assert.equal(gameStyleToRulesetId("allFives"), ALL_FIVES_RULESET_ID);
-  assert.equal(gameStyleForRulesetId(ALL_FIVES_RULESET_ID)?.id, "allFives");
-  assert.equal(normalizeGameStyleId("allFives"), "allFives");
-  assert.equal(normalizeGameStyleId(ALL_FIVES_RULESET_ID), "allFives");
-  assert.ok(listAvailableGameStyles().some((s) => s.id === "allFives"));
+  assert.equal(style.nameKey, "setup.gameStyle.american");
+  assert.equal(style.descriptionKey, "setup.gameStyle.americanDescription");
+  assert.equal(gameStyleToRulesetId("american"), ALL_FIVES_RULESET_ID);
+  assert.equal(gameStyleForRulesetId(ALL_FIVES_RULESET_ID)?.id, "american");
+  assert.equal(normalizeGameStyleId("american"), "american");
+  assert.equal(normalizeGameStyleId("allFives"), "american");
+  assert.equal(normalizeGameStyleId(ALL_FIVES_RULESET_ID), "american");
+  assert.ok(listAvailableGameStyles().some((s) => s.id === "american"));
   assert.equal(
-    listAvailableGameStyles().some((s) => s.id === "american"),
+    listAvailableGameStyles().some((s) => s.id === "allFives"),
     false
   );
+  assert.equal(getGameStyle("allFives")?.available, false);
+  assert.equal(gameStyleToRulesetId("allFives"), null);
   assert.equal(flagEmoji(style), "🇺🇸");
   assert.ok(flagDataUrl(style).startsWith("data:image/svg+xml"));
-  assert.equal(isGameStyleCompatibleWithPlayerCount("allFives", 2), true);
-  assert.equal(isGameStyleCompatibleWithPlayerCount("allFives", 3), true);
-  assert.equal(isGameStyleCompatibleWithPlayerCount("allFives", 4), true);
-  section("Game Style UI maps allFives → ruleset allFives");
+  assert.equal(isGameStyleCompatibleWithPlayerCount("american", 2), true);
+  assert.equal(isGameStyleCompatibleWithPlayerCount("american", 3), true);
+  assert.equal(isGameStyleCompatibleWithPlayerCount("american", 4), true);
+  section("Game Style UI maps American → internal ruleset allFives");
 }
 
 {
@@ -169,6 +173,20 @@ function section(title) {
   assert.equal(normalized.rulesetId, ALL_FIVES_RULESET_ID);
   assert.equal(normalized.scores[0], 20);
   section("save/resume preserves allFives rulesetId and scores");
+}
+
+{
+  assert.equal(rulesetIdForNewMatchPreference("american"), ALL_FIVES_RULESET_ID);
+  assert.equal(rulesetIdForNewMatchPreference(ALL_FIVES_RULESET_ID), ALL_FIVES_RULESET_ID);
+  const fromUi = startMatch({
+    seed: 3,
+    playerIds: ["you", "rival"],
+    rulesetId: gameStyleToRulesetId("american"),
+  });
+  assert.equal(fromUi.rulesetId, ALL_FIVES_RULESET_ID);
+  assert.equal(fromUi.targetScore, 200);
+  assert.equal(typeof resolveRuleset(fromUi.rulesetId).policies.scorePlay, "function");
+  section("tapping American starts the allFives engine");
 }
 
 {

@@ -106,13 +106,14 @@ function section(title) {
   assert.equal(available.length, 5);
   assert.equal(available[0].id, "classic");
   assert.equal(available[1].id, "haitian");
-  assert.equal(available[2].id, "allFives");
+  assert.equal(available[2].id, "american");
   assert.equal(available[3].id, "dominican");
   assert.equal(available[4].id, "puertorican");
   assert.equal(available[1].countryCode, "HT");
   assert.equal(available[1].enabled, true);
   assert.equal(available[2].countryCode, "US");
   assert.equal(available[2].enabled, true);
+  assert.equal(available[2].rulesetId, "allFives");
   assert.equal(available[3].countryCode, "DO");
   assert.equal(available[3].enabled, true);
   assert.equal(available[4].countryCode, "PR");
@@ -124,7 +125,7 @@ function section(title) {
   assert.equal(gameStyleFlagEmoji(available[1]), "🇭🇹");
   assert.ok(
     gameStyleFlagDataUrl(available[2]).startsWith("data:image/svg+xml"),
-    "All Fives style exposes SVG flag data URL"
+    "American style exposes SVG flag data URL"
   );
   assert.equal(gameStyleFlagEmoji(available[2]), "🇺🇸");
   assert.ok(
@@ -140,14 +141,13 @@ function section(title) {
   assert.equal(gameStyleToRulesetId("haitian"), "haitian");
   assert.equal(gameStyleForRulesetId("haitian")?.id, "haitian");
   assert.equal(normalizeGameStyleId("haitian"), "haitian");
-  assert.equal(gameStyleToRulesetId("american"), null);
-  assert.equal(gameStyleForRulesetId("american")?.id, "american");
-  assert.equal(normalizeGameStyleId("american"), "classic");
-  assert.equal(getGameStyle("american")?.available, false);
-  assert.equal(getGameStyle("american")?.enabled, false);
-  assert.equal(gameStyleToRulesetId("allFives"), "allFives");
-  assert.equal(gameStyleForRulesetId("allFives")?.id, "allFives");
-  assert.equal(normalizeGameStyleId("allFives"), "allFives");
+  assert.equal(gameStyleToRulesetId("american"), "allFives");
+  assert.equal(gameStyleForRulesetId("allFives")?.id, "american");
+  assert.equal(normalizeGameStyleId("american"), "american");
+  assert.equal(getGameStyle("american")?.available, true);
+  assert.equal(getGameStyle("american")?.enabled, true);
+  assert.equal(gameStyleToRulesetId("allFives"), null);
+  assert.equal(normalizeGameStyleId("allFives"), "american");
   assert.equal(gameStyleToRulesetId("dominican"), "dominican");
   assert.equal(gameStyleForRulesetId("dominican")?.id, "dominican");
   assert.equal(normalizeGameStyleId("dominican"), "dominican");
@@ -157,8 +157,13 @@ function section(title) {
   assert.ok(GAME_STYLES.some((s) => s.id === "american"));
   assert.equal(
     available.some((s) => s.id === "american"),
+    true,
+    "American is the selectable US Game Style"
+  );
+  assert.equal(
+    available.some((s) => s.id === "allFives"),
     false,
-    "American Draw is withdrawn from the selectable Game Style list"
+    "All Fives is not a separate selectable style"
   );
   assert.ok(GAME_STYLES.some((s) => s.id === "allFives"));
   assert.ok(GAME_STYLES.some((s) => s.id === "dominican"));

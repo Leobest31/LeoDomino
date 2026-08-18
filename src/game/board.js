@@ -152,5 +152,7 @@ export function canPlaceOnEnd(board, tile, end) {
 
   const ends = getOpenEnds(board);
   const pip = end === END.LEFT ? ends.left : ends.right;
-  return tileHasPip(tile, /** @type {number} */ (pip));
+  // Explicit nullish check so pip 0 stays a legal endpoint.
+  if (pip == null || pip === "") return false;
+  return tileHasPip(tile, pip);
 }

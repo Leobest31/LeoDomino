@@ -74,7 +74,12 @@ export function indexTiles(tiles) {
  * @returns {boolean}
  */
 export function tileHasPip(tile, pip) {
-  return tile.a === pip || tile.b === pip;
+  if (tile == null) return false;
+  // Pip 0 is a real face — never treat it as missing/falsy.
+  if (pip == null || pip === "") return false;
+  const n = Number(pip);
+  if (!Number.isFinite(n)) return false;
+  return Number(tile.a) === n || Number(tile.b) === n;
 }
 
 /**
@@ -84,7 +89,8 @@ export function tileHasPip(tile, pip) {
  * @returns {number}
  */
 export function oppositePip(tile, pip) {
-  if (tile.a === pip) return tile.b;
-  if (tile.b === pip) return tile.a;
+  const n = Number(pip);
+  if (Number(tile.a) === n) return tile.b;
+  if (Number(tile.b) === n) return tile.a;
   throw new Error(`Tile ${tile.id} does not contain pip ${pip}`);
 }

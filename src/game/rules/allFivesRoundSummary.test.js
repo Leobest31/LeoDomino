@@ -257,7 +257,7 @@ section("counting pace 750ms/tile; final hold 2000ms");
 {
   const here = dirname(fileURLToPath(import.meta.url));
   const finishSrc = readFileSync(join(here, "drawDominoes.js"), "utf8");
-  assert.match(finishSrc, /explainRoundEnd && winnerIndex != null/);
+  assert.match(finishSrc, /explainRoundEnd && winnerIndices\.length/);
   assert.match(finishSrc, /if \(explanation\) \{\s*points = Number\(explanation\.awarded\)/s);
   assert.equal(
     (finishSrc.match(/policies\.calculateRoundPoints/g) || []).length > 0,

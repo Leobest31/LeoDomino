@@ -86,9 +86,24 @@ export {
   allFivesScorePlay,
   scoringHighlightsFromReport,
   roundToNearestFive,
+  roundDownToFive,
   explainAllFivesRoundEnd,
   calculateAllFivesRoundPoints,
 } from "./allFivesScoring.js";
+
+export {
+  ALL_FIVES_BLOCKED_STARTER_FALLBACK,
+  allFivesBlockedAwardPerWinner,
+  allFivesBlockedWinnerIndices,
+  allFivesHandPipTotals,
+  allFivesLoserPool,
+  allFivesTileRankKey,
+  chooseAllFivesBlockedNextStarter,
+  firstWinnerInCcwTurnOrder,
+  normalizeWinnerIndices,
+  resolveAllFivesBlockedOutcome,
+  settleAllFivesBlocked,
+} from "./allFivesBlocked.js";
 
 export {
   ROUND_SUMMARY_TILE_MS,

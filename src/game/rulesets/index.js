@@ -49,6 +49,7 @@ export {
   isKnownRulesetId,
   normalizeRulesetId,
   coerceRulesetId,
+  rulesetIdForNewMatchPreference,
   listRulesetIds,
   resolveHandSize,
   isPlayerCountSupported,

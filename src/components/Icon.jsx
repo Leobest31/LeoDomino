@@ -38,22 +38,6 @@ export function IconClose({ className = "" }) {
   );
 }
 
-export function IconPlay({ className = "" }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" width="1.05em" height="1.05em" aria-hidden="true">
-      <path d="M8 6.5v11l10-5.5L8 6.5z" {...stroke} />
-    </svg>
-  );
-}
-
-export function IconDraw({ className = "" }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" width="1.05em" height="1.05em" aria-hidden="true">
-      <path d="M12 4v12M8 12l4 4 4-4M5 20h14" {...stroke} />
-    </svg>
-  );
-}
-
 export function IconPass({ className = "" }) {
   return (
     <svg className={className} viewBox="0 0 24 24" width="1.05em" height="1.05em" aria-hidden="true">

@@ -54,14 +54,14 @@ export const GAME_STYLES = Object.freeze([
   }),
   Object.freeze({
     id: "american",
-    rulesetId: AMERICAN_RULESET_ID,
+    rulesetId: ALL_FIVES_RULESET_ID,
     nameKey: "setup.gameStyle.american",
     descriptionKey: "setup.gameStyle.americanDescription",
     countryCode: "US",
-    // Withdrawn from Setup / Game Style. All Fives is the US-style mode.
-    // Engine ruleset stays registered so in-progress american saves can resume.
-    enabled: false,
-    available: false,
+    // Product-facing American. Engine id stays `allFives` so existing
+    // allFives match saves resume without a rename.
+    enabled: true,
+    available: true,
   }),
   Object.freeze({
     id: "allFives",
@@ -69,8 +69,10 @@ export const GAME_STYLES = Object.freeze([
     nameKey: "setup.gameStyle.allFives",
     descriptionKey: "setup.gameStyle.allFivesDescription",
     countryCode: "US",
-    enabled: true,
-    available: true,
+    // Withdrawn duplicate label. Kept so old prefs/saves with this style
+    // id normalize to American. Not shown in Setup / Game Style.
+    enabled: false,
+    available: false,
   }),
   Object.freeze({
     id: "dominican",
@@ -161,6 +163,19 @@ export function coerceRulesetId(id) {
 }
 
 /**
+ * Preference → engine id for a *new* match.
+ * Stored Classic Draw `american` now starts product American (`allFives`).
+ * In-progress match snapshots keep their own rulesetId on resume.
+ *
+ * @param {unknown} id
+ * @returns {string}
+ */
+export function rulesetIdForNewMatchPreference(id) {
+  if (id === AMERICAN_RULESET_ID) return ALL_FIVES_RULESET_ID;
+  return normalizeRulesetId(id);
+}
+
+/**
  * @returns {string[]}
  */
 export function listRulesetIds() {
@@ -238,7 +253,12 @@ export function gameStyleToRulesetId(styleId) {
  * @returns {object|null}
  */
 export function gameStyleForRulesetId(rulesetId) {
-  return GAME_STYLES.find((style) => style.rulesetId === rulesetId) ?? null;
+  const matches = GAME_STYLES.filter((style) => style.rulesetId === rulesetId);
+  if (!matches.length) return null;
+  return (
+    matches.find((style) => style.available && style.enabled !== false) ??
+    matches[0]
+  );
 }
 
 /**

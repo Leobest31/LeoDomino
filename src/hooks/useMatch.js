@@ -19,6 +19,7 @@ import {
   DEFAULT_RULESET_ID,
   RULESET_STORAGE_KEY,
   normalizeRulesetId,
+  rulesetIdForNewMatchPreference,
 } from "../game/index.js";
 import {
   HUMAN_INDEX,
@@ -48,7 +49,9 @@ function readStoredPlayerCount() {
 
 function readStoredRulesetId() {
   try {
-    return normalizeRulesetId(readStorage(RULESET_STORAGE_KEY, DEFAULT_RULESET_ID));
+    return rulesetIdForNewMatchPreference(
+      readStorage(RULESET_STORAGE_KEY, DEFAULT_RULESET_ID)
+    );
   } catch {
     return DEFAULT_RULESET_ID;
   }
@@ -58,7 +61,7 @@ function createMatchState(options) {
   const playerCount = normalizePlayerCount(
     options.playerCount ?? readStoredPlayerCount()
   );
-  const rulesetId = normalizeRulesetId(
+  const rulesetId = rulesetIdForNewMatchPreference(
     options.rulesetId ?? readStoredRulesetId()
   );
   return startMatch({
@@ -104,7 +107,7 @@ function createInitialState(options) {
     options.difficulty != null
       ? normalizeDifficulty(options.difficulty)
       : readStoredDifficulty();
-  const preferredRulesetId = normalizeRulesetId(
+  const preferredRulesetId = rulesetIdForNewMatchPreference(
     options.rulesetId ?? readStoredRulesetId()
   );
   if (options.playerCount != null) {

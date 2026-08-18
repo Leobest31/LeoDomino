@@ -14,6 +14,7 @@
  */
 
 import { getCurrentTerminalEnds } from "./allFivesSpinner.js";
+import { ROUND_END_REASON } from "./constants.js";
 
 /** Cumulative match target for All Fives. */
 export const ALL_FIVES_MATCH_TARGET = 200;
@@ -231,16 +232,54 @@ export function roundToNearestFive(value) {
 }
 
 /**
+ * Floor a value down to a multiple of 5. Never rounds up.
+ * Used by All Fives blocked-round *tied* shares only.
+ *
+ * @param {number} value
+ * @returns {number}
+ */
+export function roundDownToFive(value) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.floor(value / 5) * 5;
+}
+
+function winnerSeatList(winnerIndex, winnerIndices, playerCount) {
+  if (Array.isArray(winnerIndices) && winnerIndices.length) {
+    const unique = [];
+    for (const raw of winnerIndices) {
+      const index = Math.floor(Number(raw));
+      if (
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < playerCount &&
+        !unique.includes(index)
+      ) {
+        unique.push(index);
+      }
+    }
+    unique.sort((a, b) => a - b);
+    return unique;
+  }
+  const single = Math.floor(Number(winnerIndex));
+  if (Number.isInteger(single) && single >= 0 && single < playerCount) {
+    return [single];
+  }
+  return [];
+}
+
+/**
  * Authoritative All Fives round-end breakdown. Same hands and award for
  * 2P, 3P, and 4P — player count only changes how many losing seats exist.
  *
  * @param {object} options
  * @param {number|null} [options.winnerIndex]
+ * @param {number[]} [options.winnerIndices]
  * @param {{ id?: string, hand: string[] }[]} options.players
  * @param {Record<string, { a: number, b: number }>} options.byId
  * @param {string} [options.reason]
  * @returns {{
  *   winnerIndex: number|null,
+ *   winnerIndices: number[],
  *   reason: string|null,
  *   hands: { playerIndex: number, tiles: { id: string, left: number, right: number, pips: number }[], raw: number }[],
  *   rawTotal: number,
@@ -249,23 +288,31 @@ export function roundToNearestFive(value) {
  */
 export function explainAllFivesRoundEnd({
   winnerIndex,
+  winnerIndices,
   players = [],
   byId = {},
   reason = null,
 } = {}) {
   /** @type {{ playerIndex: number, tiles: { id: string, left: number, right: number, pips: number }[], raw: number }[]} */
   const hands = [];
-  if (winnerIndex == null || !Array.isArray(players)) {
+  const winners = winnerSeatList(
+    winnerIndex,
+    winnerIndices,
+    Array.isArray(players) ? players.length : 0
+  );
+  if (winners.length === 0 || !Array.isArray(players)) {
     return {
       winnerIndex: winnerIndex ?? null,
+      winnerIndices: winners,
       reason,
       hands,
       rawTotal: 0,
       awarded: 0,
     };
   }
+  const winnerSet = new Set(winners);
   for (let i = 0; i < players.length; i += 1) {
-    if (i === winnerIndex) continue;
+    if (winnerSet.has(i)) continue;
     const ids = Array.isArray(players[i]?.hand) ? players[i].hand : [];
     const tiles = ids.map((id) => {
       const tile = byId[id];
@@ -278,12 +325,17 @@ export function explainAllFivesRoundEnd({
     hands.push({ playerIndex: i, tiles, raw });
   }
   const rawTotal = hands.reduce((sum, hand) => sum + hand.raw, 0);
+  const awarded =
+    reason === ROUND_END_REASON.BLOCKED && winners.length > 1
+      ? roundDownToFive(rawTotal / winners.length)
+      : roundToNearestFive(rawTotal);
   return {
-    winnerIndex,
+    winnerIndex: winners.length === 1 ? winners[0] : null,
+    winnerIndices: winners,
     reason,
     hands,
     rawTotal,
-    awarded: roundToNearestFive(rawTotal),
+    awarded,
   };
 }
 
