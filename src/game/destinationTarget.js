@@ -9,6 +9,26 @@ import { END } from "./constants.js";
 export const DESTINATION_HIT_PADDING_MIN = 40;
 /** Extra padding as a fraction of the longer tile side. */
 export const DESTINATION_HIT_PADDING_RATIO = 0.55;
+/** Finger tap vs drag: stay under this distance to treat pointerup as a tap. */
+export const DESTINATION_TAP_SLOP_PX = 20;
+
+const OUTWARD_FACES = new Set(["E", "W", "N", "S"]);
+
+/**
+ * Outward exposed face of a destination tile after layout folding.
+ * Spinner-hub N/S ports keep their short faces; they must not inherit the
+ * spinner's main-chain travelDir.
+ *
+ * @param {"left"|"right"|"north"|"south"} end
+ * @param {unknown} travelDir
+ * @param {{ spinnerHub?: boolean }} [options]
+ * @returns {"E"|"W"|"N"|"S"|null}
+ */
+export function resolveDestinationOutward(end, travelDir, options = {}) {
+  if (options.spinnerHub && (end === END.NORTH || end === END.SOUTH)) return null;
+  if (OUTWARD_FACES.has(travelDir)) return travelDir;
+  return null;
+}
 
 /**
  * Board tile that visually represents a legal destination.
@@ -84,26 +104,42 @@ function clamp(n, lo, hi) {
  * and TOP/BOTTOM on the short sides, so a drop on the spinner body is a
  * main-chain play — not an accidental spinner branch.
  *
+ * After a snake fold, `outward` (layout travelDir) is the exposed face.
+ * Logical LEFT is still LEFT even when that face is visually east/south.
+ *
  * @param {"left"|"right"|"north"|"south"} end
  * @param {{ left: number, top: number, right: number, bottom: number }} rect
  * @param {number} x
  * @param {number} y
+ * @param {"E"|"W"|"N"|"S"|null} [outward]
  * @returns {number}
  */
-export function destinationFaceDistance(end, rect, x, y) {
-  if (end === END.LEFT) {
+export function destinationFaceDistance(end, rect, x, y, outward = null) {
+  const face =
+    outward === "W" || outward === "E" || outward === "N" || outward === "S"
+      ? outward
+      : end === END.LEFT
+        ? "W"
+        : end === END.RIGHT
+          ? "E"
+          : end === END.NORTH
+            ? "N"
+            : end === END.SOUTH
+              ? "S"
+              : null;
+  if (face === "W") {
     const qy = clamp(y, rect.top, rect.bottom);
     return Math.hypot(x - rect.left, y - qy);
   }
-  if (end === END.RIGHT) {
+  if (face === "E") {
     const qy = clamp(y, rect.top, rect.bottom);
     return Math.hypot(x - rect.right, y - qy);
   }
-  if (end === END.NORTH) {
+  if (face === "N") {
     const qx = clamp(x, rect.left, rect.right);
     return Math.hypot(x - qx, y - rect.top);
   }
-  if (end === END.SOUTH) {
+  if (face === "S") {
     const qx = clamp(x, rect.left, rect.right);
     return Math.hypot(x - qx, y - rect.bottom);
   }
@@ -179,7 +215,13 @@ export function pickTargetDestination(clientX, clientY, targets) {
       continue;
     }
 
-    const dist = destinationFaceDistance(target.end, target.rect, clientX, clientY);
+    const dist = destinationFaceDistance(
+      target.end,
+      target.rect,
+      clientX,
+      clientY,
+      target.outward ?? null
+    );
     const priority = portPriority(target.end);
     if (
       dist < bestDist - 0.5 ||

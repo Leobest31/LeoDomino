@@ -62,9 +62,9 @@ export default {
         "Double-six · 7 tiles · two open ends · first to 4 match points · win +1 · blocked +1 · Dekabès +2 · 6-6 opens round 1",
       american: "American",
       americanDescription:
-        "American Draw Dominoes. Match either end, draw until you can play, pass when empty. First to 100.",
+        "Score when open ends total a multiple of 5 (minimum 10). Draw until you can play. First to 200.",
       americanSummary:
-        "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
+        "Double-six · 7 tiles · count scoring · multiples of 5 from 10 · round-end nearest 5 · play to 200",
       allFives: "All Fives",
       allFivesDescription:
         "American All Fives. Score when open ends total a multiple of 5 (minimum 10). First to 200.",
@@ -127,6 +127,9 @@ export default {
     playScore: "+{{points}}",
     rawPipsLabel: "Raw pips: {{total}}",
     roundPointsLabel: "Round points",
+    rotateTitle: "Rotate your device",
+    rotateBody:
+      "For the best LeoDomino experience, turn your phone or tablet sideways.",
   },
   rules: {
     roundWon: "{{name}} wins the round",

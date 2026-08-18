@@ -1,10 +1,10 @@
-/* Premium reserve badge — lower dark controls (outside green table) */
+/* Premium reserve badge — top-right HUD (outside green table) */
 .game-page__hud-reserve .reserve {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.42rem 0.52rem 0.42rem 0.42rem;
+  padding: 0.18rem 0.32rem 0.18rem 0.28rem;
   background:
     linear-gradient(165deg, rgba(18, 24, 32, 0.95) 0%, rgba(6, 10, 12, 0.92) 100%);
   border: 1px solid rgba(201, 162, 39, 0.52);
@@ -31,8 +31,8 @@
 
 .game-page__hud-reserve .reserve__stack {
   position: relative;
-  width: 2.35rem;
-  height: 3.35rem;
+  width: clamp(1.15rem, calc(1.55rem * var(--game-ui-scale, 1)), 1.55rem);
+  height: clamp(1.6rem, calc(2.15rem * var(--game-ui-scale, 1)), 2.15rem);
   transform-origin: center bottom;
 }
 
@@ -44,8 +44,8 @@
 }
 
 .game-page__hud-reserve .reserve .domino {
-  --_w: 1.85rem;
-  --_h: 3.15rem;
+  --_w: 1.22rem;
+  --_h: 2.08rem;
   --_pip: 0.2rem;
   --_depth: 2px;
 }
@@ -60,8 +60,8 @@
 }
 
 .game-page__hud-reserve .reserve__empty-slot {
-  width: 1.85rem;
-  height: 3.15rem;
+  width: 1.22rem;
+  height: 2.08rem;
   border: 1.5px dashed rgba(201, 162, 39, 0.35);
   border-radius: 6px;
   opacity: 0.55;
@@ -92,7 +92,7 @@
   padding: 0.12rem 0.45rem;
   border-radius: 8px;
   font-family: var(--font-ui);
-  font-size: 1.35rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: #ffffff;
   line-height: 1.1;

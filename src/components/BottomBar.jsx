@@ -1,18 +1,9 @@
 import { useI18n } from "../i18n";
 import { useAudio } from "../audio";
-import { IconDraw, IconPass, IconPlay } from "./Icon";
+import { IconPass } from "./Icon";
 import "./BottomBar.css";
 
-function BottomBar({
-  canPlay = false,
-  canDraw = false,
-  canPass = false,
-  onPlay,
-  onDraw,
-  onPass,
-  onNewGame,
-  endAbove = null,
-}) {
+function BottomBar({ canPass = false, onPass, onNewGame, children = null }) {
   const { t } = useI18n();
   const { play } = useAudio();
 
@@ -32,24 +23,6 @@ function BottomBar({
         <div className="bottom-bar__actions">
           <button
             type="button"
-            className="btn btn--play bottom-bar__btn"
-            aria-disabled={!canPlay}
-            onClick={() => tap(canPlay, onPlay)}
-          >
-            <IconPlay />
-            <span>{t("game.play")}</span>
-          </button>
-          <button
-            type="button"
-            className="btn btn--draw bottom-bar__btn"
-            aria-disabled={!canDraw}
-            onClick={() => tap(canDraw, onDraw)}
-          >
-            <IconDraw />
-            <span>{t("game.draw")}</span>
-          </button>
-          <button
-            type="button"
             className="btn btn--pass bottom-bar__btn"
             aria-disabled={!canPass}
             onClick={() => tap(canPass, onPass)}
@@ -59,8 +32,9 @@ function BottomBar({
           </button>
         </div>
 
+        <div className="bottom-bar__center">{children}</div>
+
         <div className="bottom-bar__end">
-          {endAbove}
           <button
             type="button"
             className="btn btn--new bottom-bar__new"

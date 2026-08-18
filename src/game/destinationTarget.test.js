@@ -12,6 +12,7 @@ import {
   destinationTileId,
   destinationHighlightMap,
   pickTargetDestination,
+  resolveDestinationOutward,
 } from "./destinationTarget.js";
 import { isAutoPlaceable, resolvePlayChoice, legalEndsForTile } from "./interaction.js";
 
@@ -215,6 +216,23 @@ function section(title) {
   assert.equal(tableJsx.includes("game-table__drop"), false);
   assert.equal(tableCss.includes("game-table__drop"), false);
   section("felt drop-zone rectangles are removed");
+}
+
+{
+  const folded = rect(200, 80, 80, 40);
+  const targets = [{ end: END.LEFT, rect: folded, outward: "E" }];
+  assert.equal(pickTargetDestination(folded.right + 10, 100, targets), END.LEFT);
+  assert.equal(
+    resolveDestinationOutward(END.LEFT, "E"),
+    "E",
+    "folded LEFT keeps logical LEFT with east outward face"
+  );
+  assert.equal(
+    resolveDestinationOutward(END.NORTH, "E", { spinnerHub: true }),
+    null,
+    "spinner hub N/S do not inherit main-chain travelDir"
+  );
+  section("folded LEFT endpoint keeps logical id; hit tests the outward face");
 }
 
 console.log("\nDestination targeting tests passed.");

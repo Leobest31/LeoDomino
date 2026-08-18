@@ -10,10 +10,10 @@
   max-height: 100dvh;
   overflow: hidden;
   padding:
-    max(0.2rem, env(safe-area-inset-top, 0px))
-    max(0.35rem, env(safe-area-inset-right, 0px))
-    max(0.2rem, env(safe-area-inset-bottom, 0px))
-    max(0.35rem, env(safe-area-inset-left, 0px));
+    max(0.12rem, env(safe-area-inset-top, 0px))
+    max(0.28rem, env(safe-area-inset-right, 0px))
+    max(0.08rem, env(safe-area-inset-bottom, 0px))
+    max(0.28rem, env(safe-area-inset-left, 0px));
   background:
     radial-gradient(ellipse 80% 40% at 50% 0%, rgba(47, 125, 255, 0.055), transparent 50%),
     linear-gradient(180deg, #050807 0%, #020303 100%);
@@ -22,7 +22,8 @@
 .game-page__shell {
   display: flex;
   flex-direction: column;
-  width: min(100%, 98vw);
+  width: 100%;
+  max-width: 100%;
   height: 100%;
   max-height: 100%;
   min-height: 0;
@@ -37,6 +38,7 @@
 .game-page--round-summary .game-page__chrome,
 .game-page--round-summary .player-panel,
 .game-page--round-summary .bottom-bar,
+.game-page--round-summary .game-page__dock,
 .game-page--round-summary .game-page__side-seats {
   pointer-events: none;
 }
@@ -52,6 +54,8 @@
 }
 
 .game-page__body {
+  position: relative;
+  z-index: 1;
   flex: 1 1 0;
   min-height: 0;
   display: flex;
@@ -64,14 +68,61 @@
 
 .game-page__mid {
   flex: 1 1 0;
+  min-width: 0;
   min-height: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: row;
   align-items: stretch;
   justify-content: center;
-  width: 100%;
   gap: 0.3rem;
   overflow: hidden;
+}
+
+/*
+ * Bottom dock is a real layout row below the felt — never an overlay.
+ * Pase | Player 1 hand | New Match share one chrome band.
+ */
+.game-page__dock {
+  position: relative;
+  z-index: 8;
+  flex: 0 0 auto;
+  width: 100%;
+  height: var(--game-dock-height, 48px);
+  min-height: var(--game-dock-height, 48px);
+  max-height: var(--game-dock-height, 48px);
+  margin-top: var(--game-felt-dock-gap, 4px);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  overflow: visible;
+}
+
+.game-page__dock .player-panel,
+.game-page__dock .bottom-bar {
+  pointer-events: auto;
+}
+
+.game-page__dock .bottom-bar {
+  flex: 1 1 auto;
+  min-height: var(--game-dock-height, 48px);
+  background:
+    linear-gradient(0deg, #030605 0%, rgba(8, 14, 18, 0.98) 100%);
+  border-top: 1px solid rgba(201, 162, 39, 0.16);
+}
+
+.game-page__dock .player-panel {
+  background: transparent;
+  border-top: none;
+  box-shadow: none;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  max-height: 100%;
+  --domino-w: var(--player-hand-w, var(--domino-hand-w));
+  --domino-h: var(--player-hand-h, var(--domino-hand-h));
+  --domino-pip: var(--player-hand-pip, var(--domino-hand-pip));
 }
 
 /* 3–4 player seats — compact rail; meta CSS handles crowding, not width. */
@@ -119,16 +170,22 @@
 }
 
 /*
- * Unified dark chrome: stacked header (mute+score | logo+opponent | settings).
+ * Unified dark chrome: score | logo+opponent | sound+reserve+settings / menu.
  * Green table begins only in `.game-page__body` below this band.
  */
 .game-page__chrome {
+  position: relative;
+  z-index: 12;
   flex: 0 0 auto;
+  min-height: var(--game-chrome-height, auto);
+  height: auto;
+  max-height: none;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   width: 100%;
   margin-inline: auto;
-  margin-bottom: 0.2rem;
+  margin-bottom: var(--game-chrome-felt-gap, 6px);
   min-width: 0;
   background:
     linear-gradient(180deg, rgba(12, 18, 24, 0.98) 0%, rgba(6, 10, 12, 0.96) 100%);
@@ -138,7 +195,10 @@
     0 4px 14px rgba(0, 0, 0, 0.16);
 }
 
-.game-page__chrome .header {
+.game-page__chrome .header,
+.game-page__chrome .header--stacked {
+  height: auto;
+  min-height: var(--game-chrome-height, 0px);
   background: transparent;
   border-bottom: none;
   box-shadow: none;
@@ -146,49 +206,61 @@
   -webkit-backdrop-filter: none;
 }
 
+.game-page__chrome .header--stacked .header__inner {
+  height: auto;
+  min-height: var(--game-chrome-height, 0px);
+  box-sizing: border-box;
+}
+
 .game-page__hud-score {
   position: relative;
   z-index: 6;
-  width: clamp(8.5rem, 19vw, 10.25rem);
+  width: 100%;
   max-width: 100%;
   pointer-events: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 0;
+  align-self: flex-start;
 }
 
 .game-page__hud-score .scoreboard {
   pointer-events: auto;
 }
 
-/* Dense but readable scoreboard — reclaim felt without hurting legibility */
+/* Dense horizontal scoreboard — reclaim felt without hurting legibility */
 .game-page__chrome .scoreboard--table {
-  padding: 0.28rem 0.46rem;
+  padding: 0.2rem 0.4rem;
+  gap: clamp(0.22rem, 0.95vw, 0.55rem);
 }
 
 .game-page__chrome .scoreboard__line {
-  min-height: 1.05rem;
-  padding: 0.05rem 0;
-  column-gap: 0.35rem;
+  min-height: 0;
+  padding: 0;
+  column-gap: 0.16rem;
 }
 
 .game-page__chrome .scoreboard__label {
-  font-size: 0.58rem;
-  letter-spacing: 0.035em;
+  font-size: 0.56rem;
+  letter-spacing: 0.03em;
 }
 
 .game-page__chrome .scoreboard__icon {
-  width: 0.85rem;
-  height: 0.85rem;
-  font-size: 0.62rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  font-size: 0.58rem;
 }
 
 .game-page__chrome .scoreboard__value,
 .game-page__chrome .scoreboard__points,
 .game-page__chrome .scoreboard__value--target {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .game-page__chrome .scoreboard__line--target {
-  margin-top: 0.02rem;
-  padding-top: 0.16rem;
+  margin-top: 0;
+  padding-top: 0;
+  padding-left: 0.32rem;
 }
 
 .game-page__top-hud-center {
@@ -251,49 +323,53 @@
   transform-origin: center center;
 }
 
-/* Reserve — lower dark controls, stacked above New Match (outside green table) */
+/* Reserve — top-right HUD, immediately left of Settings (outside felt). */
 .game-page__hud-reserve {
   position: relative;
   z-index: 6;
-  width: 100%;
-  pointer-events: none;
+  width: auto;
+  max-width: min(10.5rem, 42vw);
+  flex-shrink: 1;
+  min-width: 0;
+  pointer-events: auto;
 }
 
-.game-page__hud-reserve .reserve {
+.game-page__chrome .game-page__hud-reserve .reserve {
   pointer-events: auto;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   box-sizing: border-box;
   justify-content: flex-start;
-  padding: 0.32rem 0.42rem;
-  gap: 0.4rem;
+  padding: 0.08rem 0.28rem 0.08rem 0.22rem;
+  gap: 0.22rem;
 }
 
-.game-page__hud-reserve .reserve__stack {
-  width: 1.95rem;
-  height: 2.75rem;
+.game-page__chrome .game-page__hud-reserve .reserve__stack {
+  width: clamp(1.05rem, calc(1.35rem * var(--game-ui-scale, 1)), 1.4rem);
+  height: clamp(1.45rem, calc(1.9rem * var(--game-ui-scale, 1)), 1.95rem);
 }
 
-.game-page__hud-reserve .reserve .domino {
-  --_w: 1.55rem;
-  --_h: 2.65rem;
-  --_pip: 0.18rem;
+.game-page__chrome .game-page__hud-reserve .reserve .domino {
+  --_w: 1.05rem;
+  --_h: 1.8rem;
+  --_pip: 0.14rem;
   --_depth: 2px;
 }
 
-.game-page__hud-reserve .reserve__empty-slot {
-  width: 1.55rem;
-  height: 2.65rem;
+.game-page__chrome .game-page__hud-reserve .reserve__empty-slot {
+  width: 1.05rem;
+  height: 1.8rem;
 }
 
-.game-page__hud-reserve .reserve__info {
+.game-page__chrome .game-page__hud-reserve .reserve__info {
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
 }
 
-.game-page__hud-reserve .reserve__count {
-  font-size: 1.15rem;
-  min-width: 1.75rem;
-  padding: 0.08rem 0.38rem;
+.game-page__chrome .game-page__hud-reserve .reserve__count {
+  font-size: 0.88rem;
+  min-width: 1.35rem;
+  padding: 0.02rem 0.22rem;
 }
 
 .game-page .opponent-panel,
@@ -317,12 +393,12 @@
 
 @media (max-width: 719px) {
   .game-page__shell {
-    width: min(100%, 100vw);
-    gap: 0.04rem;
+    width: 100%;
+    gap: 0;
   }
 
   .game-page__chrome {
-    margin-bottom: 0.16rem;
+    margin-bottom: var(--game-chrome-felt-gap, 4px);
   }
 
   .game-page__body {
@@ -334,31 +410,32 @@
   }
 
   .game-page__hud-score {
-    width: clamp(8rem, 33vw, 9.75rem);
+    width: 100%;
   }
 
   .game-page--players-3 .game-page__hud-score,
   .game-page--players-4 .game-page__hud-score {
-    width: clamp(8.5rem, 36vw, 10.25rem);
+    width: 100%;
   }
 
   .game-page__chrome .scoreboard--table {
-    padding: 0.32rem 0.44rem;
+    padding: 0.16rem 0.32rem;
+    gap: clamp(0.16rem, 0.8vw, 0.36rem);
   }
 
   .game-page__chrome .scoreboard__line {
-    min-height: 1.08rem;
-    padding: 0.06rem 0;
+    min-height: 0;
+    padding: 0;
   }
 
   .game-page__chrome .scoreboard__label {
-    font-size: 0.58rem;
+    font-size: 0.52rem;
   }
 
   .game-page__chrome .scoreboard__value,
   .game-page__chrome .scoreboard__points,
   .game-page__chrome .scoreboard__value--target {
-    font-size: 0.88rem;
+    font-size: 0.76rem;
   }
 
   .game-page__side-seats {
@@ -372,144 +449,125 @@
 }
 
 @media (min-width: 1100px) {
-  .game-page__shell {
-    width: min(100%, 94vw);
-  }
-
   .game-page__table-stage {
     width: 97%;
   }
 }
 
-/* Landscape phones / short viewports — reclaim felt height, keep safe-area */
-@media (max-height: 520px) and (orientation: landscape) {
-  .game-page {
-    padding-top: max(0.08rem, env(safe-area-inset-top, 0px));
-    padding-right: max(0.2rem, env(safe-area-inset-right, 0px));
-    padding-bottom: max(0.08rem, env(safe-area-inset-bottom, 0px));
-    padding-left: max(0.2rem, env(safe-area-inset-left, 0px));
-  }
+.game-page {
+  padding-top: max(0.08rem, env(safe-area-inset-top, 0px));
+  padding-right: max(0.2rem, env(safe-area-inset-right, 0px));
+  padding-bottom: max(0.08rem, var(--game-safe-bottom, env(safe-area-inset-bottom, 0px)));
+  padding-left: max(0.2rem, env(safe-area-inset-left, 0px));
+}
 
-  .game-page__shell {
-    gap: 0;
-  }
+.game-page__shell {
+  gap: 0;
+}
 
-  .game-page__chrome {
-    margin-bottom: 0.12rem;
-  }
+.game-page__chrome {
+  margin-bottom: var(--game-chrome-felt-gap, 6px);
+}
 
-  .game-page__body {
-    gap: 0;
-  }
+.game-page .player-panel {
+  padding-block: 0;
+}
 
-  .game-page__mid {
-    gap: 0.16rem;
-  }
+.game-page .bottom-bar {
+  min-height: 0;
+}
 
-  .game-page__side-seats {
-    max-width: 4.15rem;
-    gap: 0.12rem;
-  }
+/* Short landscape — compact HUD typography and chrome so the felt keeps
+   the reserved --game-chrome-height. Tile sizes stay on the universal scale
+   (data-layout-density, not a device name). */
+.game-page[data-layout-density="short"] .game-page__chrome {
+  min-height: var(--game-chrome-height, 0px);
+  max-height: var(--game-chrome-height, none);
+}
 
-  .game-page__hud-score {
-    width: clamp(7.25rem, 27vw, 8.75rem);
-  }
+/*
+ * American 4-player phone landscape: hug Rival 1 / HUD so the felt grows
+ * UPWARD. Dock height is unchanged, so the table bottom and Player 1 hand
+ * stay put. Tablet and other rulesets keep the shared chrome lock.
+ */
+.game-page--players-4[data-layout-density="short"][data-ruleset="allFives"] .game-page__chrome {
+  min-height: 0;
+  max-height: none;
+  height: auto;
+  margin-bottom: var(--game-chrome-felt-gap, 2px);
+}
 
-  .game-page--players-3 .game-page__hud-score,
-  .game-page--players-4 .game-page__hud-score {
-    width: clamp(7.75rem, 30vw, 9.25rem);
-  }
+.game-page--players-4[data-layout-density="short"][data-ruleset="allFives"] .game-page__chrome .header--stacked,
+.game-page--players-4[data-layout-density="short"][data-ruleset="allFives"] .game-page__chrome .header--stacked .header__inner {
+  min-height: 0;
+  max-height: none;
+  height: auto;
+}
 
-  .game-page__chrome .scoreboard--table {
-    padding: 0.24rem 0.34rem;
-  }
+.game-page--players-4[data-layout-density="short"][data-ruleset="allFives"] .header--stacked .header__inner {
+  padding-bottom: 0;
+}
 
-  .game-page__chrome .scoreboard__line {
-    min-height: 0.98rem;
-    padding: 0.04rem 0;
-  }
+.game-page[data-layout-density="short"] .game-page__chrome .scoreboard--table {
+  padding: 0.12rem 0.26rem;
+  gap: clamp(0.12rem, 0.7vw, 0.28rem);
+}
 
-  .game-page__chrome .scoreboard__label {
-    font-size: 0.54rem;
-  }
+.game-page[data-layout-density="short"] .game-page__chrome .scoreboard__line {
+  min-height: 0;
+  padding: 0;
+}
 
-  .game-page__chrome .scoreboard__value,
-  .game-page__chrome .scoreboard__points,
-  .game-page__chrome .scoreboard__value--target {
-    font-size: 0.8rem;
-  }
+.game-page[data-layout-density="short"] .game-page__chrome .scoreboard__label {
+  font-size: 0.48rem;
+}
 
-  .game-page__chrome .scoreboard__line--target {
-    margin-top: 0.02rem;
-    padding-top: 0.14rem;
-  }
+.game-page[data-layout-density="short"] .game-page__chrome .scoreboard__value,
+.game-page[data-layout-density="short"] .game-page__chrome .scoreboard__points,
+.game-page[data-layout-density="short"] .game-page__chrome .scoreboard__value--target {
+  font-size: 0.7rem;
+}
 
-  .game-page__top-hud-center .opponent-panel__meta {
-    padding: 0.08rem 0.4rem;
-    gap: 0.28rem;
-  }
+.game-page[data-layout-density="short"] .game-page__top-hud-center .opponent-panel__meta {
+  padding: 0.06rem 0.32rem;
+  gap: 0.22rem;
+}
 
-  .game-page__top-hud-center .opponent-panel__tray {
-    min-height: calc(var(--domino-hand-h) * 0.36 + 0.04rem);
-  }
+.game-page[data-layout-density="short"] .header--stacked .header__inner {
+  min-height: 0;
+  padding-top: 0.06rem;
+  padding-bottom: 0.04rem;
+}
 
-  .game-page__hud-reserve .reserve {
-    padding: 0.22rem 0.32rem;
-  }
+.game-page[data-layout-density="short"] .header--stacked .header__brand .brand-logo {
+  height: clamp(1.15rem, 3.4vw, 1.45rem);
+}
 
-  .game-page__hud-reserve .reserve__stack {
-    width: 1.7rem;
-    height: 2.35rem;
-  }
+.game-page[data-layout-density="short"] .header--stacked .header__menu-btn {
+  min-height: 32px;
+  padding: 0.12rem 0.36rem;
+  font-size: 0.55rem;
+}
 
-  .game-page__hud-reserve .reserve .domino {
-    --_w: 1.35rem;
-    --_h: 2.3rem;
-  }
+.game-page[data-layout-density="short"] .game-page__top-hud-center .opponent-panel .avatar {
+  width: 1.05rem;
+  height: 1.05rem;
+  font-size: 0.4rem;
+}
 
-  .game-page__hud-reserve .reserve__empty-slot {
-    width: 1.35rem;
-    height: 2.3rem;
-  }
+.game-page[data-layout-density="short"] .game-page__top-hud-center .opponent-panel__tray {
+  min-height: 0;
+}
 
-  .game-page__hud-reserve .reserve__count {
-    font-size: 1rem;
-  }
+.game-page[data-layout-density="short"] .game-page__top-hud-center .opponent-panel__tile > * {
+  transform: scale(0.52);
+}
 
-  .game-page .header {
-    height: 2.45rem;
-  }
+.game-page[data-layout-density="short"] .header {
+  height: auto;
+  min-height: 0;
+}
 
-  .game-page .opponent-panel:not(.opponent-panel--left):not(.opponent-panel--right) {
-    padding-block: 0;
-    gap: 0.04rem;
-  }
-
-  .game-page .opponent-panel:not(.opponent-panel--left):not(.opponent-panel--right) .opponent-panel__meta {
-    padding: 0.1rem 0.45rem;
-    gap: 0.35rem;
-  }
-
-  .game-page .opponent-panel:not(.opponent-panel--left):not(.opponent-panel--right) .opponent-panel__tray {
-    min-height: calc(var(--domino-hand-h) * 0.42 + 0.08rem);
-  }
-
-  .game-page .opponent-panel:not(.opponent-panel--left):not(.opponent-panel--right) .avatar {
-    width: 1.25rem;
-    height: 1.25rem;
-    font-size: 0.48rem;
-  }
-
-  .game-page .player-panel {
-    padding-block: 0;
-  }
-
-  .game-page .player-panel__meta {
-    min-height: 0;
-    padding: 0;
-  }
-
-  .game-page .player-panel__status {
-    font-size: 0.48rem;
-  }
+.game-page[data-layout-density="short"] .player-panel__status {
+  font-size: 0.48rem;
 }

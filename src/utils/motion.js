@@ -3,8 +3,8 @@
  */
 
 export const MOTION = Object.freeze({
-  /** Play / AI place flight — 200–250ms premium slide. */
-  tileFlightMs: 230,
+  /** Play / AI place flight — 250–400ms, quick and smooth. */
+  tileFlightMs: 280,
   drawFlightMs: 220,
   snapMs: 200,
   handFlipMs: 220,

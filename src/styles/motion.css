@@ -1,7 +1,7 @@
 /* Shared motion tokens & reduced-motion gates */
 
 :root {
-  --duration-flight: 230ms;
+  --duration-flight: 280ms;
   --duration-draw: 220ms;
   --duration-flip: 260ms;
   --ease-flight: cubic-bezier(0.45, 0.05, 0.55, 0.95);

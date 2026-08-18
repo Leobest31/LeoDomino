@@ -17,6 +17,7 @@ import {
   traceTopologyMove,
 } from "../game/boardTopology.js";
 import { displayGlowHalves, mergeScoreHighlights } from "./scoreGlow.js";
+import { measureHandExclusionPx } from "./handExclusion.js";
 import "./BoardContainer.css";
 
 /**
@@ -26,7 +27,10 @@ import "./BoardContainer.css";
  * `transform: translate3d(x, y, 0)` slots. No flex/grid tile flow.
  *
  * The engine lays out the complete chain (and spinner branches) in logical
- * space, then auto-fits and pins the first-double anchor to the felt center.
+ * space, then auto-fits: translate the AABB into the exclusive felt
+ * (top HUD and Player 1 dock are outside this rectangle) before any
+ * uniform scale. The spinner may leave the geometric felt mid so unused
+ * space above a south branch is used.
  */
 function BoardContainer({
   tiles = [],
@@ -39,11 +43,13 @@ function BoardContainer({
   emptyLabel = "",
   debug: debugProp = null,
   scoreHighlights = [],
+  hiddenIds = null,
 }) {
   const stageRef = useRef(null);
   const probeRef = useRef(null);
   const [area, setArea] = useState({ w: 640, h: 320 });
   const [tileSize, setTileSize] = useState({ w: 72, h: 136 });
+  const [handExclusionPx, setHandExclusionPx] = useState(0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const panRef = useRef({ x: 0, y: 0 });
   const panDragRef = useRef(null);
@@ -60,15 +66,29 @@ function BoardContainer({
         h: Math.max(120, stage.clientHeight),
       };
       setArea(nextArea);
+      const dock = document.querySelector("[data-hand-dock]");
+      setHandExclusionPx(
+        measureHandExclusionPx(
+          stage.getBoundingClientRect(),
+          dock?.getBoundingClientRect()
+        )
+      );
       const probe = probeRef.current?.querySelector(".domino, .leo-domino-premium");
       if (probe) {
         const r = probe.getBoundingClientRect();
         if (r.width > 2 && r.height > 2) {
-          // CSS probe uses the moderate hand×factor; viewport cap prevents
-          // rem/vw scaling from recreating the oversized ~134×254 base.
+          // CSS probe uses --played-tile-*; composition cap keeps phone
+          // bones from dominating a short felt.
           setTileSize(
             resolveBoardTileBase(
-              { width: nextArea.w, height: nextArea.h },
+              {
+                width: nextArea.w,
+                height: nextArea.h,
+                hudBottom: measureHandExclusionPx(
+                  stage.getBoundingClientRect(),
+                  dock?.getBoundingClientRect()
+                ),
+              },
               { w: r.width, h: r.height }
             )
           );
@@ -79,6 +99,8 @@ function BoardContainer({
     read();
     const ro = new ResizeObserver(read);
     ro.observe(stage);
+    const dock = document.querySelector("[data-hand-dock]");
+    if (dock) ro.observe(dock);
     return () => ro.disconnect();
   }, [tiles.length]);
 
@@ -119,6 +141,7 @@ function BoardContainer({
           tileWidth: tileSize.w,
           tileHeight: tileSize.h,
           hudRight,
+          hudBottom: handExclusionPx,
           maxScale: 1,
           focusTileId: newestId ?? tiles[tiles.length - 1]?.id,
           spinnerId: topology.spinnerId,
@@ -163,7 +186,7 @@ function BoardContainer({
       preferred.tiles.length > 0 ? preferred : build(null);
 
     return resolved;
-  }, [tiles, centerIndex, area, tileSize, newestId, spinnerId, spinnerNorth, spinnerSouth]);
+  }, [tiles, centerIndex, area, tileSize, newestId, spinnerId, spinnerNorth, spinnerSouth, handExclusionPx]);
 
   const { placements, armPlacements, tileScale, debug, gap, camera } = layout;
   // Pan is exploratory UX only — engine must not rely on overflow+pan.
@@ -354,6 +377,8 @@ function BoardContainer({
                 key={tile.id}
                 className={classes}
                 role="listitem"
+                data-board-tile={tile.id}
+                data-travel-dir={pos.travelDir || undefined}
                 data-score-glow={
                   halves.first || halves.second
                     ? [halves.first ? "first" : "", halves.second ? "second" : ""]
@@ -373,6 +398,7 @@ function BoardContainer({
                   orientation={display.orientation}
                   boardTileId={tile.id}
                   highlighted={isTarget}
+                  hidden={Boolean(hiddenIds?.has(tile.id))}
                 />
                 {halves.first ? (
                   <span

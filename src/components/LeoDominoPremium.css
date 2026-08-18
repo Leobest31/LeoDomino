@@ -82,8 +82,12 @@
   filter: drop-shadow(0 0 6px rgba(255, 229, 150, 0.55));
 }
 
-.leo-domino-premium.is-selected:not(.is-flat) {
-  transform: translateY(-8px) scale(1.04);
+.player-panel .leo-domino-premium.is-selected:not(.is-flat) {
+  transform: translateY(-4px) scale(1);
+}
+
+.player-panel .leo-domino-premium.is-interactive:hover:not(.is-disabled):not(.is-flat) {
+  transform: translateY(-3px) scale(1);
 }
 
 .leo-domino-premium.is-disabled {

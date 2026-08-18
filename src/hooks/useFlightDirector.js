@@ -68,11 +68,19 @@ export function useFlightDirector() {
       }
       spec.apply?.();
       await nextFrame();
+      await nextFrame();
 
       let toEl = measure(spec.toSelector);
       for (let attempt = 0; attempt < 12 && !toEl; attempt += 1) {
         await wait(16);
         toEl = measure(spec.toSelector);
+      }
+      if (!toEl && spec.toFallbackSelector) {
+        toEl = measure(spec.toFallbackSelector);
+        for (let attempt = 0; attempt < 8 && !toEl; attempt += 1) {
+          await wait(16);
+          toEl = measure(spec.toFallbackSelector);
+        }
       }
 
       if (!toEl) {
@@ -130,6 +138,7 @@ export function useFlightDirector() {
    * @param {string} [spec.fromSelector]
    * @param {{ x: number, y: number, w: number, h: number }} [spec.fromRect]
    * @param {string} spec.toSelector
+   * @param {string} [spec.toFallbackSelector] - neighbor/attachment tile if the played slot is not laid out yet
    * @param {string} [spec.startOrientation]
    * @param {string} [spec.endOrientation]
    * @param {number} [spec.durationMs]

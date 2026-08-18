@@ -62,9 +62,9 @@ export default {
         "Double-six · 7 tuiles · deux bouts ouverts · premier à 4 points de match · victoire +1 · bloqué +1 · Dekabès +2 · 6-6 ouvre la manche 1",
       american: "Américain",
       americanDescription:
-        "Draw Domino américain. Jouez sur l’un des deux bouts, piochez jusqu’à pouvoir jouer, passez si vide. Premier à 100.",
+        "Marquez quand les bouts ouverts totalisent un multiple de 5 (minimum 10). Piochez jusqu’à pouvoir jouer. Premier à 200.",
       americanSummary:
-        "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
+        "Double-six · 7 tuiles · points en cours · multiples de 5 à partir de 10 · fin de manche au plus proche de 5 · jouer à 200",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives américain. Marquez quand les bouts ouverts totalisent un multiple de 5 (minimum 10). Premier à 200.",
@@ -127,6 +127,9 @@ export default {
     playScore: "+{{points}}",
     rawPipsLabel: "Pips bruts : {{total}}",
     roundPointsLabel: "Points de manche",
+    rotateTitle: "Tournez votre appareil",
+    rotateBody:
+      "Pour une meilleure expérience LeoDomino, placez le téléphone ou la tablette à l’horizontale.",
   },
   rules: {
     roundWon: "{{name}} gagne la manche",

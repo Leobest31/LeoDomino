@@ -13,7 +13,7 @@ function FlyingDomino({
   to,
   startOrientation = "vertical",
   endOrientation = "horizontal",
-  durationMs = 230,
+  durationMs = 280,
   arcLiftPx = 2,
   onComplete,
 }) {
@@ -38,7 +38,7 @@ function FlyingDomino({
   };
 
   return (
-    <div className="flying-domino" style={style} aria-hidden="true">
+    <div className="flying-domino" style={style} aria-hidden="true" data-flight-path>
       <div className="flying-domino__inner" onAnimationEnd={() => onComplete?.()}>
         <DominoTile
           left={left}

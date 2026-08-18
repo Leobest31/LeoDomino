@@ -57,7 +57,7 @@ function AnimatedValue({ value }) {
 }
 
 /**
- * Table HUD scores — one row per seat (2 / 3 / 4 players).
+ * Table HUD scores — one horizontal strip (round, seats, target).
  * scoreFormat "ofTarget" shows Haitian-style "X / 4" per seat.
  */
 function ScoreBoard({
@@ -80,7 +80,7 @@ function ScoreBoard({
       : [];
 
   return (
-    <aside className="scoreboard scoreboard--table" aria-label={t("game.scoreboard")}>
+    <aside className="scoreboard scoreboard--table scoreboard--inline" aria-label={t("game.scoreboard")}>
       <div className="scoreboard__line">
         <span className="scoreboard__label scoreboard__label--gold">
           <span className="scoreboard__icon" aria-hidden="true">

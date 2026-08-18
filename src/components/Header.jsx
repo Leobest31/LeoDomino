@@ -15,6 +15,7 @@ function Header({
   onSettingsOpenChange,
   startBelow = null,
   centerBelow = null,
+  endBefore = null,
   compact = false,
   onMainMenu = null,
 }) {
@@ -31,24 +32,6 @@ function Header({
       <header className={`header${stacked ? " header--stacked" : ""}`}>
         <div className="header__inner">
           <div className="header__side header__side--start">
-            <button
-              type="button"
-              className="header__icon-btn"
-              onMouseEnter={() => play("button", { gain: 0.35 })}
-              onClick={async () => {
-                await unlock();
-                if (muted) {
-                  toggleMute();
-                  play("button");
-                } else {
-                  play("button");
-                  toggleMute();
-                }
-              }}
-            >
-              {muted ? <IconMute /> : <IconUnmute />}
-              <span className="sr-only">{muted ? t("audio.unmute") : t("audio.mute")}</span>
-            </button>
             {startBelow}
           </div>
 
@@ -58,19 +41,40 @@ function Header({
           </div>
 
           <div className="header__side header__side--end">
-            <button
-              type="button"
-              className="header__icon-btn"
-              onMouseEnter={() => play("button", { gain: 0.35 })}
-              onClick={async () => {
-                await unlock();
-                play("button");
-                setSettingsOpen(true);
-              }}
-            >
-              <IconSettings />
-              <span className="sr-only">{t("common.settings")}</span>
-            </button>
+            <div className="header__end-tools">
+              <button
+                type="button"
+                className="header__icon-btn"
+                onMouseEnter={() => play("button", { gain: 0.35 })}
+                onClick={async () => {
+                  await unlock();
+                  if (muted) {
+                    toggleMute();
+                    play("button");
+                  } else {
+                    play("button");
+                    toggleMute();
+                  }
+                }}
+              >
+                {muted ? <IconMute /> : <IconUnmute />}
+                <span className="sr-only">{muted ? t("audio.unmute") : t("audio.mute")}</span>
+              </button>
+              {endBefore}
+              <button
+                type="button"
+                className="header__icon-btn"
+                onMouseEnter={() => play("button", { gain: 0.35 })}
+                onClick={async () => {
+                  await unlock();
+                  play("button");
+                  setSettingsOpen(true);
+                }}
+              >
+                <IconSettings />
+                <span className="sr-only">{t("common.settings")}</span>
+              </button>
+            </div>
             {typeof onMainMenu === "function" ? (
               <button
                 type="button"

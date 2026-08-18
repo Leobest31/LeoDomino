@@ -21,6 +21,7 @@ import {
   layoutBoard,
   calculateBoardLayout,
   computePlayBounds,
+  computeChainBounds,
   resolveBoardTileBase,
   orientationForTravel,
   computeLayoutMetrics,
@@ -29,9 +30,10 @@ import {
   countTurns,
   collisionBox,
 } from "./layoutEngine.js";
+import { GAMEPLAY_REF, PLAYED_SHORT_MAX_PX } from "../ui/gameplayLayout.js";
 
 const size = { w: 40, h: 76 };
-/** Locked desktop board footprint (hand×2.15 middle range). */
+/** Locked desktop board footprint (hand×2.93 middle range). */
 const locked = {
   w: LOCKED_BOARD_TILE_SHORT_PX,
   h: LOCKED_BOARD_TILE_LONG_PX,
@@ -51,18 +53,18 @@ assert.equal(MARGIN, 14);
 assert.equal(MIN_BOARD_SCALE, 0.85);
 assert.equal(MIN_TILE_SCALE, MIN_BOARD_SCALE);
 assert.equal(MIN_DESKTOP_TILE_PX, 30);
-assert.equal(BOARD_TILE_HAND_FACTOR, 2.15);
+assert.equal(BOARD_TILE_HAND_FACTOR, 2.93);
 assert.equal(BOARD_BASE_SHORT_MIN_PX, 44);
-assert.equal(BOARD_BASE_SHORT_MAX_PX, 80);
-assert.equal(LOCKED_BOARD_TILE_SHORT_PX, 72);
-assert.equal(LOCKED_BOARD_TILE_LONG_PX, 136);
+assert.equal(BOARD_BASE_SHORT_MAX_PX, PLAYED_SHORT_MAX_PX);
+assert.equal(LOCKED_BOARD_TILE_SHORT_PX, GAMEPLAY_REF.playedShort);
+assert.equal(LOCKED_BOARD_TILE_LONG_PX, GAMEPLAY_REF.playedLong);
 assert.equal(TURN_EVERY, 5);
 assert.equal(FIRST_FOLD_RIGHT, "S");
 assert.equal(FIRST_FOLD_LEFT, "N");
 
 {
-  // Middle-range base: CSS hand×2.15 (~72×136) capped by felt — never the
-  // old oversized ~134×254, never hand-tiny.
+  // Middle-range base: CSS played-tile probe (~99×186) capped by the
+  // universal composition — never the old oversized ~134×254.
   const laptop = resolveBoardTileBase(
     { width: 1180, height: 520 },
     { w: 134, h: 254 }
@@ -623,13 +625,14 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
     assert.ok(opener, `snake ${n} opener`);
     const feltMidX = (play.minX + play.maxX) / 2;
     const feltMidY = (play.minY + play.maxY) / 2;
+    const bb = computeChainBounds(placements);
     assert.ok(
-      Math.abs(opener.x + opener.w / 2 - feltMidX) < 1.5,
-      `snake ${n} opener x center`
+      Math.abs(bb.cx - feltMidX) < 1.5,
+      `snake ${n} bbox x center`
     );
     assert.ok(
-      Math.abs(opener.y + opener.h / 2 - feltMidY) < 1.5,
-      `snake ${n} opener y center`
+      Math.abs(bb.cy - feltMidY) < 1.5,
+      `snake ${n} bbox y center`
     );
     assert.ok(!camera?.overflow, `snake ${n} must not overflow felt`);
 
@@ -637,9 +640,10 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
     const leftArm = [];
     for (let i = centerIndex - 1; i >= 0; i -= 1) leftArm.push(tiles[i]);
 
-    // Exactly 5 horizontal RIGHT, 6th turns DOWN.
-    if (rightArm.length >= 6) {
-      for (let i = 0; i < 5; i += 1) {
+    const rightFold = rightArm.findIndex((t) => byId[t.id].travelDir !== "E");
+    if (rightFold >= 0) {
+      assert.ok(rightFold >= 1 && rightFold <= 5, `snake ${n} right fold ${rightFold}`);
+      for (let i = 0; i < rightFold; i += 1) {
         assert.equal(
           byId[rightArm[i].id].travelDir,
           "E",
@@ -647,20 +651,21 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
         );
       }
       assert.equal(
-        byId[rightArm[5].id].travelDir,
+        byId[rightArm[rightFold].id].travelDir,
         FIRST_FOLD_RIGHT,
-        `snake ${n} right[5] must turn ${FIRST_FOLD_RIGHT}`
+        `snake ${n} right first fold must turn ${FIRST_FOLD_RIGHT}`
       );
-      assert.ok(byId[rightArm[5].id].isCorner, `snake ${n} right[5] corner`);
+      assert.ok(byId[rightArm[rightFold].id].isCorner, `snake ${n} right fold corner`);
     } else {
       for (const t of rightArm) {
         assert.equal(byId[t.id].travelDir, "E", `snake ${n} short right E`);
       }
     }
 
-    // Exactly 5 horizontal LEFT, 6th turns UP.
-    if (leftArm.length >= 6) {
-      for (let i = 0; i < 5; i += 1) {
+    const leftFold = leftArm.findIndex((t) => byId[t.id].travelDir !== "W");
+    if (leftFold >= 0) {
+      assert.ok(leftFold >= 1 && leftFold <= 5, `snake ${n} left fold ${leftFold}`);
+      for (let i = 0; i < leftFold; i += 1) {
         assert.equal(
           byId[leftArm[i].id].travelDir,
           "W",
@@ -668,11 +673,11 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
         );
       }
       assert.equal(
-        byId[leftArm[5].id].travelDir,
+        byId[leftArm[leftFold].id].travelDir,
         FIRST_FOLD_LEFT,
-        `snake ${n} left[5] must turn ${FIRST_FOLD_LEFT}`
+        `snake ${n} left first fold must turn ${FIRST_FOLD_LEFT}`
       );
-      assert.ok(byId[leftArm[5].id].isCorner, `snake ${n} left[5] corner`);
+      assert.ok(byId[leftArm[leftFold].id].isCorner, `snake ${n} left fold corner`);
     } else {
       for (const t of leftArm) {
         assert.equal(byId[t.id].travelDir, "W", `snake ${n} short left W`);
@@ -769,11 +774,11 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
   }
 
   const viewports = [
-    { name: "desktop", width: 1180, height: 520 },
-    { name: "tablet-landscape", width: 940, height: 480 },
+    { name: "desktop", width: 1180, height: 660 },
+    { name: "tablet-landscape", width: 940, height: 600 },
     { name: "tablet-portrait", width: 700, height: 620 },
   ];
-  const lengths = [7, 14, 21, 28];
+  const lengths = [5, 7, 14, 21, 28];
 
   for (const vp of viewports) {
     for (const n of lengths) {
@@ -841,20 +846,21 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
       const midY = (play.minY + play.maxY) / 2;
       const opener = byId.c;
       assert.ok(opener, `${vp.name} n=${n} missing center`);
+      const bb = computeChainBounds(placements);
       assert.ok(
-        Math.abs(opener.x + opener.w / 2 - midX) < 1.5,
-        `${vp.name} n=${n} center not pinned X`
+        Math.abs(bb.cx - midX) < 1.5,
+        `${vp.name} n=${n} bbox not centered X`
       );
       assert.ok(
-        Math.abs(opener.y + opener.h / 2 - midY) < 1.5,
-        `${vp.name} n=${n} center not pinned Y`
+        Math.abs(bb.cy - midY) < 1.5,
+        `${vp.name} n=${n} bbox not centered Y`
       );
 
       const short = Math.min(placements[0].w, placements[0].h);
       const long = Math.max(placements[0].w, placements[0].h);
       const turns = chainTurns(placements, tiles);
 
-      if (n <= 7 && vp.width >= 1100) {
+      if (n <= 5 && vp.width >= 1100) {
         assert.ok(
           tileScale >= 0.99,
           `${vp.name} n=${n} short chain should keep preferred scale ${tileScale}`
@@ -926,7 +932,13 @@ assert.equal(orientationForTravel(tile("t"), "N"), "vertical");
     const heightUse = (maxY - minY) / (play.maxY - play.minY);
     assert.ok(heightUse >= 0.28, `${vp.name} one21 hUse ${heightUse}`);
     const byId = Object.fromEntries(placements.map((p) => [p.id, p]));
-    assert.equal(byId.t6?.travelDir, "S", `${vp.name} one21 must fold DOWN after 5`);
+    const rightFold = tiles.slice(1).find((t) => byId[t.id]?.travelDir !== "E");
+    assert.ok(rightFold, `${vp.name} one21 must fold`);
+    assert.equal(
+      byId[rightFold.id].travelDir,
+      FIRST_FOLD_RIGHT,
+      `${vp.name} one21 first fold must be DOWN`
+    );
   }
 }
 

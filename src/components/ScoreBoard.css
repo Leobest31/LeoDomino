@@ -1,11 +1,14 @@
-/* Premium score HUD — pixel-aligned rows, table-anchored */
+/* Premium score HUD — one horizontal strip, gold/navy identity preserved */
 .scoreboard--table {
   display: flex;
-  flex-direction: column;
-  gap: 0;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: clamp(0.28rem, 1.1vw, 0.7rem);
   width: 100%;
   min-width: 0;
-  padding: 0.65rem 0.72rem;
+  padding: 0.28rem 0.5rem;
   background:
     linear-gradient(165deg, rgba(14, 18, 26, 0.95) 0%, rgba(4, 8, 10, 0.93) 100%);
   border: 1px solid rgba(201, 162, 39, 0.5);
@@ -18,20 +21,23 @@
 }
 
 .scoreboard__line {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(2.75rem, auto);
-  align-items: center;
-  column-gap: 0.55rem;
-  min-height: 1.45rem;
-  padding: 0.22rem 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  column-gap: 0.22rem;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  flex: 0 1 auto;
 }
 
 .scoreboard__of-target {
   display: inline-flex;
   align-items: baseline;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0;
-  width: 100%;
+  width: auto;
   white-space: nowrap;
 }
 
@@ -41,7 +47,7 @@
 
 .scoreboard__of-target-sep {
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.88);
   font-variant-numeric: tabular-nums;
@@ -50,13 +56,13 @@
 
 .scoreboard__label {
   display: grid;
-  grid-template-columns: 1rem minmax(0, 1fr);
+  grid-template-columns: 0.9rem minmax(0, 1fr);
   align-items: center;
-  column-gap: 0.35rem;
+  column-gap: 0.2rem;
   font-family: var(--font-ui);
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
@@ -69,9 +75,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  font-size: 0.7rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  font-size: 0.66rem;
   line-height: 1;
   opacity: 0.9;
 }
@@ -90,14 +96,15 @@
 
 .scoreboard__value,
 .scoreboard__points {
-  display: block;
-  width: 100%;
+  display: inline-block;
+  width: auto;
+  flex-shrink: 0;
   font-family: var(--font-ui);
-  font-size: 1.1rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: #ffffff;
   line-height: 1;
-  text-align: right;
+  text-align: left;
   font-variant-numeric: tabular-nums;
   transition:
     color var(--duration-fast) var(--ease-out),
@@ -111,63 +118,65 @@
 
 .scoreboard__value--target {
   color: var(--color-gold-bright);
-  font-size: 1.1rem;
+  font-size: 0.92rem;
 }
 
 .scoreboard__line--target {
-  margin-top: 0.12rem;
-  padding-top: 0.38rem;
-  border-top: 1px solid rgba(201, 162, 39, 0.28);
+  margin-top: 0;
+  padding-top: 0;
+  padding-left: 0.38rem;
+  border-top: none;
+  border-left: 1px solid rgba(201, 162, 39, 0.28);
 }
 
 @media (max-width: 719px) {
   .scoreboard--table {
-    padding: 0.48rem 0.55rem;
+    padding: 0.2rem 0.36rem;
+    gap: clamp(0.18rem, 0.9vw, 0.42rem);
   }
 
   .scoreboard__line {
-    min-height: 1.32rem;
-    padding: 0.14rem 0;
-    grid-template-columns: minmax(0, 1fr) 2.4rem;
-    column-gap: 0.4rem;
+    column-gap: 0.14rem;
   }
 
   .scoreboard__label {
-    font-size: 0.64rem;
-    grid-template-columns: 0.9rem minmax(0, 1fr);
-    column-gap: 0.28rem;
+    font-size: 0.54rem;
+    letter-spacing: 0.03em;
+    grid-template-columns: 0.78rem minmax(0, 1fr);
+    column-gap: 0.14rem;
   }
 
   .scoreboard__icon {
-    width: 0.9rem;
-    height: 0.9rem;
-    font-size: 0.62rem;
+    width: 0.78rem;
+    height: 0.78rem;
+    font-size: 0.56rem;
   }
 
   .scoreboard__value,
   .scoreboard__points,
-  .scoreboard__value--target {
-    font-size: 0.98rem;
+  .scoreboard__value--target,
+  .scoreboard__of-target-sep {
+    font-size: 0.78rem;
+  }
+
+  .scoreboard__line--target {
+    padding-left: 0.28rem;
   }
 }
 
-/* 4-player (and 3p) scoreboards need slightly denser but readable rows */
+/* Extra seats: compact first; wrap only if the row cannot hold every field */
 @media (max-width: 719px) {
   .game-page--players-3 .scoreboard--table,
   .game-page--players-4 .scoreboard--table {
-    padding: 0.42rem 0.5rem;
-  }
-
-  .game-page--players-3 .scoreboard__line,
-  .game-page--players-4 .scoreboard__line {
-    min-height: 1.2rem;
-    padding: 0.1rem 0;
+    flex-wrap: wrap;
+    row-gap: 0.08rem;
+    padding: 0.16rem 0.3rem;
   }
 
   .game-page--players-3 .scoreboard__label,
   .game-page--players-4 .scoreboard__label {
-    font-size: 0.63rem;
-    letter-spacing: 0.035em;
+    font-size: 0.5rem;
+    letter-spacing: 0.02em;
   }
 
   .game-page--players-3 .scoreboard__value,
@@ -176,6 +185,6 @@
   .game-page--players-4 .scoreboard__value,
   .game-page--players-4 .scoreboard__points,
   .game-page--players-4 .scoreboard__value--target {
-    font-size: 0.9rem;
+    font-size: 0.72rem;
   }
 }

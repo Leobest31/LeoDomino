@@ -5,6 +5,9 @@
   transform: translate(-50%, -50%);
   filter: drop-shadow(0 1.5px 2.5px rgba(40, 30, 15, 0.22));
   touch-action: none;
+  --domino-w: var(--player-hand-w, var(--domino-hand-w));
+  --domino-h: var(--player-hand-h, var(--domino-hand-h));
+  --domino-pip: var(--player-hand-pip, var(--domino-hand-pip));
 }
 
 .drag-ghost .domino {

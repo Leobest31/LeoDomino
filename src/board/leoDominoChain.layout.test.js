@@ -1,6 +1,7 @@
 /**
- * Universal LeoDomino chain layout — first-double anchor, fixed 5/2 routing,
- * preferred size until overflow, uniform auto-fit, ruleset smoke.
+ * Universal LeoDomino chain layout — first-double anchor, felt-aware first
+ * run (5-straight ceiling), preferred size until overflow, uniform auto-fit,
+ * ruleset smoke.
  *
  * Run: node src/board/leoDominoChain.layout.test.js
  */
@@ -20,6 +21,7 @@ import {
   FIRST_FOLD_TOP,
   FIRST_FOLD_BOTTOM,
   TURN_EVERY,
+  packFirstRunLimit,
 } from "./layoutEngine.js";
 import {
   applyPlace,
@@ -134,7 +136,7 @@ function assertChainBboxCentered(layout, vp, label) {
   const safe = computeSafeFeltBounds(play);
   const midX = (safe.minX + safe.maxX) / 2;
   const midY = (safe.minY + safe.maxY) / 2;
-  const boxes = layout.tiles;
+  const boxes = [...layout.tiles, ...(layout.armTiles || [])];
   const minX = Math.min(...boxes.map((t) => t.x));
   const maxX = Math.max(...boxes.map((t) => t.x + t.w));
   const minY = Math.min(...boxes.map((t) => t.y));
@@ -185,15 +187,10 @@ function assertHorizontalMainLine(layout, board, vp, label) {
 }
 
 function assertAnchorPinned(layout, centerId, vp, label) {
-  const play = computePlayBounds(vp, 14, 0, 0);
-  const safe = computeSafeFeltBounds(play);
-  const midX = (safe.minX + safe.maxX) / 2;
-  const midY = (safe.minY + safe.maxY) / 2;
   const c = layout.tiles.find((t) => t.tileId === centerId);
   assert.ok(c, `${label}: missing center ${centerId}`);
-  const cx = centerOf(c);
-  assert.ok(Math.abs(cx.x - midX) < 1.5, `${label}: anchor x ${cx.x} vs ${midX}`);
-  assert.ok(Math.abs(cx.y - midY) < 1.5, `${label}: anchor y ${cx.y} vs ${midY}`);
+  assertInsideSafe(layout, vp, label);
+  assertChainBboxCentered(layout, vp, `${label}-bbox`);
 }
 
 function mkCross(leftCount, rightCount, northCount = 0, southCount = 0) {
@@ -452,24 +449,62 @@ function toSvg(layout, vp, title) {
 }
 
 {
-  // Scenario C/D — LEFT 5 → UP, RIGHT 5 → DOWN.
+  // Scenario C/D — first fold is UP on LEFT and DOWN on RIGHT.
+  // 5-straight remains the ceiling when it fits; shorter first runs are
+  // used when that rail cannot fit at preferred size.
+  const compact = { w: 40, h: 76 };
   const packed = mkCross(6, 6);
+  const compactLayout = layoutBoardChain(packed.board, VIEWPORTS.desktop, {
+    spinnerId: "3-3",
+    centerTileId: "3-3",
+    tileWidth: compact.w,
+    tileHeight: compact.h,
+    spinnerNorth: packed.north,
+    spinnerSouth: packed.south,
+  });
+  const compactBranches = branches(compactLayout, packed.board, "3-3");
+  for (let i = 0; i < 5; i += 1) {
+    assert.equal(compactBranches.left[i].travelDir, "W", `compact left[${i}] W`);
+    assert.equal(compactBranches.right[i].travelDir, "E", `compact right[${i}] E`);
+  }
+  assert.equal(compactBranches.left[5].travelDir, FIRST_FOLD_LEFT, "compact left[5] UP");
+  assert.equal(compactBranches.right[5].travelDir, FIRST_FOLD_RIGHT, "compact right[5] DOWN");
+  assert.ok(compactBranches.left[5].isCorner, "compact left tile 6 is the first fold");
+  assert.ok(compactBranches.right[5].isCorner, "compact right tile 6 is the first fold");
+
   for (const [name, vp] of Object.entries(VIEWPORTS)) {
     const layout = layoutCross(vp, packed);
     const { left, right } = branches(layout, packed.board, "3-3");
-    for (let i = 0; i < 5; i += 1) {
+    const play = computePlayBounds(vp, 14, 0, 0);
+    const safe = computeSafeFeltBounds(play);
+    const firstRun = packFirstRunLimit(
+      safe.maxX - safe.minX,
+      locked.h,
+      locked.w,
+      2
+    );
+    const foldAt = Math.min(firstRun, 5);
+    for (let i = 0; i < Math.min(foldAt, left.length); i += 1) {
       assert.equal(left[i].travelDir, "W", `${name} left[${i}] W`);
       assert.equal(right[i].travelDir, "E", `${name} right[${i}] E`);
     }
-    assert.equal(left[5].travelDir, FIRST_FOLD_LEFT, `${name} left[5] UP`);
-    assert.equal(right[5].travelDir, FIRST_FOLD_RIGHT, `${name} right[5] DOWN`);
-    assert.ok(left[5].isCorner, `${name} left tile 6 is the first fold`);
-    assert.ok(right[5].isCorner, `${name} right tile 6 is the first fold`);
+    if (left.length > foldAt) {
+      const idx = left.findIndex((t) => t.travelDir !== "W");
+      assert.ok(idx >= 1 && idx <= 5, `${name} left fold index ${idx}`);
+      assert.equal(left[idx].travelDir, FIRST_FOLD_LEFT, `${name} left first fold UP`);
+      assert.ok(left[idx].isCorner, `${name} left first fold is a corner`);
+    }
+    if (right.length > foldAt) {
+      const idx = right.findIndex((t) => t.travelDir !== "E");
+      assert.ok(idx >= 1 && idx <= 5, `${name} right fold index ${idx}`);
+      assert.equal(right[idx].travelDir, FIRST_FOLD_RIGHT, `${name} right first fold DOWN`);
+      assert.ok(right[idx].isCorner, `${name} right first fold is a corner`);
+    }
     assertAnchorPinned(layout, "3-3", vp, `${name} CD`);
     assertNoOverlap(layout, `${name} CD`);
     assertInsideSafe(layout, vp, `${name} CD`);
   }
-  console.log("✓ Scenario C/D: LEFT 5→UP and RIGHT 5→DOWN");
+  console.log("✓ Scenario C/D: LEFT→UP and RIGHT→DOWN (5-straight when it fits)");
 }
 
 {

@@ -62,9 +62,9 @@ export default {
         "Duplo-seis · 7 peças · duas pontas · primeiro a 4 pontos de partida · vitória +1 · bloqueio +1 · Dekabès +2 · 6-6 abre a ronda 1",
       american: "Americano",
       americanDescription:
-        "Draw Domino americano. Encaixa em qualquer ponta, compre até poder jogar, passe se vazio. Primeiro a 100.",
+        "Marque quando as pontas somam um múltiplo de 5 (mínimo 10). Compre até poder jogar. Primeiro a 200.",
       americanSummary:
-        "Duplo-seis · 7 peças · duas pontas abertas · comprar até poder jogar · passar se vazio · jogar até 100",
+        "Duplo-seis · 7 peças · pontos durante o jogo · múltiplos de 5 a partir de 10 · fim da ronda ao 5 mais próximo · jogar até 200",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives americano. Marque quando as pontas somam um múltiplo de 5 (mínimo 10). Primeiro a 200.",
@@ -127,6 +127,9 @@ export default {
     playScore: "+{{points}}",
     rawPipsLabel: "Pips brutos: {{total}}",
     roundPointsLabel: "Pontos da ronda",
+    rotateTitle: "Gire o dispositivo",
+    rotateBody:
+      "Para a melhor experiência LeoDomino, vire o telemóvel ou o tablet na horizontal.",
   },
   rules: {
     roundWon: "{{name}} vence a ronda",

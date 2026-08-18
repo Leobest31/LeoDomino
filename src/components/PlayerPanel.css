@@ -2,25 +2,18 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   gap: 0;
-  padding: 0.02rem 0.55rem 0.02rem;
+  padding: 0.02rem 0.2rem 0;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin: 0 auto;
   position: relative;
   z-index: 8;
-  /* Hand tiles slightly larger for tap comfort — scoped, board unchanged */
-  --domino-hand-w: clamp(1.85rem, 5vw, 2.28rem);
-  --domino-hand-h: clamp(3.4rem, 9.4vw, 4.25rem);
-  --domino-hand-pip: clamp(0.21rem, 0.58vw, 0.3rem);
-  --domino-w: var(--domino-hand-w);
-  --domino-h: var(--domino-hand-h);
-  --domino-pip: var(--domino-hand-pip);
-  background:
-    linear-gradient(180deg, rgba(8, 18, 28, 0.4) 0%, rgba(4, 10, 8, 0.72) 55%, rgba(3, 7, 6, 0.88) 100%);
-  border-top: 1px solid rgba(201, 162, 39, 0.14);
-  box-shadow:
-    inset 0 1px 0 rgba(47, 125, 255, 0.06),
-    0 -4px 14px rgba(0, 0, 0, 0.16);
+  background: transparent;
+  border-top: none;
+  box-shadow: none;
 }
 
 /* Collapse decorative title — reclaim dark gap between table and hand */
@@ -52,8 +45,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 0 0.02rem;
-  min-height: 0.55rem;
+  padding: 0;
+  height: 0;
+  min-height: 0;
+  overflow: visible;
+  pointer-events: none;
 }
 
 .player-panel__identity {
@@ -74,11 +70,12 @@
 }
 
 .player-panel__status {
-  font-size: 0.55rem;
+  font-size: 0.5rem;
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--color-text-muted);
   transition: color var(--duration-fast) var(--ease-out);
+  transform: translateY(-0.15rem);
 }
 
 .player-panel__status--turn {
@@ -94,7 +91,7 @@
   width: fit-content;
   max-width: 100%;
   margin-inline: auto;
-  padding: 0.1rem 0.36rem 0.1rem;
+  padding: 0.04rem 0.28rem 0.02rem;
   border-radius: var(--radius-md);
   border: 1px solid rgba(201, 162, 39, 0.18);
   background:
@@ -113,21 +110,31 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: var(--domino-gap);
+  gap: var(--player-hand-gap, var(--domino-gap));
   width: max-content;
-  min-height: calc(var(--domino-hand-h) + 0.12rem);
+  min-height: var(--player-hand-h, var(--domino-hand-h));
   margin: 0;
-  padding-bottom: 0.02rem;
+  padding-bottom: 0;
 }
 
 .player-panel__hand > * {
   flex: 0 0 auto;
   display: flex;
   align-items: flex-end;
+  position: relative;
+  z-index: 2;
+}
+
+.player-panel__hand > * + * {
+  margin-left: var(--player-hand-overlap, 0px);
 }
 
 /* Hand size comes from CSS vars — don’t force a 44px floor that fights compact scale */
 .player-panel .domino--interactive {
+  min-width: 0;
+}
+
+.player-panel .leo-domino-premium.is-interactive {
   min-width: 0;
 }
 
@@ -152,43 +159,35 @@
 
 @media (min-width: 768px) {
   .player-panel {
-    padding: 0.02rem 0.9rem 0.02rem;
+    padding: 0.02rem 0.9rem 0;
   }
 
   .player-panel__hand {
-    gap: 0.38rem;
+    gap: var(--player-hand-gap, 0.32rem);
   }
 
   .player-panel__tray {
-    padding: 0.1rem 0.5rem 0.1rem;
+    padding: 0.04rem 0.4rem 0.02rem;
   }
 }
 
 @media (max-width: 719px) {
   .player-panel {
-    padding: 0.02rem 0.35rem 0.02rem;
-    --domino-hand-w: clamp(1.9rem, 5.4vw, 2.2rem);
-    --domino-hand-h: clamp(3.5rem, 10vw, 4.1rem);
+    padding: 0.02rem 0.35rem 0;
   }
 
   .player-panel__tray {
-    padding: 0.08rem 0.28rem 0.08rem;
+    padding: 0.04rem 0.22rem 0.02rem;
   }
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
-  .player-panel {
-    --domino-hand-w: clamp(1.55rem, 4.2vh, 1.95rem);
-    --domino-hand-h: clamp(2.75rem, 7.8vh, 3.55rem);
-    --domino-hand-pip: clamp(0.18rem, 0.5vh, 0.26rem);
-  }
-
   .player-panel__tray {
     padding: 0.04rem 0.22rem;
   }
 
   .player-panel__hand {
-    min-height: calc(var(--domino-hand-h) + 0.06rem);
+    min-height: var(--player-hand-h, var(--domino-hand-h));
   }
 }
 

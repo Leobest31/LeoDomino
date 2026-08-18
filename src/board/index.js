@@ -19,6 +19,11 @@ export {
   GAP,
   CHAIN_GAP,
   TURN_EVERY,
+  RUN_CEILING,
+  packRunLimit,
+  packFirstRunLimit,
+  packLaterRunSearchLimit,
+  packSpinnerArmLimit,
   SPINNER_MAIN_STRAIGHT,
   SPINNER_ARM_STRAIGHT,
   FIRST_FOLD_RIGHT,
@@ -44,6 +49,10 @@ export {
   BRIDGE_RESERVE,
   MIN_SAFE_GAP_PX,
 } from "./DominoLayoutEngine.js";
+export {
+  HAND_EXCLUSION_GAP_PX,
+  measureHandExclusionPx,
+} from "./handExclusion.js";
 export {
   isBoardDebugEnabled,
   setBoardDebug,

@@ -4,13 +4,13 @@
   --color-bg: #07110d;
   --color-bg-elevated: #121c18;
   --color-bg-panel: rgba(7, 14, 11, 0.92);
-  /* Felt — deep casino green (tiles stay the focus) */
-  --color-felt: #0a5c24;
-  --color-felt-mid: #084a1c;
+  /* Felt — deep casino green with a slightly lifted play-area midtone */
+  --color-felt: #0e7030;
+  --color-felt-mid: #0a5822;
   --color-felt-dark: #063816;
-  --color-felt-light: #0c6a2c;
-  --color-felt-hot: #0c6a2c;
-  --color-felt-glow: rgba(12, 106, 44, 0.16);
+  --color-felt-light: #1a8c40;
+  --color-felt-hot: #1a8c40;
+  --color-felt-glow: rgba(26, 140, 64, 0.2);
   /* Wood frame — reference .game-area border #4b250e */
   --color-wood: #4b250e;
   --color-wood-mid: #4b250e;
@@ -67,21 +67,44 @@
   --radius-tile: 16%;
   --radius-pill: 999px;
   --header-height: 3.15rem;
-  --bottom-bar-height: 3.45rem;
+  --bottom-bar-height: 2.7rem;
   --game-max: 100%;
   /* Prefer filling the mid stage — high ceiling so the felt can grow */
   --game-area-height: clamp(24rem, 78dvh, 62rem);
   --game-area-width: 100%;
   --game-area-max-width: none;
 
-  /* Hand — compact but nearer comfortable tap width on phones */
-  --domino-hand-w: clamp(1.63rem, 4.3vw, 2.11rem);
-  --domino-hand-h: clamp(3.1rem, 8.2vw, 4.01rem);
-  --domino-hand-pip: clamp(0.19rem, 0.52vw, 0.28rem);
+  /* Hand — defaults match the 1280×800 reference; GamePage overwrites. */
+  --domino-hand-w: 33px;
+  --domino-hand-h: 60px;
+  --domino-hand-pip: 5.5px;
+  --player-hand-w: 39.6px;
+  --player-hand-h: 72px;
+  --player-hand-pip: 6.6px;
+  --player-hand-gap: 6px;
+  --player-hand-overlap: 0px;
   --domino-w: var(--domino-hand-w);
   --domino-h: var(--domino-hand-h);
   --domino-pip: var(--domino-hand-pip);
   --domino-gap: 0.3rem;
+
+  --game-ui-scale: 1;
+  --game-hud-scale: 1;
+  --game-action-scale: 1;
+  --game-chrome-height: 132px;
+  --game-dock-height: 78px;
+  --game-region-gap: 6px;
+  --game-chrome-felt-gap: 6px;
+  --game-felt-dock-gap: 6px;
+  --felt-width: 1280px;
+  --felt-height: 578px;
+  --played-tile-w: 118.8px;
+  --played-tile-h: 223.2px;
+  --game-action-height: 44px;
+  --game-hand-exclusion: 0px;
+  --game-pass-col: 116px;
+  --game-match-col: 122px;
+  --game-safe-bottom: env(safe-area-inset-bottom, 0px);
 
   /* Brand accents — gold / leo-blue / black (subtle) */
   --color-leo-blue: #2f7dff;
@@ -150,6 +173,6 @@
 @media (min-width: 768px) {
   :root {
     --header-height: 3.25rem;
-    --bottom-bar-height: 3.55rem;
+    --bottom-bar-height: 2.85rem;
   }
 }

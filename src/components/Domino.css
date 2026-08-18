@@ -583,14 +583,12 @@
 }
 
 .player-panel .domino--interactive:hover {
-  transform: translateY(-7px);
+  transform: translateY(-3px);
 }
 
 .player-panel .domino--selected {
-  transform: translateY(-11px);
-  filter:
-    drop-shadow(0 1px 0.75px rgba(0, 0, 0, 0.72))
-    drop-shadow(0 6px 10px rgba(0, 0, 0, 0.38));
+  transform: translateY(-4px);
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

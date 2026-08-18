@@ -12,6 +12,14 @@ import FlyingDomino from "../components/FlyingDomino";
 import DragGhost from "../components/DragGhost";
 import GameBanner from "../components/GameBanner";
 import MatchOverModal from "../components/MatchOverModal";
+import LandscapePrompt from "../components/LandscapePrompt";
+import { shouldPromptLandscape } from "../ui/gameplayOrientation.js";
+import {
+  applyGameplayLayoutVars,
+  gameplayDensityClass,
+  measureSafeGameplayBox,
+  resolveGameplayLayout,
+} from "../ui/gameplayLayout.js";
 import { useMatch } from "../hooks/useMatch";
 import { useFlightDirector } from "../hooks/useFlightDirector";
 import { usePrefs } from "../hooks/usePrefs.js";
@@ -29,6 +37,8 @@ import {
   destinationHighlightMap,
   destinationTileId,
   pickTargetDestination,
+  resolveDestinationOutward,
+  DESTINATION_TAP_SLOP_PX,
 } from "../game/destinationTarget.js";
 import { MOTION, wait } from "../utils/motion.js";
 import {
@@ -57,13 +67,85 @@ function collectDestinationTargets(legalEnds, layout) {
     if (!tileId) continue;
     const el = document.querySelector(`[data-board-tile="${tileId}"]`);
     if (!el) continue;
-    targets.push({ end, rect: el.getBoundingClientRect() });
+    const travelDir = el.getAttribute("data-travel-dir");
+    const spinnerHub = Boolean(layout.spinnerId && tileId === layout.spinnerId);
+    targets.push({
+      end,
+      rect: el.getBoundingClientRect(),
+      outward: resolveDestinationOutward(end, travelDir, { spinnerHub }),
+    });
   }
   return targets;
 }
 
 function allTableTiles(board, north = [], south = []) {
   return [...board, ...north, ...south];
+}
+
+function useLandscapePrompt() {
+  const [prompt, setPrompt] = useState(false);
+
+  useEffect(() => {
+    const read = () => {
+      setPrompt(
+        shouldPromptLandscape({
+          width: window.innerWidth,
+          height: window.innerHeight,
+          coarsePointer: window.matchMedia("(pointer: coarse)").matches,
+        })
+      );
+    };
+    read();
+    const portrait = window.matchMedia("(orientation: portrait)");
+    const coarse = window.matchMedia("(pointer: coarse)");
+    portrait.addEventListener("change", read);
+    coarse.addEventListener("change", read);
+    window.addEventListener("resize", read);
+    return () => {
+      portrait.removeEventListener("change", read);
+      coarse.removeEventListener("change", read);
+      window.removeEventListener("resize", read);
+    };
+  }, []);
+
+  return prompt;
+}
+
+function useGameplayLayout(layoutOptions = {}) {
+  const pageRef = useRef(null);
+  const playerCount = Number(layoutOptions.playerCount) || 0;
+  const rulesetId = layoutOptions.rulesetId ?? "";
+
+  useLayoutEffect(() => {
+    const el = pageRef.current;
+    if (!el) return undefined;
+
+    const apply = () => {
+      const layout = resolveGameplayLayout(measureSafeGameplayBox(el), {
+        playerCount,
+        rulesetId,
+      });
+      applyGameplayLayoutVars(el, layout);
+      el.dataset.layoutDensity = gameplayDensityClass(layout);
+      el.dataset.ruleset = rulesetId;
+    };
+
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", apply);
+    vv?.addEventListener("scroll", apply);
+    window.addEventListener("resize", apply);
+    return () => {
+      ro.disconnect();
+      vv?.removeEventListener("resize", apply);
+      vv?.removeEventListener("scroll", apply);
+      window.removeEventListener("resize", apply);
+    };
+  }, [playerCount, rulesetId]);
+
+  return pageRef;
 }
 
 /**
@@ -105,12 +187,18 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     HUMAN_INDEX,
   } = useMatch(matchOptions ?? {});
 
+  const rotatePrompt = useLandscapePrompt();
+  const pageRef = useGameplayLayout({
+    playerCount: state.players.length,
+    rulesetId: state.rulesetId,
+  });
   const { flight, hiddenIds, runFlight, hideTile, showTile } = useFlightDirector();
   const [newestId, setNewestId] = useState(null);
   const [banner, setBanner] = useState(null);
   const [hudScores, setHudScores] = useState(() => state.scores);
   const [tablePlayScore, setTablePlayScore] = useState(null);
   const [scoreHighlights, setScoreHighlights] = useState([]);
+  const [playScoreHoldDone, setPlayScoreHoldDone] = useState(true);
   const scoreHoldGenRef = useRef(0);
   const scoreHoldActiveRef = useRef(false);
   const summaryGenRef = useRef(0);
@@ -168,6 +256,12 @@ function GamePage({ onMainMenu, matchOptions = null }) {
 
       setMotionLock(true);
       clearSelection();
+      const attachId = destinationTileId(chosen.end, {
+        board: snap.board,
+        spinnerId: snap.spinnerId,
+        spinnerNorth: snap.spinnerNorth,
+        spinnerSouth: snap.spinnerSouth,
+      });
       await runFlight({
         tileId,
         left: handTile.a,
@@ -176,11 +270,11 @@ function GamePage({ onMainMenu, matchOptions = null }) {
         fromSelector: `[data-tile-id="${tileId}"]`,
         fromRect: fromRect || undefined,
         toSelector: `[data-board-tile="${tileId}"]`,
+        toFallbackSelector: attachId ? `[data-board-tile="${attachId}"]` : undefined,
         startOrientation: "vertical",
         endOrientation: chosen.orientation,
         durationMs: MOTION.tileFlightMs,
         arcLiftPx: MOTION.playArcLiftPx,
-        skipHide: Boolean(fromRect),
         apply: () => {
           commitPlay(tileId, chosen.end);
         },
@@ -203,10 +297,8 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       if (!current) return;
 
       const snap = stateRef.current;
-      const legalEnds = legalEndsForTile(
-        getAvailableActions(snap).legalMoves,
-        current.tileId
-      );
+      const legalMoves = getAvailableActions(snap).legalMoves;
+      const legalEnds = legalEndsForTile(legalMoves, current.tileId);
       const end = pickTargetDestination(
         clientX,
         clientY,
@@ -224,6 +316,9 @@ function GamePage({ onMainMenu, matchOptions = null }) {
         w: current.w,
         h: current.h,
       };
+      const originX = Number.isFinite(current.originX) ? current.originX : current.x;
+      const originY = Number.isFinite(current.originY) ? current.originY : current.y;
+      const travel = Math.hypot(clientX - originX, clientY - originY);
 
       setDrag(null);
       setHotEnd(null);
@@ -233,6 +328,17 @@ function GamePage({ onMainMenu, matchOptions = null }) {
         hideTile(tileId);
         await placeTileOnBoard(tileId, end, fromRect);
         return;
+      }
+
+      // Tiny pointer travel is a tap. Unique legal destination (including a
+      // single 0-end) must place the same way tap and drag agree.
+      if (travel <= DESTINATION_TAP_SLOP_PX && isAutoPlaceable(legalMoves, tileId)) {
+        const move = resolvePlayChoice(legalMoves, tileId);
+        if (move) {
+          hideTile(tileId);
+          await placeTileOnBoard(tileId, move.end, fromRect);
+          return;
+        }
       }
 
       // Dropped elsewhere — glide back to the hand.
@@ -308,25 +414,36 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   }, [drag, finishDrag, stateRef]);
 
   useEffect(() => {
-    if (state.phase === PHASE.ROUND_OVER && state.roundResult?.summary) {
-      scoreHoldActiveRef.current = false;
-      setTablePlayScore(null);
-      setScoreHighlights([]);
-      return undefined;
-    }
     const pts = Number(lastPlayPoints) || 0;
-    if (!shouldShowPlayScorePopup(pts)) {
+    const showPlayScore = shouldShowPlayScorePopup(pts);
+    if (!showPlayScore) {
       scoreHoldActiveRef.current = false;
+      setPlayScoreHoldDone(true);
       setTablePlayScore(null);
       setScoreHighlights([]);
-      setHudScores(state.scores);
+      if (state.phase !== PHASE.ROUND_OVER || !state.roundResult?.summary) {
+        setHudScores(state.scores);
+      }
       return undefined;
     }
     const gen = ++scoreHoldGenRef.current;
     scoreHoldActiveRef.current = true;
+    setPlayScoreHoldDone(false);
+    const roundPts = Number(state.roundResult?.points) || 0;
+    const roundWinners = Array.isArray(state.roundResult?.winnerIndices)
+      ? state.roundResult.winnerIndices
+      : state.roundResult?.winnerIndex != null
+        ? [state.roundResult.winnerIndex]
+        : [];
     setHudScores(
       hudScoresDuringHold({
-        scores: state.scores,
+        scores: hudScoresDuringRoundSummary({
+          scores: state.scores,
+          winnerIndex: state.roundResult?.winnerIndex,
+          winnerIndices: roundWinners,
+          points: roundPts,
+          hudLag: Boolean(state.roundResult?.summary),
+        }),
         lastPlayPoints: pts,
         lastPlayPointsSeat,
         holdElapsedMs: 0,
@@ -339,10 +456,13 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     const timer = window.setTimeout(() => {
       if (scoreHoldGenRef.current !== gen) return;
       scoreHoldActiveRef.current = false;
-      setHudScores(state.scores);
       setTablePlayScore(null);
       setScoreHighlights([]);
-      setMotionLock(false);
+      setPlayScoreHoldDone(true);
+      if (!state.roundResult?.summary) {
+        setHudScores(state.scores);
+        setMotionLock(false);
+      }
     }, MOTION.playScoreHoldMs);
     return () => window.clearTimeout(timer);
   }, [
@@ -355,10 +475,17 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     state.roundResult,
   ]);
 
-  const summaryActive = usesAllFivesRoundSummary(state);
+  const summaryActive =
+    usesAllFivesRoundSummary(state) &&
+    (!shouldShowPlayScorePopup(Number(lastPlayPoints) || 0) || playScoreHoldDone);
   const summaryExplanation = summaryActive
     ? {
         winnerIndex: state.roundResult.winnerIndex,
+        winnerIndices: Array.isArray(state.roundResult.winnerIndices)
+          ? state.roundResult.winnerIndices
+          : state.roundResult.winnerIndex != null
+            ? [state.roundResult.winnerIndex]
+            : [],
         awarded: Number(state.roundResult.points) || 0,
         rawTotal: Number(state.roundResult.rawPips) || 0,
         hands: Array.isArray(state.roundResult.hands) ? state.roundResult.hands : [],
@@ -382,6 +509,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       hudScoresDuringRoundSummary({
         scores: state.scores,
         winnerIndex: state.roundResult.winnerIndex,
+        winnerIndices: state.roundResult.winnerIndices,
         points: state.roundResult.points,
         hudLag: true,
       })
@@ -403,13 +531,14 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     state.seed,
     state.round,
     state.roundResult?.winnerIndex,
+    state.roundResult?.winnerIndices,
     state.roundResult?.points,
     state.scores,
   ]);
 
   useEffect(() => {
     if (!summaryView?.done || !summaryActive) return undefined;
-    const key = `${state.seed}:r${state.round}:${state.roundResult?.winnerIndex}:${state.roundResult?.points}`;
+    const key = `${state.seed}:r${state.round}:${(state.roundResult?.winnerIndices || [state.roundResult?.winnerIndex]).join(",")}:${state.roundResult?.points}`;
     if (summaryDoneRef.current === key) return undefined;
     summaryDoneRef.current = key;
     summaryGenRef.current += 1;
@@ -459,7 +588,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     if (!isHumanTurn) return;
     if (event.button != null && event.button !== 0) return;
     const ends = legalEndsForTile(actions.legalMoves, tileId);
-    if (ends.length < 2) return;
+    if (!ends.length) return;
 
     const rect = event.currentTarget.getBoundingClientRect();
     const tile = humanHand.find((entry) => entry.id === tileId);
@@ -479,6 +608,8 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       right: tile.right,
       x: event.clientX,
       y: event.clientY,
+      originX: event.clientX,
+      originY: event.clientY,
       w: rect.width,
       h: rect.height,
     });
@@ -550,27 +681,6 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     }
   }, [commitDraw, play, runFlight, selectTile, setMotionLock, stateRef]);
 
-  const handleDraw = async () => {
-    if (!getAvailableActions(stateRef.current).canDraw) {
-      play("error");
-      return;
-    }
-    await runDrawSequence();
-  };
-
-  const handlePlay = async () => {
-    if (!selectedId || !isAutoPlaceable(actions.legalMoves, selectedId)) {
-      play("error");
-      return;
-    }
-    const move = resolvePlayChoice(actions.legalMoves, selectedId);
-    if (!move) {
-      play("error");
-      return;
-    }
-    await placeTileOnBoard(selectedId, move.end);
-  };
-
   // Auto-start sequential draw when the human begins a turn with no legal play.
   useEffect(() => {
     if (!isHumanTurn || !actions.canDraw || drag) return;
@@ -588,8 +698,9 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     state.reserve.length,
   ]);
 
-  // AI / external board additions — fly onto the shared board.
-  // Board tiles stay visible always; flight is cosmetic only (no hideTile).
+  // AI / opponent board additions — fly from that seat's hand area to the
+  // exact laid-out destination. Face is revealed only on this played flight;
+  // opponent hand tiles stay face-down.
   const boardSignature = allTableTiles(
     state.board,
     spinnerNorth,
@@ -617,8 +728,6 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     const tileId = added[added.length - 1];
     // Human plays already animate via placeTileOnBoard — skip duplicate flight.
     if (hiddenIdsRef.current.has(tileId)) {
-      // Ensure any stale hide cannot leave a board tile invisible in the hand layer.
-      showTile(tileId);
       return undefined;
     }
 
@@ -636,6 +745,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
         ? `[data-opponent-origin][data-seat-index="${fromSeat}"]`
         : "[data-opponent-origin]";
 
+    hideTile(tileId);
     const timer = window.setTimeout(() => {
       setMotionLock(true);
       runFlight({
@@ -662,16 +772,13 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [boardSignature, handCountsSignature, HUMAN_INDEX, play, runFlight, setMotionLock, showTile, spinnerNorth, spinnerSouth, state.board, state.players]);
+  }, [boardSignature, handCountsSignature, HUMAN_INDEX, hideTile, play, runFlight, setMotionLock, showTile, spinnerNorth, spinnerSouth, state.board, state.players]);
 
-  // Safety: every board tile must remain visible for the whole round.
+  // Keep an in-flight board tile hidden until the hand-to-slot animation lands.
   useEffect(() => {
-    for (const tile of allTableTiles(state.board, spinnerNorth, spinnerSouth)) {
-      if (hiddenIdsRef.current.has(tile.id)) {
-        showTile(tile.id);
-      }
-    }
-  }, [boardSignature, showTile, spinnerNorth, spinnerSouth, state.board]);
+    if (!flight?.tileId) return;
+    hideTile(flight.tileId);
+  }, [boardSignature, flight?.tileId, hideTile]);
 
   // AI draws one face-down tile at a time from the reserve into the drawing seat.
   useLayoutEffect(() => {
@@ -818,6 +925,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     ? hudScoresDuringRoundSummary({
         scores: state.scores,
         winnerIndex: summaryView.winnerIndex,
+        winnerIndices: state.roundResult?.winnerIndices,
         points: summaryView.awarded,
         hudLag: summaryView.hudLag,
       })
@@ -859,11 +967,6 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const leftSeats = opponentSeats.filter((seat) => seat.position === "left");
   const rightSeats = opponentSeats.filter((seat) => seat.position === "right");
 
-  const canPlayButton =
-    isHumanTurn &&
-    Boolean(selectedId) &&
-    isAutoPlaceable(actions.legalMoves, selectedId);
-
   const handleNewMatch = () => {
     play("button");
     restart();
@@ -885,13 +988,15 @@ function GamePage({ onMainMenu, matchOptions = null }) {
 
   return (
     <div
+      ref={pageRef}
       className={`game-page game-page--players-${state.players.length}${
         celebrating ? " game-page--celebrate" : ""
       }${matchOver ? " game-page--match-over" : ""}${
         summaryActive ? " game-page--round-summary" : ""
-      }`}
+      }${rotatePrompt ? " game-page--rotate-prompt" : ""}`}
     >
-      <div className="game-page__shell">
+      {rotatePrompt ? <LandscapePrompt /> : null}
+      <div className="game-page__shell" hidden={rotatePrompt}>
         <div className="game-page__chrome" {...(matchOver ? { inert: true } : {})}>
           <Header
             difficulty={difficulty}
@@ -902,6 +1007,11 @@ function GamePage({ onMainMenu, matchOptions = null }) {
             onSettingsOpenChange={setSettingsOpen}
             onMainMenu={() => onMainMenu?.()}
             compact
+            endBefore={
+              <div className="game-page__hud-reserve">
+                <Reserve count={state.reserve.length} />
+              </div>
+            }
             startBelow={
               <div className="game-page__hud-score">
                 <ScoreBoard
@@ -967,6 +1077,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
                 scoreHighlights={scoreHighlights}
                 roundSummary={summaryView && !summaryView.done ? summaryView : null}
                 playerNames={playerNames}
+                hiddenIds={hiddenIds}
               />
             </div>
 
@@ -987,36 +1098,31 @@ function GamePage({ onMainMenu, matchOptions = null }) {
               </div>
             ) : null}
           </div>
-
-          <PlayerPanel
-            name={t("game.you")}
-            status={humanStatus}
-            tiles={humanHand}
-            selectedId={selectedId}
-            onSelectTile={isHumanTurn ? handleTileSelect : undefined}
-            onTilePointerDown={isHumanTurn ? handleTilePointerDown : undefined}
-            draggingId={drag?.tileId ?? null}
-            isTurn={isHumanTurn}
-            hiddenIds={hiddenIds}
-            enteringIds={enteringIds}
-          />
         </div>
 
-        <div {...(matchOver ? { inert: true } : {})}>
+        <div
+          className="game-page__dock"
+          data-hand-dock
+          {...(matchOver ? { inert: true } : {})}
+        >
           <BottomBar
-            canPlay={canPlayButton}
-            canDraw={isHumanTurn && actions.canDraw && !drag}
             canPass={isHumanTurn && actions.canPass}
-            onPlay={handlePlay}
-            onDraw={handleDraw}
             onPass={pass}
             onNewGame={restart}
-            endAbove={
-              <div className="game-page__hud-reserve">
-                <Reserve count={state.reserve.length} />
-              </div>
-            }
-          />
+          >
+            <PlayerPanel
+              name={t("game.you")}
+              status={humanStatus}
+              tiles={humanHand}
+              selectedId={selectedId}
+              onSelectTile={isHumanTurn ? handleTileSelect : undefined}
+              onTilePointerDown={isHumanTurn ? handleTilePointerDown : undefined}
+              draggingId={drag?.tileId ?? null}
+              isTurn={isHumanTurn}
+              hiddenIds={hiddenIds}
+              enteringIds={enteringIds}
+            />
+          </BottomBar>
         </div>
       </div>
 

@@ -65,9 +65,9 @@ export default {
         "Doub-sis · 7 donmino · de bout ouvè · premye ki rive 4 pwen match · genyen +1 · bloke +1 · Dekabès +2 · 6-6 louvri premye wo a",
       american: "Ameriken",
       americanDescription:
-        "Draw Domino Ameriken. Matche nenpòt bout, tire jiskaske ou ka jwe, pase lè rezèv la vid. Premye ki rive 100.",
+        "Fè pwen lè bout ouvè yo ajoute yon miltip 5 (minimòm 10). Tire jiskaske ou ka jwe. Premye ki rive 200.",
       americanSummary:
-        "Doub-sis · 7 donmino · de bout ouvè · tire jiskaske ou ka jwe · pase lè vid · jwe jiska 100",
+        "Doub-sis · 7 donmino · pwen pandan jwèt · miltip 5 depi 10 · fen wo a awondi a 5 · jwe jiska 200",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives Ameriken. Fè pwen lè bout ouvè yo ajoute yon miltip 5 (minimòm 10). Premye ki rive 200.",
@@ -130,6 +130,9 @@ export default {
     playScore: "+{{points}}",
     rawPipsLabel: "Pip brit: {{total}}",
     roundPointsLabel: "Pwen wo a",
+    rotateTitle: "Vire aparèy ou",
+    rotateBody:
+      "Pou pi bon eksperyans LeoDomino, mete telefòn oswa tablèt ou sou kote.",
   },
   rules: {
     roundWon: "{{name}} genyen wo a",

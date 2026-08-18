@@ -75,12 +75,18 @@
   border-radius: 10px;
   overflow: hidden;
   background:
-    /* Soft upper wash — restrained so cloth stays deep casino green. */
-    radial-gradient(ellipse 52% 38% at 40% 20%, rgba(48, 110, 72, 0.14), transparent 64%),
-    radial-gradient(ellipse 96% 90% at 50% 54%, #0a5c24 0%, #084a1c 38%, #063816 68%, #042610 100%);
+    /* Overhead play-area lift — percentage ellipses so it scales with the felt. */
+    radial-gradient(ellipse 64% 58% at 50% 44%, rgba(58, 148, 86, 0.36), transparent 74%),
+    radial-gradient(
+      ellipse 92% 84% at 50% 48%,
+      var(--color-felt-light) 0%,
+      var(--color-felt) 38%,
+      var(--color-felt-mid) 68%,
+      var(--color-felt-dark) 100%
+    );
   box-shadow:
-    inset 0 0 40px rgba(0, 0, 0, 0.28),
-    inset 0 0 80px rgba(0, 0, 0, 0.2);
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.16);
   display: flex;
   flex-direction: column;
   padding: 0.22rem 0.28rem;
@@ -94,18 +100,18 @@
   border-radius: inherit;
   pointer-events: none;
   z-index: 1;
-  opacity: 0.48;
+  opacity: 0.42;
   background:
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.16 0 0 0 0 0.07 0 0 0 0.38 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.05 0 0 0 0 0.18 0 0 0 0 0.08 0 0 0 0.34 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"),
     repeating-linear-gradient(
       0deg,
       transparent 0 2px,
-      rgba(255, 255, 255, 0.015) 2px 3px
+      rgba(255, 255, 255, 0.018) 2px 3px
     ),
     repeating-linear-gradient(
       90deg,
       transparent 0 2px,
-      rgba(0, 0, 0, 0.032) 2px 3px
+      rgba(0, 0, 0, 0.028) 2px 3px
     );
   mix-blend-mode: soft-light;
 }
@@ -118,10 +124,10 @@
   pointer-events: none;
   z-index: 2;
   background:
-    /* Very soft play-area lift — no bright center hotspot competing with tiles. */
-    radial-gradient(ellipse 48% 42% at 50% 50%, rgba(255, 236, 190, 0.028), transparent 70%),
-    radial-gradient(ellipse 50% 38% at 38% 22%, rgba(255, 228, 170, 0.035), transparent 64%),
-    radial-gradient(ellipse 94% 90% at 50% 50%, transparent 48%, rgba(0, 0, 0, 0.3) 100%);
+    /* Soft overhead glow + gentle edge falloff. Percent sizes, no pixel hotspot. */
+    radial-gradient(ellipse 58% 52% at 50% 44%, rgba(255, 250, 236, 0.075), transparent 70%),
+    radial-gradient(ellipse 36% 28% at 48% 26%, rgba(255, 255, 255, 0.04), transparent 56%),
+    radial-gradient(ellipse 96% 92% at 50% 52%, transparent 50%, rgba(0, 0, 0, 0.14) 80%, rgba(0, 0, 0, 0.3) 100%);
 }
 
 .game-table__play-score {
@@ -172,11 +178,17 @@
 
 :root[data-theme="noir"] .game-table__felt {
   background:
-    radial-gradient(ellipse 52% 38% at 40% 20%, rgba(36, 95, 58, 0.12), transparent 64%),
-    radial-gradient(ellipse 96% 90% at 50% 54%, #08501e 0%, #063c16 46%, #04280e 100%);
+    radial-gradient(ellipse 64% 58% at 50% 44%, rgba(40, 122, 70, 0.28), transparent 74%),
+    radial-gradient(
+      ellipse 92% 84% at 50% 48%,
+      var(--color-felt-light) 0%,
+      var(--color-felt) 36%,
+      var(--color-felt-mid) 66%,
+      var(--color-felt-dark) 100%
+    );
   box-shadow:
-    inset 0 0 40px rgba(0, 0, 0, 0.32),
-    inset 0 0 80px rgba(0, 0, 0, 0.24);
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.2);
 }
 
 :root[data-theme="noir"] .game-table__frame {
