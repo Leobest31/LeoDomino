@@ -8,6 +8,8 @@
 
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   calculateBoardLayout,
   computePlayBounds,
@@ -668,12 +670,12 @@ function toSvg(layout, vp, title) {
     for (const [vpName, vp] of Object.entries(VIEWPORTS)) {
       const layout = layoutBoardChain(board, vp, extra);
       writeFileSync(
-        `/tmp/leo-layout-${name}-${vpName}.svg`,
+        join(tmpdir(), `leo-layout-${name}-${vpName}.svg`),
         toSvg(layout, vp, `${name} ${vpName}`)
       );
     }
   }
-  console.log("✓ wrote visual scenario SVGs to /tmp/leo-layout-*.svg");
+  console.log(`✓ wrote visual scenario SVGs to ${join(tmpdir(), "leo-layout-*.svg")}`);
 }
 
 console.log("\nLeoDomino universal chain layout tests passed.");
