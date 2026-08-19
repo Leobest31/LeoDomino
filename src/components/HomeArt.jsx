@@ -1,5 +1,18 @@
-import { logoOfficial, tile36 } from "../assets";
+import { homeDominos, homeLeagueLion, homeLeoBestLion, homeStoreChest } from "../assets";
 import "./HomeArt.css";
+
+export function HomeGlyph({ src, size, className = "" }) {
+  return (
+    <img
+      className={`home-glyph${className ? ` ${className}` : ""}`}
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      draggable={false}
+    />
+  );
+}
 
 export function GoldCorners() {
   return (
@@ -12,61 +25,18 @@ export function GoldCorners() {
   );
 }
 
-export function LeagueStars({ filled = 4, total = 5 }) {
+export function LeagueStars() {
   return (
-    <div className="home-stars" aria-hidden="true">
-      {Array.from({ length: total }, (_, index) => (
-        <span
-          key={index}
-          className={index < filled ? "home-stars__star home-stars__star--on" : "home-stars__star"}
-        />
-      ))}
-    </div>
+    <p className="home-stars" aria-hidden="true">
+      ★★★
+    </p>
   );
 }
 
 export function LeagueEmblem() {
   return (
     <div className="home-emblem" aria-hidden="true">
-      <svg className="home-emblem__svg" viewBox="0 0 160 188">
-        <defs>
-          <linearGradient id="homeEmblemGold" x1="20" y1="8" x2="140" y2="180">
-            <stop offset="0%" stopColor="#f6e7a8" />
-            <stop offset="42%" stopColor="#e0b84a" />
-            <stop offset="100%" stopColor="#8a6818" />
-          </linearGradient>
-          <linearGradient id="homeEmblemFace" x1="40" y1="28" x2="120" y2="150">
-            <stop offset="0%" stopColor="#1a2a22" />
-            <stop offset="100%" stopColor="#070b10" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M80 8 L142 28 V88 C142 136 112 164 80 180 C48 164 18 136 18 88 V28 Z"
-          fill="url(#homeEmblemFace)"
-          stroke="url(#homeEmblemGold)"
-          strokeWidth="5"
-        />
-        <path
-          d="M36 118 C52 138 68 148 80 154 C92 148 108 138 124 118"
-          fill="none"
-          stroke="#2e9a4e"
-          strokeWidth="7"
-          strokeLinecap="round"
-        />
-        <path
-          d="M40 112 C56 130 70 140 80 145 C90 140 104 130 120 112"
-          fill="none"
-          stroke="#7adf8d"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-        />
-        <g fill="#ebc84a">
-          <polygon points="80,18 83,26 91,26 84.5,31 87,39 80,34 73,39 75.5,31 69,26 77,26" />
-          <polygon points="54,26 57,33 64,33 58.5,37 61,44 54,40 47,44 49.5,37 44,33 51,33" />
-          <polygon points="106,26 109,33 116,33 110.5,37 113,44 106,40 99,44 101.5,37 96,33 103,33" />
-        </g>
-      </svg>
-      <img className="home-emblem__lion" src={logoOfficial} alt="" draggable={false} />
+      <img className="home-emblem__lion" src={homeLeagueLion} alt="" draggable={false} />
     </div>
   );
 }
@@ -75,7 +45,7 @@ export function LeoBestPortrait() {
   return (
     <div className="home-leo-art" aria-hidden="true">
       <span className="home-leo-art__ring">
-        <img className="home-leo-art__face" src={logoOfficial} alt="" draggable={false} />
+        <img className="home-leo-art__face" src={homeLeoBestLion} alt="" draggable={false} />
       </span>
     </div>
   );
@@ -84,9 +54,15 @@ export function LeoBestPortrait() {
 export function DominoSpread() {
   return (
     <div className="home-dominos" aria-hidden="true">
-      <img className="home-dominos__tile home-dominos__tile--a" src={tile36} alt="" draggable={false} />
-      <img className="home-dominos__tile home-dominos__tile--b" src={tile36} alt="" draggable={false} />
-      <img className="home-dominos__tile home-dominos__tile--c" src={tile36} alt="" draggable={false} />
+      <img className="home-dominos__photo" src={homeDominos} alt="" draggable={false} />
+    </div>
+  );
+}
+
+export function StoreChest() {
+  return (
+    <div className="home-store-art" aria-hidden="true">
+      <img className="home-store-art__img" src={homeStoreChest} alt="" draggable={false} />
     </div>
   );
 }

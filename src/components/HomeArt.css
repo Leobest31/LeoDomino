@@ -1,3 +1,10 @@
+.home-glyph {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+  object-position: center;
+}
+
 .home-corners {
   position: absolute;
   inset: 0;
@@ -40,10 +47,35 @@
 
 .home-emblem {
   position: relative;
-  width: clamp(4.2rem, 18vw, 5.4rem);
-  height: clamp(4.2rem, 18vw, 5.4rem);
+  width: 64px;
+  height: 64px;
   flex-shrink: 0;
-  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.45));
+  overflow: hidden;
+  border-radius: 10px;
+  isolation: isolate;
+  filter:
+    drop-shadow(0 6px 7px rgba(0, 0, 0, 0.52))
+    drop-shadow(0 0 10px rgba(255, 184, 0, 0.38));
+}
+
+.home-emblem::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 170, 0.22),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.28);
+}
+
+.home-emblem__wreath {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
 }
 
 .home-emblem__svg {
@@ -53,50 +85,66 @@
 }
 
 .home-emblem__lion {
-  position: absolute;
-  left: 50%;
-  top: 48%;
-  width: 74%;
-  height: 62%;
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  object-position: 16% 18%;
-  transform: translate(-50%, -50%);
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+  object-position: center 40%;
+  transform: scale(1.04);
+  transform-origin: center 40%;
+  filter: contrast(1.14) saturate(1.06);
 }
 
 .home-leo-art {
   position: relative;
-  width: 3.55rem;
-  height: 3.55rem;
+  width: 56px;
+  height: 56px;
   flex-shrink: 0;
 }
 
 .home-leo-art__ring {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 3.55rem;
-  height: 3.55rem;
-  overflow: hidden;
-  border: 2.5px solid #f0d382;
-  border-radius: 38px;
-  background: radial-gradient(circle at 38% 28%, #24362c, #070b10 72%);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+  width: 56px;
+  height: 56px;
+  overflow: visible;
+  isolation: isolate;
+  border: 0;
+  border-radius: 28px;
+  background: transparent;
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(255, 184, 0, 0.22);
+}
+
+.home-leo-art__ring::after {
+  display: none;
 }
 
 .home-leo-art__face {
   display: block;
-  width: 155%;
-  height: 155%;
-  max-width: none;
-  object-fit: cover;
-  object-position: 18% 14%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .home-dominos {
   position: relative;
-  width: 3.4rem;
-  height: 2.1rem;
+  width: 80px;
+  height: 40px;
   flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.home-dominos__photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .home-dominos__tile {
@@ -106,24 +154,20 @@
   filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.4));
 }
 
-.home-dominos__tile--a {
-  left: 0.15rem;
-  top: 0.55rem;
-  transform: rotate(-18deg);
+.home-store-art {
+  width: 90px;
+  height: 50px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
 }
 
-.home-dominos__tile--b {
-  left: 1.1rem;
-  top: 0;
-  z-index: 2;
-  width: 1.55rem;
-  transform: rotate(4deg);
-}
-
-.home-dominos__tile--c {
-  right: 0.05rem;
-  top: 0.7rem;
-  transform: rotate(20deg);
+.home-store-art__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .home-art-icon {
@@ -140,24 +184,17 @@
 
 .home-coin-mark {
   display: block;
-  width: 1.55rem;
-  height: 1.55rem;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
 }
 
 .home-stars {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.home-stars__star {
-  width: 11px;
-  height: 11px;
-  background: #475569;
-  clip-path: polygon(50% 2%, 63% 35%, 98% 38%, 72% 59%, 79% 96%, 50% 78%, 21% 96%, 28% 59%, 2% 38%, 37% 35%);
-}
-
-.home-stars__star--on {
-  background: linear-gradient(180deg, #ffe899, #c5a059);
+  margin: 0;
+  color: #ffb800;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(255, 184, 0, 0.55);
 }

@@ -1,0 +1,7 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon-wrap">
+<rect x="0.5" y="0.5" width="47" height="47" rx="23.5" fill="#2C221A"/>
+<rect x="0.5" y="0.5" width="47" height="47" rx="23.5" stroke="#FFB800"/>
+<path id="coins" d="M28.7998 13C32.224 13.0001 34.9999 15.776 35 19.2002C35 22.6245 32.2241 25.4003 28.7998 25.4004C25.3754 25.4004 22.5996 22.6246 22.5996 19.2002C22.5997 15.7759 25.3755 13 28.7998 13ZM27.5996 15.7998C27.0475 15.7998 26.5999 16.2477 26.5996 16.7998C26.5996 17.3521 27.0473 17.7998 27.5996 17.7998H27.7998V21.6006C27.7999 22.1528 28.2475 22.6006 28.7998 22.6006C29.352 22.6005 29.7998 22.1528 29.7998 21.6006V15.7998H27.5996Z" stroke="#FFB800" stroke-width="2" stroke-linecap="round"/>
+</g>
+</svg>

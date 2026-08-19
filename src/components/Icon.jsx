@@ -211,3 +211,21 @@ export function IconCoins({ className = "" }) {
     </svg>
   );
 }
+
+export function IconLock({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
+      <rect x="6" y="11" width="12" height="9" rx="2" {...stroke} />
+      <path d="M8.5 11V8.2a3.5 3.5 0 0 1 7 0V11" {...stroke} />
+    </svg>
+  );
+}
+
+export function IconAward({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
+      <circle cx="12" cy="9" r="5.2" {...stroke} />
+      <path d="M8.6 13.4 7 21l5-2.2L17 21l-1.6-7.6" {...stroke} />
+    </svg>
+  );
+}

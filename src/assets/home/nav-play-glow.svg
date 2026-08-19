@@ -1,0 +1,27 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="76" height="76" viewBox="0 0 76 76" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="play-circle" filter="url(#filter0_d_0_15)">
+<rect x="12" y="8" width="52" height="52" rx="26" fill="url(#playMetal)" shape-rendering="crispEdges"/>
+<rect x="14" y="10" width="48" height="48" rx="24" stroke="#05060C" stroke-width="4" shape-rendering="crispEdges"/>
+<ellipse cx="38" cy="22" rx="16" ry="8" fill="white" fill-opacity="0.22"/>
+<path id="play-arrow" d="M38 23C44.0751 23 49 27.9249 49 34C49 40.0751 44.0751 45 38 45C31.9249 45 27 40.0751 27 34C27 27.9249 31.9249 23 38 23ZM41.8027 34C41.8027 34.0346 41.7934 34.0686 41.7764 34.0986C41.7593 34.1287 41.7348 34.1541 41.7051 34.1719L41.7021 34.1729L35.7061 37.7695L35.7031 37.7715C35.6728 37.7897 35.6379 37.7993 35.6025 37.7998C35.5671 37.8003 35.5318 37.7919 35.501 37.7744C35.4701 37.7569 35.4445 37.7309 35.4268 37.7002C35.4091 37.6696 35.4003 37.6349 35.4004 37.5996V30.4004C35.4003 30.3651 35.4091 30.3303 35.4268 30.2998C35.4445 30.2692 35.4702 30.2431 35.501 30.2256C35.5318 30.2081 35.5671 30.1997 35.6025 30.2002C35.6379 30.2007 35.6728 30.2103 35.7031 30.2285L35.7061 30.2305L41.7021 33.8271L41.7051 33.8281C41.7348 33.8459 41.7593 33.8713 41.7764 33.9014C41.7934 33.9314 41.8027 33.9654 41.8027 34ZM43.8027 34C43.8027 33.619 43.7038 33.2444 43.5156 32.9131C43.3278 32.5824 43.057 32.3063 42.7305 32.1113H42.7314L36.7363 28.5166H36.7373C36.4032 28.3148 36.0212 28.2057 35.6309 28.2002C35.2405 28.1947 34.8553 28.293 34.5156 28.4854C34.176 28.6777 33.8934 28.9574 33.6973 29.2949C33.5257 29.5903 33.4258 29.9212 33.4043 30.2607L33.4004 30.4033V37.5908C33.3988 37.9814 33.5013 38.3662 33.6973 38.7041C33.8931 39.0417 34.1752 39.3211 34.5146 39.5137C34.8545 39.7063 35.2403 39.8052 35.6309 39.7998C36.0212 39.7943 36.4031 39.6852 36.7373 39.4834L36.7363 39.4824L42.7305 35.8877C43.0568 35.6927 43.3278 35.4175 43.5156 35.0869C43.7038 34.7556 43.8027 34.381 43.8027 34Z" stroke="black" stroke-width="2" stroke-linecap="round"/>
+</g>
+<defs>
+<linearGradient id="playMetal" x1="38" y1="8" x2="38" y2="60" gradientUnits="userSpaceOnUse">
+<stop offset="0%" stop-color="#b8ffe0"/>
+<stop offset="18%" stop-color="#5cffb0"/>
+<stop offset="46%" stop-color="#00e676"/>
+<stop offset="78%" stop-color="#00c853"/>
+<stop offset="100%" stop-color="#009e48"/>
+</linearGradient>
+<filter id="filter0_d_0_15" x="0" y="0" width="76" height="76" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="4"/>
+<feGaussianBlur stdDeviation="6"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.901961 0 0 0 0 0.462745 0 0 0 0.301961 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_15"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_15" result="shape"/>
+</filter>
+</defs>
+</svg>

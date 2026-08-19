@@ -1,32 +1,37 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../i18n";
 import { useAudio } from "../audio";
+import {
+  homeAvatarLion,
+  homeDotOff,
+  homeDotOn,
+  homeIconAward,
+  homeIconBell,
+  homeIconCart,
+  homeIconCoins,
+  homeEarthGlobe,
+  homeFriendUsers,
+  homeLock3d,
+  homeIconHouse,
+  homeIconMenu,
+  homeIconMenuNav,
+  homeIconShield,
+  homeIconTrophy,
+  homeNavPlayGlow,
+  homeOnlineDot,
+  homeStoreCoinWrap,
+} from "../assets";
 import BrandLogo from "../components/BrandLogo";
-import Avatar from "../components/Avatar";
 import SettingsPanel from "../components/SettingsPanel";
 import {
-  ArtCoinMark,
-  ArtCoins,
-  ArtGlobe,
-  ArtLock,
-  ArtTrophy,
-  ArtUsers,
   DominoSpread,
-  GoldCorners,
+  HomeGlyph,
   LeagueEmblem,
   LeagueStars,
   LeoBestPortrait,
+  StoreChest,
 } from "../components/HomeArt";
-import {
-  IconBell,
-  IconHome,
-  IconMenu,
-  IconPlayFill,
-  IconPlus,
-  IconShield,
-  IconUser,
-  IconUsers,
-} from "../components/Icon";
+import { IconUser } from "../components/Icon";
 import {
   AI_DIFFICULTY_STORAGE_KEY,
   DEFAULT_DIFFICULTY,
@@ -37,16 +42,17 @@ import { readStorage, writeStorage } from "../utils/storage.js";
 import "./HomePage.css";
 
 /**
- * Figma `leodomino-full-reproduction` layout preview only.
+ * Figma `leodomino-premium` layout preview only.
  * Not persisted, not match state, not a player profile.
  */
 const HOME_PREVIEW = Object.freeze({
+  notices: "3",
   leoCoins: "5,240",
   level: "12",
   leoPoints: "1,250",
   nextPoints: "1,500",
   lp: "1,250",
-  pointsFill: 72,
+  levelFill: 75,
   leagueFill: 75,
   countdown: [
     { value: "02", labelKey: "home.countdownDays" },
@@ -57,7 +63,7 @@ const HOME_PREVIEW = Object.freeze({
 });
 
 /**
- * V1 Home dashboard — Figma visual shell, existing Home only.
+ * Premium Home dashboard — Figma visual shell, existing Home only.
  * PLAY VS LEOBEST is the only live gameplay path.
  */
 function HomePage({ onPlayVsLeoBest, onResume }) {
@@ -104,6 +110,20 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
     tap(() => onPlayVsLeoBest?.());
   };
 
+  /**
+   * Temporary Coming Soon for this visual integration.
+   * Before V1 publish this becomes: Create Account / Sign In → Find Match → online 1v1.
+   */
+  const handlePlayOnline = () => {
+    showComingSoon();
+  };
+
+  const goToStore = () => {
+    tap(() => {
+      document.getElementById("store")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
   return (
     <main className="home" data-home="true" aria-label={t("home.aria")}>
       <div className="home__atmosphere" aria-hidden="true">
@@ -111,21 +131,24 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
         <div className="home__vignette" />
       </div>
 
+      <div className="home__frame">
       <header className="home__header">
         <button
           type="button"
-          className="home__icon-btn"
+          className="home__menu-btn"
           onClick={openSettings}
           aria-label={t("common.settings")}
         >
-          <IconMenu />
+          <HomeGlyph src={homeIconMenu} size={36} />
         </button>
         <div className="home__brand">
-          <BrandLogo size="md" className="home__crest" title={t("common.brand")} decorative />
           <div className="home__wordmark">
             <p className="home__wordmark-row" aria-label={t("common.brand")}>
-              <span className="home__wordmark-leo">{t("home.wordmarkLeo")}</span>
-              <span className="home__wordmark-domino">{t("home.wordmarkDomino")}</span>
+              <BrandLogo size="sm" className="home__crest" title={t("common.brand")} decorative />
+              <span className="home__wordmark-text">
+                <span className="home__wordmark-leo">{t("home.wordmarkLeo")}</span>
+                <span className="home__wordmark-domino">{t("home.wordmarkDomino")}</span>
+              </span>
             </p>
             <p className="home__tagline">{t("home.tagline")}</p>
           </div>
@@ -137,7 +160,10 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
             onClick={showComingSoon}
             aria-label={t("home.notifications")}
           >
-            <IconBell />
+            <span className="home__bell-glyph">
+              <HomeGlyph src={homeIconBell} size={18} />
+            </span>
+            <span className="home__badge">{HOME_PREVIEW.notices}</span>
           </button>
           <button
             type="button"
@@ -145,74 +171,77 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
             onClick={openSettings}
             aria-label={t("home.profile")}
           >
-            <Avatar label={t("game.you")} tone="player" size="sm" />
-            <span className="home__online-dot" aria-hidden="true" />
+            <img className="home__avatar-img" src={homeAvatarLion} alt="" draggable={false} />
+            <img className="home__online-dot" src={homeOnlineDot} alt="" aria-hidden="true" draggable={false} />
           </button>
         </div>
       </header>
 
-      <div className="home__scroll">
-        <section className="home__status" aria-label={t("home.statusAria")}>
-          <div className="home__stat">
-            <ArtCoinMark />
-            <div className="home__stat-copy">
-              <span className="home__stat-label">{t("home.leoCoins")}</span>
-              <span className="home__stat-value">{HOME_PREVIEW.leoCoins}</span>
-            </div>
-            <button
-              type="button"
-              className="home__plus"
-              onClick={showComingSoon}
-              aria-label={t("home.leoCoins")}
-            >
-              <IconPlus />
-            </button>
+      <section className="home__status" aria-label={t("home.statusAria")}>
+        <div className="home__stat home__stat--pill">
+          <span className="home__stat-glyph home__stat-glyph--16">
+            <HomeGlyph src={homeIconCoins} size={16} />
+          </span>
+          <span className="home__stat-value">{HOME_PREVIEW.leoCoins}</span>
+          <button
+            type="button"
+            className="home__plus"
+            onClick={showComingSoon}
+            aria-label={t("home.leoCoins")}
+          >
+            +
+          </button>
+        </div>
+        <div className="home__stat home__stat--level">
+          <span className="home__stat-row">
+            <span className="home__stat-glyph home__stat-glyph--14">
+              <HomeGlyph src={homeIconShield} size={14} />
+            </span>
+            <span className="home__stat-value home__stat-value--lvl">
+              {t("home.lvl", { n: HOME_PREVIEW.level })}
+            </span>
+          </span>
+          <span className="home__mini-progress home__mini-progress--emerald" aria-hidden="true">
+            <span style={{ width: `${HOME_PREVIEW.levelFill}%` }} />
+          </span>
+        </div>
+        <div className="home__stat home__stat--pill">
+          <BrandLogo size="sm" className="home__stat-crest" title={t("home.leoPoints")} decorative />
+          <div className="home__stat-copy home__stat-copy--lp">
+            <span className="home__stat-value home__stat-value--lp">
+              {HOME_PREVIEW.leoPoints} {t("home.lp")}
+            </span>
+            <span className="home__stat-next">{t("home.nextLabel", { n: HOME_PREVIEW.nextPoints })}</span>
           </div>
-          <div className="home__stat">
-            <IconShield className="home__stat-icon" />
-            <div className="home__stat-copy">
-              <span className="home__stat-label">{t("home.level")}</span>
-              <span className="home__stat-value">{HOME_PREVIEW.level}</span>
-            </div>
-          </div>
-          <div className="home__stat">
-            <div className="home__stat-copy home__stat-copy--lp">
-              <span className="home__stat-row">
-                <span className="home__stat-label">{t("home.leoPoints")}</span>
-                <span className="home__stat-value home__stat-value--gold">{HOME_PREVIEW.leoPoints}</span>
-              </span>
-              <span className="home__mini-progress" aria-hidden="true">
-                <span style={{ width: `${HOME_PREVIEW.pointsFill}%` }} />
-              </span>
-              <span className="home__stat-next">{t("home.nextLabel", { n: HOME_PREVIEW.nextPoints })}</span>
-            </div>
-          </div>
-        </section>
+        </div>
+      </section>
 
+      <div className="home__scroll">
         <article className="home__card home__card--league" data-home-card="league">
-          <GoldCorners />
           <div className="home__league-layout">
             <div className="home__league-art">
-              <span className="home__eyebrow">{t("home.leagueSeason", { n: 1 })}</span>
-              <LeagueEmblem />
               <LeagueStars />
+              <LeagueEmblem />
               <p className="home__division-name">{t("home.goldII")}</p>
+              <p className="home__eyebrow">{t("home.seasonN", { n: 1 })}</p>
             </div>
             <div className="home__league-copy">
               <h2 className="home__progress-label">{t("home.yourProgress")}</h2>
               <p className="home__lp-hero">
                 {HOME_PREVIEW.lp} <span>{t("home.lp")}</span>
               </p>
-              <p className="home__progress-meta">{t("home.lpToGoldIII")}</p>
               <div className="home__progress" aria-hidden="true">
+                <span className="home__progress-meta-row">
+                  <span className="home__progress-meta">{t("home.lpToGoldIII")}</span>
+                  <span className="home__progress-pct">{HOME_PREVIEW.leagueFill}%</span>
+                </span>
                 <span className="home__progress-track">
                   <span className="home__progress-fill" style={{ width: `${HOME_PREVIEW.leagueFill}%` }} />
                 </span>
-                <IconShield className="home__progress-icon" />
               </div>
               <button
                 type="button"
-                className="home__cta home__cta--green"
+                className="home__cta home__cta--pea home__cta--league home__cta--chevron"
                 data-home-cta="league"
                 onClick={showComingSoon}
               >
@@ -222,41 +251,35 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
           </div>
         </article>
         <div className="home__dots" aria-hidden="true">
-          <span className="home__dot home__dot--on" />
-          <span className="home__dot" />
-          <span className="home__dot" />
-          <span className="home__dot" />
-          <span className="home__dot" />
+          <img className="home__dot" src={homeDotOn} alt="" width={6} height={6} draggable={false} />
+          <img className="home__dot" src={homeDotOff} alt="" width={6} height={6} draggable={false} />
+          <img className="home__dot" src={homeDotOff} alt="" width={6} height={6} draggable={false} />
         </div>
 
         <article className="home__card home__card--play" data-home-card="leoBest">
-          <GoldCorners />
           <div className="home__leo-layout">
-            <div className="home__leo-identity">
+            <div className="home__leo-identity" aria-label={t("game.leoBest")}>
               <LeoBestPortrait />
-              <span className="home__leo-name-row">
-                <span className="home__leo-name">{t("game.leoBest")}</span>
-                <span className="home__ai-chip">{t("home.ai")}</span>
-              </span>
+              <span className="home__ai-chip">{t("home.ai")}</span>
             </div>
             <div className="home__leo-copy">
               <h2 className="home__card-title">{t("home.playVsLeoBest")}</h2>
               <p className="home__card-sub">{t("home.offlineVs")}</p>
-              <div className="home__leo-meta">
-                <span className="home__vs-chip">
-                  <IconUsers className="home__vs-icon" />
-                  {t("home.oneVsOne")}
-                </span>
-                <DominoSpread />
-                <button
-                  type="button"
-                  className="home__cta home__cta--gold home__cta--inline"
-                  data-home-cta="playVsLeoBest"
-                  onClick={playVsLeoBest}
-                >
-                  {t("game.play")}
-                </button>
-              </div>
+              <span className="home__vs-chip">
+                <IconUser className="home__vs-icon" />
+                {t("home.oneVsOne")}
+              </span>
+            </div>
+            <div className="home__leo-side">
+              <DominoSpread />
+              <button
+                type="button"
+                className="home__cta home__cta--emerald home__cta--inline home__cta--chevron"
+                data-home-cta="playVsLeoBest"
+                onClick={playVsLeoBest}
+              >
+                {t("game.play")}
+              </button>
             </div>
           </div>
         </article>
@@ -275,17 +298,16 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
         <section className="home__modes" aria-label={t("setup.comingSoonLegend")}>
           <ModeCard
             id="online"
-            tone="green"
-            icon={<ArtGlobe />}
+            icon={<HomeGlyph src={homeEarthGlobe} size={40} className="home-mode__earth" />}
             title={t("home.playOnline")}
             subtitle={t("home.playOnlineSub")}
             action={t("home.findMatch")}
-            onPress={showComingSoon}
+            onPress={handlePlayOnline}
           />
           <ModeCard
             id="friend"
-            tone="blue"
-            icon={<ArtUsers />}
+            tone="royal"
+            icon={<HomeGlyph src={homeFriendUsers} size={40} className="home-mode__glyph-3d" />}
             title={t("home.playFriend")}
             subtitle={t("home.friendSub")}
             action={t("home.invite")}
@@ -293,8 +315,8 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
           />
           <ModeCard
             id="private"
-            tone="purple"
-            icon={<ArtLock />}
+            tone="violet"
+            icon={<HomeGlyph src={homeLock3d} size={40} className="home-mode__glyph-3d" />}
             title={t("home.privateTable")}
             subtitle={t("home.privateTableSub")}
             action={t("home.create")}
@@ -303,57 +325,73 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
         </section>
 
         <article className="home__card home__card--promo" id="tournaments" data-home-card="tournaments">
-          <GoldCorners />
           <div className="home__tourney">
-            <ArtTrophy />
+            <span className="home__tourney-icon">
+              <HomeGlyph src={homeIconTrophy} size={24} />
+            </span>
             <div className="home__tourney-copy">
               <h2 className="home__promo-title">{t("home.tournaments")}</h2>
               <p className="home__card-sub">{t("home.tournamentsLead")}</p>
-              <div className="home__tourney-rule" aria-hidden="true" />
-              <div className="home__tourney-meta">
-                <div>
-                  <span className="home__eyebrow">{t("home.nextTournament")}</span>
-                  <p className="home__tourney-name">{t("home.leoDominoCup")}</p>
-                </div>
-                <div className="home__countdown" aria-hidden="true">
-                  {HOME_PREVIEW.countdown.map((slot, index) => (
-                    <span key={slot.labelKey} className="home__countdown-group">
-                      {index > 0 ? <span className="home__countdown-sep">:</span> : null}
-                      <span className="home__count">
-                        <span className="home__count-value">{slot.value}</span>
-                        <span className="home__count-label">{t(slot.labelKey)}</span>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="home__cta home__cta--purple"
-                onClick={showComingSoon}
-              >
-                {t("home.viewAll")}
-              </button>
             </div>
+          </div>
+          <div className="home__tourney-rule" aria-hidden="true" />
+          <div className="home__tourney-meta">
+            <div>
+              <span className="home__eyebrow">{t("home.nextTournament")}</span>
+              <p className="home__tourney-name">{t("home.leoDominoCup")}</p>
+            </div>
+            <div className="home__countdown" aria-hidden="true">
+              {HOME_PREVIEW.countdown.map((slot) => (
+                <span key={slot.labelKey} className="home__count">
+                  <span className="home__count-value">{slot.value}</span>
+                  <span className="home__count-label">{t(slot.labelKey)}</span>
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="home__cta home__cta--gold-outline home__cta--mini home__cta--view-all home__cta--chevron"
+              onClick={showComingSoon}
+            >
+              {t("home.viewAll")}
+            </button>
           </div>
         </article>
 
         <article className="home__card home__card--store" id="store" data-home-card="store">
           <button type="button" className="home__promo home__promo--store" onClick={showComingSoon}>
-            <ArtCoins />
+            <img
+              className="home__store-wrap"
+              src={homeStoreCoinWrap}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+            />
             <div className="home__promo-copy">
-              <h2 className="home__promo-title home__promo-title--green">{t("home.leoCoinsStore")}</h2>
+              <h2 className="home__promo-title">{t("home.leoCoinsStore")}</h2>
               <p className="home__card-sub">{t("home.storeLead")}</p>
+              <span className="home__cta home__cta--mini home__cta--gold-fill home__cta--shop home__cta--chevron">
+                {t("home.shopNow")}
+              </span>
             </div>
-            <span className="home__cta home__cta--mini home__cta--purple">{t("home.shopNow")}</span>
+            <StoreChest />
           </button>
         </article>
       </div>
 
       <nav className="home__nav" aria-label={t("common.navigation")} data-home-nav="true">
         <button type="button" className="home__nav-item home__nav-item--on" aria-current="page">
-          <IconHome />
+          <HomeGlyph src={homeIconHouse} size={20} />
           <span>{t("home.navHome")}</span>
+        </button>
+        <button
+          type="button"
+          className="home__nav-item"
+          data-home-nav-item="league"
+          onClick={showComingSoon}
+        >
+          <HomeGlyph src={homeIconAward} size={20} />
+          <span>{t("home.navLeague")}</span>
         </button>
         <button
           type="button"
@@ -362,38 +400,34 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
           onClick={playVsLeoBest}
         >
           <span className="home__nav-play" aria-hidden="true">
-            <IconPlayFill />
+            <img className="home__nav-play-img" src={homeNavPlayGlow} alt="" draggable={false} />
           </span>
           <span>{t("home.navPlay")}</span>
         </button>
         <button
           type="button"
           className="home__nav-item"
-          data-home-nav-item="friends"
-          onClick={showComingSoon}
+          data-home-nav-item="store"
+          onClick={goToStore}
         >
-          <IconUsers />
-          <span>{t("home.navFriends")}</span>
+          <span className="home__nav-glyph">
+            <HomeGlyph src={homeIconCart} size={20} />
+          </span>
+          <span>{t("home.navStore")}</span>
         </button>
         <button
           type="button"
           className="home__nav-item"
-          data-home-nav-item="league"
-          onClick={showComingSoon}
-        >
-          <IconShield />
-          <span>{t("home.navLeague")}</span>
-        </button>
-        <button
-          type="button"
-          className="home__nav-item"
-          data-home-nav-item="profile"
+          data-home-nav-item="menu"
           onClick={openSettings}
         >
-          <IconUser />
-          <span>{t("home.navProfile")}</span>
+          <span className="home__nav-glyph">
+            <HomeGlyph src={homeIconMenuNav} size={20} />
+          </span>
+          <span>{t("home.navMenu")}</span>
         </button>
       </nav>
+      </div>
 
       {notice ? (
         <p className="home__notice" role="status">
@@ -411,22 +445,21 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
   );
 }
 
-function ModeCard({ id, tone, icon, title, subtitle, action, onPress }) {
+function ModeCard({ id, icon, title, subtitle, action, onPress, tone = "emerald" }) {
   return (
     <button
       type="button"
-      className={`home-mode home-mode--${tone}`}
+      className="home-mode"
       id={id}
       data-home-card={id}
       onClick={onPress}
     >
-      <GoldCorners />
       <span className="home-mode__title">{title}</span>
       <span className="home-mode__icon" aria-hidden="true">
         {icon}
       </span>
       <span className="home-mode__sub">{subtitle}</span>
-      <span className={`home-mode__cta home-mode__cta--${tone}`}>{action}</span>
+      <span className={`home-mode__cta home-mode__cta--${tone} home__cta--chevron`}>{action}</span>
     </button>
   );
 }
