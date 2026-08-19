@@ -12,6 +12,19 @@ export function GoldCorners() {
   );
 }
 
+export function LeagueStars({ filled = 4, total = 5 }) {
+  return (
+    <div className="home-stars" aria-hidden="true">
+      {Array.from({ length: total }, (_, index) => (
+        <span
+          key={index}
+          className={index < filled ? "home-stars__star home-stars__star--on" : "home-stars__star"}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function LeagueEmblem() {
   return (
     <div className="home-emblem" aria-hidden="true">
@@ -61,9 +74,9 @@ export function LeagueEmblem() {
 export function LeoBestPortrait() {
   return (
     <div className="home-leo-art" aria-hidden="true">
-      <span className="home-leo-art__crown" />
-      <span className="home-leo-art__ring" />
-      <img className="home-leo-art__face" src={logoOfficial} alt="" draggable={false} />
+      <span className="home-leo-art__ring">
+        <img className="home-leo-art__face" src={logoOfficial} alt="" draggable={false} />
+      </span>
     </div>
   );
 }

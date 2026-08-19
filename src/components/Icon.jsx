@@ -175,6 +175,15 @@ export function IconUsers({ className = "" }) {
   );
 }
 
+export function IconUser({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
+      <circle cx="12" cy="8.2" r="3.1" {...stroke} />
+      <path d="M5.6 19.2c.6-3.4 3-5.2 6.4-5.2s5.8 1.8 6.4 5.2" {...stroke} />
+    </svg>
+  );
+}
+
 export function IconGlobe({ className = "" }) {
   return (
     <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">

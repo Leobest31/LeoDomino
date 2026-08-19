@@ -7,43 +7,43 @@
 
 .home-corners__mark {
   position: absolute;
-  width: 0.85rem;
-  height: 0.85rem;
+  width: 0.62rem;
+  height: 0.62rem;
   border-color: #ebc84a;
   border-style: solid;
   filter: drop-shadow(0 0 4px rgba(235, 200, 74, 0.55));
 }
 
 .home-corners__mark--tl {
-  top: 0.42rem;
-  left: 0.42rem;
+  top: 0.28rem;
+  left: 0.28rem;
   border-width: 1.6px 0 0 1.6px;
 }
 
 .home-corners__mark--tr {
-  top: 0.42rem;
-  right: 0.42rem;
+  top: 0.28rem;
+  right: 0.28rem;
   border-width: 1.6px 1.6px 0 0;
 }
 
 .home-corners__mark--bl {
-  bottom: 0.42rem;
-  left: 0.42rem;
+  bottom: 0.28rem;
+  left: 0.28rem;
   border-width: 0 0 1.6px 1.6px;
 }
 
 .home-corners__mark--br {
-  bottom: 0.42rem;
-  right: 0.42rem;
+  bottom: 0.28rem;
+  right: 0.28rem;
   border-width: 0 1.6px 1.6px 0;
 }
 
 .home-emblem {
   position: relative;
-  width: clamp(5.6rem, 22vw, 7.1rem);
-  height: clamp(6.5rem, 26vw, 8.2rem);
+  width: clamp(4.2rem, 18vw, 5.4rem);
+  height: clamp(4.2rem, 18vw, 5.4rem);
   flex-shrink: 0;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.45));
 }
 
 .home-emblem__svg {
@@ -55,70 +55,53 @@
 .home-emblem__lion {
   position: absolute;
   left: 50%;
-  top: 46%;
-  width: 58%;
-  height: auto;
+  top: 48%;
+  width: 74%;
+  height: 62%;
+  object-fit: cover;
+  object-position: 16% 18%;
   transform: translate(-50%, -50%);
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
 }
 
 .home-leo-art {
   position: relative;
-  width: 4.5rem;
-  height: 4.9rem;
+  width: 3.55rem;
+  height: 3.55rem;
   flex-shrink: 0;
 }
 
-.home-leo-art__crown {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  width: 2.1rem;
-  height: 0.7rem;
-  transform: translateX(-50%);
-  background:
-    linear-gradient(180deg, #f6e7a8, #c9a227);
-  clip-path: polygon(8% 100%, 0 30%, 28% 62%, 50% 0, 72% 62%, 100% 30%, 92% 100%);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
-}
-
 .home-leo-art__ring {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 4.35rem;
-  height: 4.35rem;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  background:
-    conic-gradient(from 210deg, #8a6818, #f6e7a8, #c9a227, #8a6818);
-  box-shadow:
-    0 8px 18px rgba(0, 0, 0, 0.4),
-    0 0 16px rgba(235, 200, 74, 0.28);
+  display: grid;
+  place-items: center;
+  width: 3.55rem;
+  height: 3.55rem;
+  overflow: hidden;
+  border: 2.5px solid #f0d382;
+  border-radius: 38px;
+  background: radial-gradient(circle at 38% 28%, #24362c, #070b10 72%);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
 }
 
 .home-leo-art__face {
-  position: absolute;
-  left: 50%;
-  bottom: 0.18rem;
-  width: 3.85rem;
-  height: 3.85rem;
-  transform: translateX(-50%);
-  object-fit: contain;
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 28%, #24362c, #070b10 72%);
+  display: block;
+  width: 155%;
+  height: 155%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 18% 14%;
 }
 
 .home-dominos {
   position: relative;
-  width: 4.8rem;
-  height: 4.4rem;
+  width: 3.4rem;
+  height: 2.1rem;
   flex-shrink: 0;
 }
 
 .home-dominos__tile {
   position: absolute;
-  width: 1.85rem;
+  width: 1.42rem;
   height: auto;
   filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.4));
 }
@@ -130,10 +113,10 @@
 }
 
 .home-dominos__tile--b {
-  left: 1.45rem;
+  left: 1.1rem;
   top: 0;
   z-index: 2;
-  width: 2.05rem;
+  width: 1.55rem;
   transform: rotate(4deg);
 }
 
@@ -145,14 +128,14 @@
 
 .home-art-icon {
   display: block;
-  width: 3.35rem;
-  height: 3.35rem;
+  width: 1.9rem;
+  height: 1.9rem;
   filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.35));
 }
 
 .home-art-icon--lg {
-  width: 4.15rem;
-  height: 4.15rem;
+  width: 2.55rem;
+  height: 2.55rem;
 }
 
 .home-coin-mark {
@@ -160,4 +143,21 @@
   width: 1.55rem;
   height: 1.55rem;
   flex-shrink: 0;
+}
+
+.home-stars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.home-stars__star {
+  width: 11px;
+  height: 11px;
+  background: #475569;
+  clip-path: polygon(50% 2%, 63% 35%, 98% 38%, 72% 59%, 79% 96%, 50% 78%, 21% 96%, 28% 59%, 2% 38%, 37% 35%);
+}
+
+.home-stars__star--on {
+  background: linear-gradient(180deg, #ffe899, #c5a059);
 }
