@@ -3,11 +3,11 @@
   flex-shrink: 0;
   min-height: var(--bottom-bar-height);
   background:
-    linear-gradient(0deg, #030605 0%, rgba(8, 14, 18, 0.98) 100%);
-  border-top: 1px solid rgba(201, 162, 39, 0.16);
+    linear-gradient(180deg, rgba(8, 14, 18, 0.98) 0%, #030605 100%);
+  border-top: none;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.16);
   box-shadow:
-    0 -10px 28px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(47, 125, 255, 0.07);
+    inset 0 -1px 0 rgba(47, 125, 255, 0.07);
 }
 
 .bottom-bar__rail {
@@ -22,13 +22,13 @@
     minmax(var(--game-match-col, 6.4rem), auto);
   align-items: end;
   justify-content: stretch;
-  gap: 0.45rem;
+  gap: var(--game-dock-col-gap, 0.45rem);
   max-width: var(--game-max);
   margin: 0 auto;
   padding:
-    0.08rem
+    0
     clamp(0.45rem, 1.4vw, 0.9rem)
-    max(0.12rem, env(safe-area-inset-bottom, 0px));
+    0;
   min-height: var(--game-dock-height, var(--bottom-bar-height));
 }
 
@@ -47,7 +47,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   overflow: hidden;
 }
 
@@ -69,7 +69,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.22rem;
   flex-shrink: 0;
   min-width: 0;
@@ -90,18 +90,24 @@
 
 @media (max-width: 520px) {
   .bottom-bar__inner {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-    padding: 0.48rem 0.55rem max(0.55rem, env(safe-area-inset-bottom, 0px));
-    gap: 0.45rem;
+    grid-template-columns:
+      minmax(var(--game-pass-col, 5.2rem), auto)
+      minmax(0, 1fr)
+      minmax(var(--game-match-col, 5.4rem), auto);
+    align-items: end;
+    padding: 0 0.35rem 0;
+    gap: var(--game-dock-col-gap, 0.32rem);
   }
 
   .bottom-bar__actions,
   .bottom-bar__center,
-  .bottom-bar__end,
+  .bottom-bar__end {
+    width: 100%;
+    min-width: 0;
+  }
+
   .bottom-bar__btn,
   .bottom-bar__new {
-    width: 100%;
     min-width: 0;
   }
 }
@@ -120,11 +126,11 @@
     align-items: end;
     justify-content: stretch;
     padding:
-      0.08rem
+      0
       clamp(0.4rem, 1.2vw, 0.85rem)
-      0.1rem;
+      0;
     min-height: var(--game-dock-height, 0px);
-    gap: 0.4rem;
+    gap: var(--game-dock-col-gap, 0.4rem);
   }
 
   .bottom-bar__actions {

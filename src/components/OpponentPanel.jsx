@@ -21,6 +21,8 @@ function OpponentPanel({
   seatIndex = 1,
   compact = false,
   avatarTone = "rival",
+  tilesOnly = false,
+  tileSize = "sm",
 }) {
   const { t } = useI18n();
   const resolvedName = name ?? t("game.rival");
@@ -33,41 +35,43 @@ function OpponentPanel({
     <section
       className={`opponent-panel opponent-panel--${position}${
         compact ? " opponent-panel--compact" : ""
-      }${thinking ? " opponent-panel--thinking" : ""}${
+      }${tilesOnly ? " opponent-panel--tiles-only" : ""}${thinking ? " opponent-panel--thinking" : ""}${
         isTurn && !thinking ? " opponent-panel--turn" : ""
       }`}
       aria-label={t("game.handAria", { name: resolvedName })}
     >
-      <div className="opponent-panel__meta">
-        <div className="opponent-panel__identity">
-          <Avatar
-            label={resolvedName}
-            tone={avatarTone}
-            size="sm"
-            active={thinking || isTurn}
-          />
-          <div className="opponent-panel__text">
-            <span className="opponent-panel__name">{resolvedName}</span>
-            <span
-              className={
-                thinking
-                  ? "opponent-panel__status opponent-panel__status--thinking"
-                  : isTurn
-                    ? "opponent-panel__status opponent-panel__status--turn"
-                    : "opponent-panel__status"
-              }
-            >
-              {resolvedStatus}
-            </span>
+      {tilesOnly ? null : (
+        <div className="opponent-panel__meta">
+          <div className="opponent-panel__identity">
+            <Avatar
+              label={resolvedName}
+              tone={avatarTone}
+              size="sm"
+              active={thinking || isTurn}
+            />
+            <div className="opponent-panel__text">
+              <span className="opponent-panel__name">{resolvedName}</span>
+              <span
+                className={
+                  thinking
+                    ? "opponent-panel__status opponent-panel__status--thinking"
+                    : isTurn
+                      ? "opponent-panel__status opponent-panel__status--turn"
+                      : "opponent-panel__status"
+                }
+              >
+                {resolvedStatus}
+              </span>
+            </div>
           </div>
+          <span
+            className="opponent-panel__count"
+            aria-label={t("game.tilesCount", { count: tileCount })}
+          >
+            {tileCount}
+          </span>
         </div>
-        <span
-          className="opponent-panel__count"
-          aria-label={t("game.tilesCount", { count: tileCount })}
-        >
-          {tileCount}
-        </span>
-      </div>
+      )}
 
       <div
         className="opponent-panel__tray"
@@ -90,7 +94,7 @@ function OpponentPanel({
                 <DominoTile
                   faceDown
                   orientation={sideSeat ? "horizontal" : "vertical"}
-                  size="sm"
+                  size={tileSize}
                   label={t("game.faceDown")}
                 />
               </li>

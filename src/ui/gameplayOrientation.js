@@ -13,8 +13,8 @@ export function shouldPromptLandscape(viewport) {
 }
 
 /**
- * Estimated leftover height for the green felt after chrome and the bottom
- * hand/control dock. Used by layout tests — keep in sync with gameplayLayout.
+ * Estimated leftover height for the green felt after chrome and the
+ * Player 1 hand/control dock. Used by layout tests — keep in sync with gameplayLayout.
  */
 export function estimateFeltHeight(viewportHeight, chrome) {
   const h = Number(viewportHeight) || 0;
@@ -36,7 +36,7 @@ export const TABLET_LANDSCAPE_CHROME_BEFORE = {
 
 /**
  * Representative tablet-landscape chrome after the exclusive felt stack.
- * Player tray + Pase/New Match occupy a real bottom dock, so they subtract
+ * Player tray + Pase/New Match occupy a real hand dock, so they subtract
  * from felt height instead of overlaying the green table.
  */
 export const TABLET_LANDSCAPE_CHROME_AFTER = {

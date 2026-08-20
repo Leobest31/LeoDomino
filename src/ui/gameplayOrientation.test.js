@@ -50,6 +50,16 @@ const phonePortrait = resolveGameplayLayout({ width: 390, height: 844 });
 assert.equal(phonePortrait.orientation, "portrait");
 assert.ok(phonePortrait.feltHeight > phonePortrait.chromeHeight, "portrait felt dominates chrome");
 assert.ok(phonePortrait.feltHeight > phonePortrait.dockHeight, "portrait felt dominates dock");
+assert.ok(phonePortrait.handTop >= phonePortrait.feltBottom - 0.5, "portrait hand sits at the bottom of the felt");
+assert.ok(phonePortrait.opponentRailHeight >= 32, "portrait reserves LeoBest hidden tiles");
+assert.ok(
+  phonePortrait.feltTop >= phonePortrait.opponentTop + phonePortrait.opponentRailHeight - 0.5,
+  "portrait felt starts under the opponent rail"
+);
+assert.ok(
+  phonePortrait.handTop - phonePortrait.feltBottom <= 4.5,
+  "portrait hand sits flush under the felt"
+);
 assert.ok(phonePortrait.playedShort >= 44, `portrait tiles stay readable (${phonePortrait.playedShort})`);
 
 const tabletH = 800;
@@ -58,7 +68,7 @@ const feltAfter = estimateFeltHeight(tabletH, TABLET_LANDSCAPE_CHROME_AFTER);
 assert.ok(feltAfter > feltBefore, `felt must remain playable ${feltBefore} → ${feltAfter}`);
 assert.ok(
   TABLET_LANDSCAPE_CHROME_AFTER.bottom > 0,
-  "bottom dock must reserve real height outside the felt"
+  "hand dock must reserve real height outside the felt"
 );
 assert.ok(
   TABLET_LANDSCAPE_CHROME_AFTER.player === 0,
@@ -66,7 +76,7 @@ assert.ok(
 );
 assert.ok(
   feltAfter < tabletH - TABLET_LANDSCAPE_CHROME_AFTER.header,
-  "felt must not consume the bottom dock"
+  "felt must not consume the hand dock"
 );
 
 console.log("Gameplay orientation tests passed.");

@@ -90,4 +90,17 @@ const opponent = read("../components/OpponentPanel.jsx");
   section("flight duration in 250–400ms; reduced-motion still disables flight CSS");
 }
 
+{
+  assert.match(gamePage, /pendingAiDraw/);
+  assert.match(gamePage, /data-reserve-pick="\$\{pendingAiDraw\.tileId\}"/);
+  assert.match(gamePage, /faceDown: true/);
+  assert.match(gamePage, /confirmAiDraw\(pendingAiDraw\.tileId\)/);
+  assert.match(gamePage, /left: 0/);
+  assert.match(gamePage, /right: 0/);
+  assert.match(read("../components/ReservePicker.jsx"), /data-reserve-draw-source/);
+  assert.ok(MOTION.aiDrawRevealMs >= 400);
+  assert.ok(MOTION.aiDrawFlightMs >= 280);
+  section("AI reserve draw shows the real face-down tile then flies it to LeoBest");
+}
+
 console.log("\nPlay-flight UI contract tests passed.");

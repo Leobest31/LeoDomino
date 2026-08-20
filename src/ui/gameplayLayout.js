@@ -7,7 +7,7 @@
  * it must not invent a second layout.
  *
  * Vertical stack (no overlays):
- *   top chrome  →  green felt  →  bottom hand/control dock
+ *   HUD  →  opponent rail  →  green felt (flex fill)  →  Player 1 dock
  */
 
 /**
@@ -36,7 +36,7 @@ export const GAMEPLAY_REF = Object.freeze({
   chrome: 132,
   dock: 78,
   regionGap: 6,
-  felt: 578,
+  felt: 586,
   playedShort: PLAYED_SHORT_REF_PX * PLAYED_PREFERRED_SCALE,
   playedLong: PLAYED_LONG_REF_PX * PLAYED_PREFERRED_SCALE,
   handShort: 33,
@@ -67,11 +67,13 @@ export const CHROME_MIN_PX = 96;
 export const CHROME_MAX_PX = 148;
 export const DOCK_MIN_PX = 48;
 export const DOCK_MAX_PX = 136;
-/** Vertical pad inside the dock — not empty space above the hand. */
+/** Vertical pad inside the dock — not empty space around the hand. */
 export const DOCK_PAD_PX = 4;
-/** Felt-to-hand gap after unused dock reservation is removed. */
-export const FELT_HAND_GAP_MIN_PX = 4;
-export const FELT_HAND_GAP_MAX_PX = 8;
+/** Portrait: room above/below the tiles, including the 3D tile lip. */
+export const PORTRAIT_DOCK_PAD_PX = 28;
+/** Hand-to-table gap: Player 1's hand sits flush under the felt. */
+export const FELT_HAND_GAP_MIN_PX = 0;
+export const FELT_HAND_GAP_MAX_PX = 4;
 /** 4-player phone landscape: small Rival 1 → table-frame gap. Bottom edge stays put. */
 export const FOUR_PLAYER_PHONE_CHROME_FELT_GAP_PX = 2;
 export const FOUR_PLAYER_PHONE_CHROME_MIN_PX = 64;
@@ -89,52 +91,89 @@ export const PHONE_LANDSCAPE_MIN_AR = 2.05;
 export const PLAYED_SHORT_OF_FELT_W_PORTRAIT = 0.165;
 /** One vertical bone may occupy this fraction of portrait felt height before wrap. */
 export const PLAYED_LONG_MAX_OF_FELT_H_PORTRAIT = 0.28;
-export const PORTRAIT_CHROME_MIN_PX = 88;
-export const PORTRAIT_CHROME_MAX_PX = 128;
-export const PORTRAIT_DOCK_MIN_PX = 92;
+export const PORTRAIT_CHROME_MIN_PX = 64;
+export const PORTRAIT_CHROME_MAX_PX = 80;
+/** Portrait dock is tall enough for the full Player 1 tile plus padding. */
+export const PORTRAIT_DOCK_MIN_PX = 80;
 export const PORTRAIT_DOCK_MAX_PX = 148;
+/** Portrait Player 1 tile short-side floor/ceiling — keep bones readable. */
+export const PORTRAIT_HAND_SHORT_MIN_PX = 34;
+export const PORTRAIT_HAND_SHORT_MAX_PX = 44;
 export const HAND_LONG_MIN_PX = 36;
 export const HAND_LONG_MAX_PX = 64;
-/** Player 1 unplayed tiles only — does not change dock/felt reservation. */
+/** Player 1 unplayed tiles. Dock height follows this size so the table can sit flush. */
 export const PLAYER_HAND_SCALE = 1.2;
 export const PLAYER_HAND_GAP_PX = 6;
 export const PLAYER_HAND_OVERLAP_MIN_PX = -8;
 export const ACTION_MIN_PX = 36;
 export const ACTION_MAX_PX = 48;
 export const ACTION_COL_MIN_PX = 110;
+/** Compact portrait Pass — tiles get the leftover width first. */
+export const PORTRAIT_ACTION_COL_MIN_PX = 42;
+/** Compact portrait New Match — slightly wider than Pass for two-line copy. */
+export const PORTRAIT_MATCH_COL_MIN_PX = 48;
 export const DOCK_COL_GAP_PX = 10;
+export const PORTRAIT_DOCK_COL_GAP_PX = 6;
+/** Walnut + inner padding reserved outside the 7-tile budget. */
+export const PORTRAIT_DOCK_INSET_PX = 12;
+/** Portrait rack never stacks; keep a visible gap even on short widths. */
+export const PORTRAIT_HAND_GAP_MIN_PX = 2;
 export const COMPOSITION_GAP_PX = 8;
+/** Portrait LeoBest face-down tray between the HUD and the felt. */
+export const PORTRAIT_OPPONENT_RAIL_MIN_PX = 32;
+export const PORTRAIT_OPPONENT_RAIL_MAX_PX = 36;
+/**
+ * Bottom clearance for the system navigation / home indicator.
+ * Use the CSS safe-area inset when the environment reports one.
+ * Keep only a thin floor when inset is 0 so the table can fill the
+ * leftover portrait height instead of leaving a large dark band.
+ */
+export const GAME_SAFE_BOTTOM_CSS = "env(safe-area-inset-bottom, 0px)";
 
 const TILE_RATIO = GAMEPLAY_REF.playedLong / GAMEPLAY_REF.playedShort;
 const HAND_RATIO = GAMEPLAY_REF.handLong / GAMEPLAY_REF.handShort;
 
 /**
  * Fit seven scaled Player 1 tiles into the dock center without changing
- * felt/dock geometry. Prefer a small gap; allow a controlled overlap on
- * narrow widths.
+ * felt/dock geometry. Prefer a small gap. Landscape may use a controlled
+ * overlap on narrow widths; portrait never overlaps.
  */
-export function fitPlayerHandRow(tileShort, budget) {
+export function fitPlayerHandRow(tileShort, budget, options = {}) {
   const n = 7;
+  const allowOverlap = options.allowOverlap !== false;
+  const minGap = Number.isFinite(Number(options.minGap))
+    ? Number(options.minGap)
+    : 2;
   const width = Math.max(18, Number(tileShort) || 0);
   const room = Math.max(80, Number(budget) || 0);
   let gap = PLAYER_HAND_GAP_PX;
   let overlap = 0;
-  const withGap = n * width + (n - 1) * gap;
+  let short = width;
+  const withGap = n * short + (n - 1) * gap;
   if (withGap > room) {
-    gap = (room - n * width) / (n - 1);
-    if (gap >= 2) {
+    gap = (room - n * short) / (n - 1);
+    if (gap >= minGap) {
       overlap = 0;
-    } else {
+    } else if (allowOverlap) {
       gap = 0;
-      overlap = clamp((room - n * width) / (n - 1), PLAYER_HAND_OVERLAP_MIN_PX, 0);
+      overlap = clamp((room - n * short) / (n - 1), PLAYER_HAND_OVERLAP_MIN_PX, 0);
+    } else {
+      gap = minGap;
+      overlap = 0;
+      short = Math.max(18, (room - (n - 1) * gap) / n);
     }
   }
-  let short = width;
   const used = n * short + (n - 1) * (gap + overlap);
   if (used > room + 0.5) {
-    short = Math.max(18, (room - (n - 1) * PLAYER_HAND_OVERLAP_MIN_PX) / n);
-    gap = 0;
-    overlap = PLAYER_HAND_OVERLAP_MIN_PX;
+    if (allowOverlap) {
+      short = Math.max(18, (room - (n - 1) * PLAYER_HAND_OVERLAP_MIN_PX) / n);
+      gap = 0;
+      overlap = PLAYER_HAND_OVERLAP_MIN_PX;
+    } else {
+      gap = minGap;
+      overlap = 0;
+      short = Math.max(18, (room - (n - 1) * gap) / n);
+    }
   }
   return { short, gap, overlap };
 }
@@ -236,17 +275,22 @@ export function resolveGameplayLayout(viewport, options = {}) {
   let chromeHeight = clamp(GAMEPLAY_REF.chrome * heightScale, CHROME_MIN_PX, CHROME_MAX_PX);
   const regionGap = clamp(Math.round(GAMEPLAY_REF.regionGap * uiScale), 4, 10);
   let chromeFeltGap = regionGap;
-  const feltDockGap = clamp(regionGap, FELT_HAND_GAP_MIN_PX, FELT_HAND_GAP_MAX_PX);
+  const feltDockGap = FELT_HAND_GAP_MIN_PX;
   const menuHeight = clamp(GAMEPLAY_REF.menu * uiScale, 32, 44);
   const statusBand = clamp(GAMEPLAY_REF.statusBand * uiScale, 12, 18);
 
   let handLong = clamp(GAMEPLAY_REF.handLong * uiScale, HAND_LONG_MIN_PX, HAND_LONG_MAX_PX);
   let handShort = handLong / HAND_RATIO;
-  const passWidth = Math.max(ACTION_COL_MIN_PX, 116 * uiScale);
-  const matchWidth = Math.max(ACTION_COL_MIN_PX, 122 * uiScale);
+  const colMin = portrait ? PORTRAIT_ACTION_COL_MIN_PX : ACTION_COL_MIN_PX;
+  const colGap = portrait ? PORTRAIT_DOCK_COL_GAP_PX : DOCK_COL_GAP_PX;
+  const passWidth = Math.max(colMin, (portrait ? PORTRAIT_ACTION_COL_MIN_PX : 116) * uiScale);
+  const matchWidth = Math.max(
+    portrait ? PORTRAIT_MATCH_COL_MIN_PX : colMin,
+    (portrait ? PORTRAIT_MATCH_COL_MIN_PX : 122) * uiScale
+  );
   const handBudget = Math.max(
     120,
-    safeW - passWidth - matchWidth - 2 * DOCK_COL_GAP_PX
+    safeW - passWidth - matchWidth - 2 * colGap - (portrait ? PORTRAIT_DOCK_INSET_PX : 0)
   );
   const maxHandShort = (handBudget - 6 * 6) / 7;
   if (!portrait && handShort > maxHandShort) {
@@ -256,8 +300,15 @@ export function resolveGameplayLayout(viewport, options = {}) {
   const handPip = Math.max(3, 5.5 * uiScale);
   let playerRow = fitPlayerHandRow(handShort * PLAYER_HAND_SCALE, handBudget);
   if (portrait) {
-    const readable = clamp(handShort * PLAYER_HAND_SCALE, 28, 40);
-    playerRow = { short: readable, gap: PLAYER_HAND_GAP_PX, overlap: 0 };
+    const readable = clamp(
+      handShort * PLAYER_HAND_SCALE,
+      PORTRAIT_HAND_SHORT_MIN_PX,
+      PORTRAIT_HAND_SHORT_MAX_PX
+    );
+    playerRow = fitPlayerHandRow(readable, handBudget, {
+      allowOverlap: false,
+      minGap: PORTRAIT_HAND_GAP_MIN_PX,
+    });
   }
   let playerHandShort = playerRow.short;
   let playerHandLong = playerHandShort * HAND_RATIO;
@@ -265,23 +316,15 @@ export function resolveGameplayLayout(viewport, options = {}) {
   const actionHeight = clamp(GAMEPLAY_REF.action * uiScale, ACTION_MIN_PX, ACTION_MAX_PX);
   const headerHeight = clamp(GAMEPLAY_REF.chrome * 0.38 * uiScale, 36, 56);
 
-  const dockFromHand = handLong + statusBand + DOCK_PAD_PX;
+  // Dock hugs the visible Player 1 tiles (status overlays, it does not
+  // reserve a second band). Recovered height goes to the table.
+  const dockFromHand = playerHandLong + DOCK_PAD_PX;
   const dockFromActions = actionHeight + DOCK_PAD_PX;
   let dockHeight = clamp(
     Math.max(dockFromHand, dockFromActions),
     DOCK_MIN_PX,
     DOCK_MAX_PX
   );
-  // Keep the +20% hand inside the existing dock so the felt cannot move.
-  if (!portrait) {
-    const maxPlayerLong = Math.max(HAND_LONG_MIN_PX, dockHeight - 8);
-    if (playerHandLong > maxPlayerLong) {
-      const fit = maxPlayerLong / playerHandLong;
-      playerHandLong = maxPlayerLong;
-      playerHandShort *= fit;
-      playerHandPip = Math.max(3.2, playerHandPip * fit);
-    }
-  }
 
   const scoreRowHeight = clamp(Math.round(28 * uiScale + 10), 28, 42);
   const menuGap = clamp(Math.round(GAMEPLAY_REF.regionGap * uiScale), 3, 6);
@@ -289,9 +332,8 @@ export function resolveGameplayLayout(viewport, options = {}) {
   const classicTwoPhone = !portrait && isClassicTwoPlayerPhoneLayout({ safeW, safeH }, options);
   const classicThreePhone = !portrait && isClassicThreePlayerPhoneLayout({ safeW, safeH }, options);
   if (fourPlayerPhone || classicTwoPhone || classicThreePhone) {
-    // Hug Rival 1 / HUD content. Dock and feltDockGap stay put so the
-    // felt BOTTOM and Player 1 hand do not move. Top edge rises; bottom
-    // does not translate.
+    // Hug Rival 1 / HUD content. Table still fills remaining height
+    // under the hand; chrome shrinks so the felt grows.
     const menuStack = headerHeight + menuGap + menuHeight;
     const rivalTray = Math.round(handLong * 0.52) + 20;
     const centerStack = headerHeight + rivalTray;
@@ -305,21 +347,32 @@ export function resolveGameplayLayout(viewport, options = {}) {
   }
   if (portrait) {
     chromeHeight = clamp(
-      Math.round(safeH * 0.155),
+      Math.round(safeH * 0.09),
       PORTRAIT_CHROME_MIN_PX,
       PORTRAIT_CHROME_MAX_PX
     );
-    chromeFeltGap = 4;
+    chromeFeltGap = 2;
     dockHeight = clamp(
-      Math.max(playerHandLong + statusBand + 12, actionHeight + 12, PORTRAIT_DOCK_MIN_PX),
+      Math.max(playerHandLong + PORTRAIT_DOCK_PAD_PX, actionHeight + PORTRAIT_DOCK_PAD_PX),
       PORTRAIT_DOCK_MIN_PX,
       PORTRAIT_DOCK_MAX_PX
     );
   }
 
+  const opponentRailHeight = portrait
+    ? clamp(Math.round(handLong * 0.7 + 6), PORTRAIT_OPPONENT_RAIL_MIN_PX, PORTRAIT_OPPONENT_RAIL_MAX_PX)
+    : 0;
+
+  const hudAvatar = portrait
+    ? clamp(chromeHeight - 16, 44, 64)
+    : clamp(Math.round(chromeHeight * 0.4), 30, 46);
+  const hudScore = portrait
+    ? clamp(Math.round(hudAvatar * 0.58), 24, 38)
+    : clamp(Math.round(hudAvatar * 0.5), 16, 24);
+
   const feltHeight = Math.max(
     160,
-    safeH - chromeHeight - dockHeight - chromeFeltGap - feltDockGap
+    safeH - chromeHeight - opponentRailHeight - dockHeight - chromeFeltGap - feltDockGap
   );
   const feltWidth = safeW;
   const usableBoardHeight = feltHeight;
@@ -354,7 +407,8 @@ export function resolveGameplayLayout(viewport, options = {}) {
   playedShort = clamp(playedShort, PLAYED_SHORT_MIN_PX, PLAYED_SHORT_MAX_PX);
   playedLong = playedShort * TILE_RATIO;
 
-  const feltTop = chromeHeight + chromeFeltGap;
+  const opponentTop = chromeHeight + chromeFeltGap;
+  const feltTop = opponentTop + opponentRailHeight;
   const feltBottom = feltTop + feltHeight;
   const dockTop = feltBottom + feltDockGap;
   const menuTop = headerHeight + menuGap;
@@ -366,6 +420,8 @@ export function resolveGameplayLayout(viewport, options = {}) {
     safeH,
     chromeHeight,
     dockHeight,
+    opponentRailHeight,
+    opponentTop,
     feltHeight,
     feltWidth,
     usableBoardHeight,
@@ -388,6 +444,7 @@ export function resolveGameplayLayout(viewport, options = {}) {
     statusBand,
     passWidth,
     matchWidth,
+    colGap,
     handBudget,
     feltTop,
     feltBottom,
@@ -395,16 +452,17 @@ export function resolveGameplayLayout(viewport, options = {}) {
     scoreBottom: scoreRowHeight,
     menuBottom,
     menuTop,
-    // Status ("Se tou ou") lives inside the dock with the hand — not a
-    // second dark band between the gold table edge and the tiles.
+    // Player 1 hand sits at the bottom edge of the felt.
     handTop: dockTop,
     passLeft: 0,
     passRight: passWidth,
     matchLeft: safeW - matchWidth,
     matchRight: safeW,
-    handLeft: passWidth + DOCK_COL_GAP_PX,
-    handRight: safeW - matchWidth - DOCK_COL_GAP_PX,
+    handLeft: passWidth + colGap,
+    handRight: safeW - matchWidth - colGap,
     handExclusion: 0,
+    hudAvatar,
+    hudScore,
     density: gameplayDensityClass({ safeW, safeH }),
     orientation: portrait ? "portrait" : "landscape",
   };
@@ -431,6 +489,12 @@ export function gameplayComposition(layout) {
       bottom: L.menuBottom,
     },
     felt: { left: 0, right: L.feltWidth, top: L.feltTop, bottom: L.feltBottom },
+    opponent: {
+      left: 0,
+      right: L.safeW,
+      top: L.opponentTop,
+      bottom: L.opponentTop + L.opponentRailHeight,
+    },
     hand: {
       left: L.handLeft,
       right: L.handRight,
@@ -497,6 +561,7 @@ export function gameplayLayoutCssVars(layout) {
     "--game-action-scale": String(Number(layout.uiScale.toFixed(4))),
     "--game-chrome-height": px(layout.chromeHeight, 0),
     "--game-dock-height": px(layout.dockHeight, 0),
+    "--game-opponent-rail": px(layout.opponentRailHeight, 0),
     "--game-region-gap": px(layout.regionGap, 0),
     "--game-chrome-felt-gap": px(layout.chromeFeltGap, 0),
     "--game-felt-dock-gap": px(layout.feltDockGap, 0),
@@ -517,11 +582,14 @@ export function gameplayLayoutCssVars(layout) {
     "--domino-pip": px(layout.handPip),
     "--game-action-height": px(layout.actionHeight, 0),
     "--game-hand-exclusion": px(layout.handExclusion, 0),
-    "--game-safe-bottom": "env(safe-area-inset-bottom, 0px)",
+    "--game-safe-bottom": GAME_SAFE_BOTTOM_CSS,
     "--header-height": px(layout.headerHeight, 0),
     "--bottom-bar-height": px(layout.actionHeight + 8, 0),
     "--game-pass-col": px(layout.passWidth, 0),
     "--game-match-col": px(layout.matchWidth, 0),
+    "--game-dock-col-gap": px(layout.colGap ?? (layout.orientation === "portrait" ? PORTRAIT_DOCK_COL_GAP_PX : DOCK_COL_GAP_PX), 0),
+    "--game-hud-avatar": px(layout.hudAvatar, 0),
+    "--game-hud-score": px(layout.hudScore, 0),
   };
 }
 

@@ -13,6 +13,7 @@ import {
   drawTile,
   passTurn,
   applyAiTurn,
+  chooseAiAction,
   PHASE,
   DEFAULT_DIFFICULTY,
 } from "../game/index.js";
@@ -101,9 +102,74 @@ function advance(state) {
     const { L, tileSize } = stageOf(vp);
     assert.equal(L.orientation, "portrait", `${vp.name} is portrait`);
     assert.ok(L.feltHeight > L.chromeHeight + 40, `${vp.name} felt is the largest region`);
+    assert.ok(L.opponentRailHeight >= 32, `${vp.name} opponent rail is visible`);
+    assert.ok(
+      L.opponentTop >= L.chromeHeight,
+      `${vp.name} opponent hand sits under the HUD`
+    );
+    assert.ok(
+      L.handTop >= L.opponentTop + L.opponentRailHeight - 0.5,
+      `${vp.name} Player 1 hand sits under the opponent rail`
+    );
+    assert.ok(
+      L.handTop >= L.feltBottom - 0.5,
+      `${vp.name} Player 1 hand sits at the bottom of the felt`
+    );
+    assert.ok(
+      L.handTop - L.feltBottom <= 4.5,
+      `${vp.name} hand sits flush under the felt`
+    );
+    assert.ok(Math.abs(L.dockTop + L.dockHeight - L.safeH) < 1, `${vp.name} dock reaches the usable bottom`);
+    assert.equal(
+      Number((L.safeH - (L.dockTop + L.dockHeight)).toFixed(1)),
+      0,
+      `${vp.name} unused space below the dock is 0px`
+    );
     assert.ok(tileSize.w >= 40, `${vp.name} preferred short ${tileSize.w} stays readable`);
-    assert.ok(L.playerHandShort >= 26, `${vp.name} hand stays touchable`);
+    assert.ok(L.playerHandShort >= 32, `${vp.name} hand stays readable`);
+    assert.equal(L.playerHandOverlap, 0, `${vp.name} 7 tiles do not overlap`);
+    assert.ok(L.playerHandGap >= 1.9, `${vp.name} keeps a gap between tiles`);
+    assert.ok(
+      L.dockHeight >= L.playerHandLong + 20,
+      `${vp.name} dock has room to center the hand (${L.dockHeight} vs tile ${L.playerHandLong})`
+    );
+    assert.ok(L.hudAvatar >= 44, `${vp.name} HUD avatars stay visible (${L.hudAvatar})`);
+    assert.ok(L.hudScore >= 24, `${vp.name} HUD scores stay readable (${L.hudScore})`);
   }
+  const a37p = resolveGameplayLayout({ width: 412, height: 915 }, { playerCount: 2, rulesetId: "legacy" });
+  const shortP = resolveGameplayLayout({ width: 360, height: 640 }, { playerCount: 2, rulesetId: "legacy" });
+  const tallP = resolveGameplayLayout({ width: 412, height: 1024 }, { playerCount: 2, rulesetId: "legacy" });
+  const dump = (name, L) => ({
+    name,
+    viewport: `${L.safeW}×${L.safeH}`,
+    topContent: Math.round(L.chromeHeight + L.chromeFeltGap + L.opponentRailHeight),
+    tableHeight: Math.round(L.feltHeight),
+    dock: Math.round(L.dockHeight),
+    unusedBelowFelt: Number((L.handTop - L.feltBottom).toFixed(1)),
+  });
+  console.log("Portrait fill", {
+    a37: dump("Galaxy A37-class", a37p),
+    shorter: dump("shorter portrait", shortP),
+    taller: dump("taller portrait", tallP),
+  });
+  console.log("Portrait A37-class layout", {
+    chrome: a37p.chromeHeight,
+    opponentTop: a37p.opponentTop,
+    opponentBottom: a37p.opponentTop + a37p.opponentRailHeight,
+    opponentRail: a37p.opponentRailHeight,
+    hudAvatar: a37p.hudAvatar,
+    hudScore: a37p.hudScore,
+    handTop: a37p.handTop,
+    handBottom: a37p.dockTop + a37p.dockHeight,
+    playerHand: `${Math.round(a37p.playerHandShort)}×${Math.round(a37p.playerHandLong)}`,
+    feltTop: a37p.feltTop,
+    feltBottom: a37p.feltBottom,
+    feltHeight: a37p.feltHeight,
+    gap: a37p.handTop - a37p.feltBottom,
+    unusedBelowFelt: Number((a37p.handTop - a37p.feltBottom).toFixed(1)),
+    unusedBelowDock: Number((a37p.safeH - (a37p.dockTop + a37p.dockHeight)).toFixed(1)),
+    safeBottomCss: "env(safe-area-inset-bottom, 0px)",
+  });
 }
 
 {
@@ -220,6 +286,44 @@ function advance(state) {
   assert.equal(dominican.players[0].hand.length, 14);
   assert.equal(dominican.reserve.length, 0);
   assert.equal(getAvailableActions(dominican).canDraw, false);
+}
+
+{
+  let sawDraw = false;
+  for (const seed of [41, 3, 11, 19, 77, 101, 2026, 9]) {
+    let state = startMatch({
+      seed,
+      playerCount: 2,
+      playerIds: ["you", "leoBest"],
+      rulesetId: "legacy",
+    });
+    let guard = 0;
+    while (state.phase === PHASE.PLAYING && guard < 80 && !sawDraw) {
+      guard += 1;
+      if (state.currentPlayer === 1) {
+        const before = state.reserve.slice();
+        const action = chooseAiAction(state, {
+          difficulty: DEFAULT_DIFFICULTY,
+          aiIndex: 1,
+        });
+        if (action?.type === "draw") {
+          assert.ok(before[0], "AI draw uses the engine reserve order");
+          const next = drawTile(state, before[0]);
+          assert.equal(next.reserve.includes(before[0]), false, "drawn reserve tile leaves the boneyard");
+          assert.equal(next.players[1].hand.includes(before[0]), true, "same tile enters LeoBest's hand");
+          assert.equal(next.reserve.length, before.length - 1);
+          assert.equal(next.players[1].hand.length, state.players[1].hand.length + 1);
+          sawDraw = true;
+          break;
+        }
+      }
+      const next = advance(state);
+      if (next === state) break;
+      state = next;
+    }
+    if (sawDraw) break;
+  }
+  assert.equal(sawDraw, true, "AI reserve-draw visualization uses the real engine tile");
 }
 
 console.log("V1 portrait layout + reserve + 1v1 tests passed.");

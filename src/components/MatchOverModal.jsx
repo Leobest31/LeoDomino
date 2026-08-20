@@ -146,13 +146,15 @@ function MatchOverModal({
           >
             {t("matchOver.newMatch")}
           </button>
-          <button
-            type="button"
-            className="match-over__btn match-over__btn--secondary"
-            onClick={onStatistics}
-          >
-            {t("matchOver.statistics")}
-          </button>
+          {typeof onStatistics === "function" ? (
+            <button
+              type="button"
+              className="match-over__btn match-over__btn--secondary"
+              onClick={onStatistics}
+            >
+              {t("matchOver.statistics")}
+            </button>
+          ) : null}
           <button
             type="button"
             className="match-over__btn match-over__btn--ghost"

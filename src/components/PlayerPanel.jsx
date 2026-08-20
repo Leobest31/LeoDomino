@@ -15,6 +15,7 @@ function PlayerPanel({
   isTurn = false,
   hiddenIds,
   enteringIds,
+  tilesOnly = false,
 }) {
   const { t } = useI18n();
   const resolvedName = name ?? t("game.you");
@@ -27,12 +28,15 @@ function PlayerPanel({
       className={`player-panel${isTurn ? " player-panel--turn" : ""}`}
       aria-label={t("game.handAria", { name: resolvedName })}
     >
+      {tilesOnly ? null : (
       <div className="player-panel__title" aria-hidden="true">
         <span className="player-panel__title-rule" />
         <span className="player-panel__title-text">{t("game.yourHand")}</span>
         <span className="player-panel__title-rule player-panel__title-rule--end" />
       </div>
+      )}
 
+      {tilesOnly ? null : (
       <div className="player-panel__meta">
         <div className="player-panel__identity">
           <Avatar label={resolvedName} tone="player" active={isTurn} />
@@ -56,6 +60,7 @@ function PlayerPanel({
           {t("game.tilesCount", { count: tiles.length })}
         </span>
       </div>
+      )}
 
       <div className="player-panel__tray">
         <ul className="player-panel__hand" ref={handRef} data-hand-root="player">

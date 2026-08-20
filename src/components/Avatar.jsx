@@ -1,9 +1,9 @@
-import { logoIcon } from "../assets";
+import { leoBestLionHud } from "../assets";
 import "./Avatar.css";
 
 /**
  * Premium medallion avatar.
- * LeoBest uses the LeoDomino lion-head mark — not an imported opponent art.
+ * LeoBest uses a dedicated lion-head portrait — not a human starter avatar.
  */
 function Avatar({ label = "?", tone = "player", size = "md", active = false }) {
   const initial = String(label).trim().charAt(0).toUpperCase() || "?";
@@ -17,7 +17,7 @@ function Avatar({ label = "?", tone = "player", size = "md", active = false }) {
       <span className="avatar__ring" />
       {leoBest ? (
         <span className="avatar__face avatar__face--crest">
-          <img src={logoIcon} alt="" draggable={false} />
+          <img src={leoBestLionHud} alt="" draggable={false} />
         </span>
       ) : (
         <span className="avatar__face">{initial}</span>

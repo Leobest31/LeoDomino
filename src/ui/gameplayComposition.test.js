@@ -77,7 +77,7 @@ function longSpinner() {
   const bottomCss = read("components/BottomBar.css");
   const headerCss = read("components/Header.css");
   assert.match(page, /game-page__dock/, "dock remains");
-  assert.match(page, /<BottomBar[\s\S]*<PlayerPanel/, "hand lives in the bottom dock");
+  assert.match(page, /<BottomBar[\s\S]*<PlayerPanel/, "hand lives in the Player 1 dock");
   assert.doesNotMatch(
     css,
     /grid-area:\s*1\s*\/\s*1[\s\S]*game-page__dock/,
@@ -121,7 +121,7 @@ for (const vp of VIEWPORTS) {
   const label = vp.name;
 
   assert.ok(
-    Math.abs(L.chromeHeight + L.chromeFeltGap + L.feltHeight + L.feltDockGap + L.dockHeight - L.safeH) < 1.5,
+    Math.abs(L.chromeHeight + L.chromeFeltGap + L.opponentRailHeight + L.feltHeight + L.feltDockGap + L.dockHeight - L.safeH) < 1.5,
     `${label} chrome+gaps+felt+dock must fill safe height`
   );
   assert.ok(L.feltHeight > L.chromeHeight, `${label} felt dominates chrome`);
@@ -143,19 +143,19 @@ for (const vp of VIEWPORTS) {
   assert.ok(!rectsOverlap(C.score, C.menu, 0.5), `${label} score vs menu`);
   assert.ok(C.menu.left > L.safeW * 0.5, `${label} menu stays on the right`);
 
-  assert.ok(C.felt.bottom <= C.hand.top + 0.01, `${label} feltBottom <= handTop`);
+  assert.ok(C.hand.top >= C.felt.bottom - 0.01, `${label} Player 1 hand sits at the bottom of the felt`);
   const feltHandGap = C.hand.top - C.felt.bottom;
   assert.ok(
     feltHandGap >= FELT_HAND_GAP_MIN_PX - 0.5 &&
       feltHandGap <= FELT_HAND_GAP_MAX_PX + 0.5,
-    `${label} felt-to-hand gap ${feltHandGap.toFixed(1)}px must stay ${FELT_HAND_GAP_MIN_PX}–${FELT_HAND_GAP_MAX_PX}`
+    `${label} hand-to-table gap ${feltHandGap.toFixed(1)}px must stay ${FELT_HAND_GAP_MIN_PX}–${FELT_HAND_GAP_MAX_PX}`
   );
   assert.ok(!rectsOverlap(C.felt, C.hand, 0.5), `${label} no hand tile may intersect felt`);
   assert.ok(!rectsOverlap(C.felt, C.pass, 0.5), `${label} Pase stays outside felt`);
   assert.ok(!rectsOverlap(C.felt, C.newMatch, 0.5), `${label} New Match stays outside felt`);
 
-  assert.ok(C.pass.left <= 1, `${label} Pase is bottom-left`);
-  assert.ok(C.newMatch.right >= L.safeW - 1, `${label} New Match is bottom-right`);
+  assert.ok(C.pass.left <= 1, `${label} Pase stays on the hand-dock left`);
+  assert.ok(C.newMatch.right >= L.safeW - 1, `${label} New Match stays on the hand-dock right`);
   assert.ok(
     C.hand.left >= C.pass.right + COMPOSITION_GAP_PX - 0.5,
     `${label} handLeft >= PaseRight + gap`
@@ -253,7 +253,10 @@ for (const vp of VIEWPORTS) {
   );
   assert.equal(PLAYED_PREFERRED_SCALE, 1.2, "+20% played preferred size remains");
   assert.equal(PHONE_PLAYED_SIZE_BOOST, 1.15, "phone landscape +15% preferred boost");
-  assert.equal(ref.feltTop, ref.chromeHeight + ref.chromeFeltGap);
+  assert.equal(
+    ref.feltTop,
+    ref.chromeHeight + ref.chromeFeltGap + ref.opponentRailHeight
+  );
 }
 
 function legacyBottomReservation(L) {
@@ -279,10 +282,23 @@ function legacyBottomReservation(L) {
   const compare = VIEWPORTS.map((vp) => {
     const L = resolveGameplayLayout(vp);
     const old = legacyBottomReservation(L);
-    assert.equal(L.feltTop, old.feltTop, `${vp.name} feltTop stays put`);
+    assert.equal(
+      L.feltTop,
+      L.chromeHeight + L.chromeFeltGap + L.opponentRailHeight,
+      `${vp.name} felt starts under the opponent rail`
+    );
+    assert.equal(
+      L.dockTop,
+      L.feltBottom + L.feltDockGap,
+      `${vp.name} dock sits flush under the felt`
+    );
     assert.ok(L.feltHeight > old.feltHeight + 0.5, `${vp.name} feltHeight must grow`);
-    assert.ok(L.feltBottom > old.feltBottom + 0.5, `${vp.name} feltBottom moves down`);
+    assert.ok(L.feltBottom > old.feltBottom - L.dockHeight, `${vp.name} felt still fills leftover height`);
     assert.ok(L.dockHeight < old.dock - 0.5, `${vp.name} unused dock height is recovered`);
+    assert.ok(
+      Math.abs(L.dockTop + L.dockHeight - L.safeH) < 1,
+      `${vp.name} dock reaches the usable bottom`
+    );
     return {
       vp: vp.name,
       safeH: L.safeH,
@@ -329,7 +345,11 @@ function legacyBottomReservation(L) {
 
   assert.equal(am4Phone.feltBottom, basePhone.feltBottom, "American 4p phone felt bottom stays put");
   assert.equal(am4Phone.dockHeight, basePhone.dockHeight, "American 4p phone dock stays put");
-  assert.equal(am4Phone.handTop, basePhone.handTop, "American 4p phone hand stays put");
+  assert.ok(
+    Math.abs(am4Phone.feltBottom - (am4Phone.dockTop - am4Phone.feltDockGap)) < 0.01,
+    "American 4p phone hand stays flush under the felt"
+  );
+  assert.equal(am4Phone.handTop, basePhone.handTop, "American 4p phone hand stays at the felt bottom");
   assert.equal(
     am4Phone.chromeFeltGap,
     AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX,
@@ -360,7 +380,7 @@ function legacyBottomReservation(L) {
   });
   assert.equal(classic2Phone.feltTop, am4Phone.feltTop, "Classic 2p phone uses the Rival 1 upward hug");
   assert.equal(classic2Phone.feltBottom, basePhone.feltBottom, "Classic 2p phone felt bottom stays put");
-  assert.equal(classic2Phone.handTop, basePhone.handTop, "Classic 2p phone hand stays put");
+  assert.equal(classic2Phone.handTop, am4Phone.handTop, "Classic 2p phone hand matches the compact HUD stack");
   assert.equal(classic2Phone.playedShort, basePhone.playedShort, "Classic 2p phone tile short unchanged");
   const classic3Phone = resolveGameplayLayout(phone, {
     playerCount: 3,
@@ -368,7 +388,7 @@ function legacyBottomReservation(L) {
   });
   assert.equal(classic3Phone.feltTop, am4Phone.feltTop, "Classic 3p phone uses the Rival 1 upward hug");
   assert.equal(classic3Phone.feltBottom, basePhone.feltBottom, "Classic 3p phone felt bottom stays put");
-  assert.equal(classic3Phone.handTop, basePhone.handTop, "Classic 3p phone hand stays put");
+  assert.equal(classic3Phone.handTop, am4Phone.handTop, "Classic 3p phone hand matches the compact HUD stack");
   assert.equal(classic3Phone.playedShort, basePhone.playedShort, "Classic 3p phone tile short unchanged");
   assert.equal(am4Tablet.feltTop, baseTablet.feltTop, "American 4p tablet felt top is unchanged");
   assert.equal(

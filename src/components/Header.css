@@ -132,34 +132,41 @@
   outline-offset: 2px;
 }
 
-/* Match HUD: mute+score and logo+opponent share one compact chrome height */
+/* Match HUD: identity clusters share one compact chrome row */
 .header--stacked {
   height: auto;
   min-height: 0;
 }
 
 .header--stacked .header__inner {
-  align-items: stretch;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   height: auto;
   min-height: var(--game-chrome-height, 0px);
-  padding-top: 0.16rem;
-  padding-bottom: var(--game-chrome-felt-gap, 0.18rem);
-  column-gap: clamp(0.35rem, 1.2vw, 0.85rem);
+  padding-top: 0;
+  padding-bottom: 0;
+  column-gap: clamp(0.28rem, 1vw, 0.65rem);
 }
 
 .header--stacked .header__side--start {
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: center;
   justify-content: flex-start;
-  align-self: flex-start;
+  align-self: center;
   gap: 0;
+  flex: 0 0 auto;
 }
 
 .header--stacked .header__brand {
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 0.12rem;
-  max-width: min(72vw, 28rem);
+  flex: 1 1 auto;
+  max-width: none;
+  min-width: 0;
 }
 
 .header--stacked .header__brand .brand-logo {
@@ -167,11 +174,12 @@
 }
 
 .header--stacked .header__side--end {
-  flex-direction: column;
-  align-items: flex-end;
-  align-self: flex-start;
-  justify-content: flex-start;
-  gap: clamp(0.06rem, 0.45vh, 0.12rem);
+  flex-direction: row;
+  align-items: center;
+  align-self: center;
+  justify-content: flex-end;
+  gap: clamp(0.18rem, 0.8vw, 0.4rem);
+  flex: 0 0 auto;
 }
 
 .header__end-tools {

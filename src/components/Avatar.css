@@ -55,9 +55,9 @@
 }
 
 .avatar--leoBest .avatar__face--crest img {
-  width: 78%;
-  height: 78%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .avatar--active .avatar__ring {

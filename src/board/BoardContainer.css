@@ -6,11 +6,12 @@
   --domino-h: calc(var(--played-tile-h, 223.2px) * var(--board-tile-scale));
   --domino-pip: calc(var(--played-tile-w, 118.8px) * 0.132 * var(--board-tile-scale));
 
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 3;
-  flex: 1 1 auto;
-  width: 100%;
-  height: 100%;
+  flex: none;
+  width: auto;
+  height: auto;
   min-height: 0;
   overflow: hidden;
   display: flex;

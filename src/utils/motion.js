@@ -6,6 +6,11 @@ export const MOTION = Object.freeze({
   /** Play / AI place flight — 250–400ms, quick and smooth. */
   tileFlightMs: 280,
   drawFlightMs: 220,
+  /** Pause so the highlighted face-down reserve tile is readable before it flies. */
+  aiDrawRevealMs: 520,
+  /** Visible transfer from the reserve well to LeoBest's hidden rail. */
+  aiDrawFlightMs: 360,
+  aiDrawArcLiftPx: 18,
   snapMs: 200,
   handFlipMs: 220,
   scoreMs: 300,

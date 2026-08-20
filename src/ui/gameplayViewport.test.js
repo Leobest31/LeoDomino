@@ -10,6 +10,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX,
+  DOCK_PAD_PX,
+  PORTRAIT_DOCK_PAD_PX,
   FELT_HAND_GAP_MIN_PX,
   FELT_HAND_GAP_MAX_PX,
   gameplayComposition,
@@ -56,6 +58,8 @@ function firstRule(css, selector) {
   const gamePageRule = firstRule(page, ".game-page");
   assert.match(gamePageRule, /width:\s*100%/);
   assert.match(gamePageRule, /height:\s*100%/);
+  assert.match(gamePageRule, /min-height:\s*0/);
+  assert.doesNotMatch(gamePageRule, /height:\s*100(?:d|s|l)?vh/, "game-page fills html 100dvh via height 100%, not a second viewport height");
   assert.doesNotMatch(gamePageRule, /max-height:\s*100(?:d|s|l)?vh/, "game-page is not capped below the available viewport");
   assert.match(gamePageRule, /align-items:\s*stretch/, "shell is not vertically centered in leftover space");
   assert.match(
@@ -80,10 +84,34 @@ function firstRule(css, selector) {
   assert.doesNotMatch(global, /\.app--game \{[^}]*max-height:\s*100dvh/);
   assert.doesNotMatch(page, /\.game-page__table-stage \{[^}]*width:\s*99%/);
   assert.doesNotMatch(page, /@media \(min-width: 1100px\) \{[^}]*width:\s*97%/);
-  assert.match(page, /\.game-page__table-stage \{[^}]*width:\s*100%/);
+  assert.match(page, /\.game-page__table \{[^}]*width:\s*100%/);
+  assert.match(page, /\.game-page__shell \{[^}]*height:\s*100%/);
+  assert.match(page, /\.game-page__shell \{[^}]*max-height:\s*100%/);
+  assert.match(page, /\.game-page__table \{[^}]*flex:\s*1 1 0/, "table region is the leftover-height region");
+  const tableCss = read("components/GameTable.css");
+  assert.match(tableCss, /\.game-table \{[^}]*flex-direction:\s*column/);
+  assert.match(tableCss, /\.game-table__felt \{[^}]*flex:\s*1 1 0/, "visible felt is the flexible surface");
+  const boardCss = read("board/BoardContainer.css");
+  assert.match(boardCss, /\.board-container \{[^}]*position:\s*absolute/);
+  assert.match(boardCss, /\.board-container \{[^}]*inset:\s*0/, "board surface fills the visible felt");
 
   assert.doesNotMatch(layout, /Galaxy|SM_A376|iPhone|Samsung|A37/);
   assert.match(layout, /usableGameplayViewport/);
+  assert.match(
+    layout,
+    /GAME_SAFE_BOTTOM_CSS = "env\(safe-area-inset-bottom, 0px\)"/,
+    "bottom padding is the CSS safe-area inset only"
+  );
+  assert.doesNotMatch(
+    layout,
+    /clamp\(28px, 6dvh, 52px\)/,
+    "gameplay no longer reserves a large unused dark band under the table"
+  );
+  assert.match(
+    page,
+    /padding-bottom:\s*var\(--game-safe-bottom/,
+    "system inset is applied once on the gameplay page, not inside the hand"
+  );
 }
 
 {
@@ -108,7 +136,7 @@ function assertFill(label, vp, options = {}) {
   const L = resolveGameplayLayout(box, options);
   const C = gameplayComposition(L);
   const stack =
-    L.chromeHeight + L.chromeFeltGap + L.feltHeight + L.feltDockGap + L.dockHeight;
+    L.chromeHeight + L.chromeFeltGap + L.opponentRailHeight + L.feltHeight + L.feltDockGap + L.dockHeight;
 
   assert.equal(L.feltWidth, L.safeW, `${label} felt uses full usable width`);
   assert.ok(
@@ -117,12 +145,12 @@ function assertFill(label, vp, options = {}) {
   );
   assert.equal(L.safeW, box.width, `${label} layout width is the usable viewport`);
   assert.equal(L.safeH, box.height, `${label} layout height is the usable viewport`);
-  assert.ok(C.hand.top >= C.felt.bottom - 0.01, `${label} Player 1 hand stays below felt`);
+  assert.ok(C.hand.top >= C.felt.bottom - 0.01, `${label} Player 1 hand stays under the felt`);
   const feltHandGap = C.hand.top - C.felt.bottom;
   assert.ok(
     feltHandGap >= FELT_HAND_GAP_MIN_PX - 0.5 &&
       feltHandGap <= FELT_HAND_GAP_MAX_PX + 0.5,
-    `${label} felt-to-hand gap ${feltHandGap}`
+    `${label} hand-to-table gap ${feltHandGap}`
   );
   assert.ok(!rectsOverlap(C.felt, C.hand, 0.5), `${label} hand does not clip felt`);
   assert.ok(!rectsOverlap(C.score, C.felt, 0.5), `${label} scoreboard stays in HUD`);
@@ -156,13 +184,13 @@ for (const vp of LANDSCAPE) {
   assert.equal(gameplayDensityClass(grown), "short");
   assert.equal(grown.feltBottom, base.feltBottom, "A37 felt bottom stays put");
   assert.equal(grown.dockHeight, base.dockHeight, "A37 dock stays put");
-  assert.equal(grown.handTop, base.handTop, "A37 Player 1 hand stays put");
+  assert.equal(grown.handTop, base.handTop, "A37 Player 1 hand stays at the felt bottom");
   assert.equal(grown.chromeFeltGap, AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX);
   assert.ok(grown.feltTop < base.feltTop - 8, "A37 felt grows upward under Rival 1");
   assert.ok(grown.feltHeight > base.feltHeight + 8, "A37 felt height grows up, not by stretching tiles");
   assert.ok(C.menu.bottom <= C.felt.top + 0.01, "A37 menu stays above expanded felt");
   assert.ok(C.score.bottom <= C.felt.top + 0.01, "A37 score stays above expanded felt");
-  assert.ok(C.hand.top >= C.felt.bottom - 0.01, "A37 hand remains below felt");
+  assert.ok(C.hand.top >= C.felt.bottom - 0.01, "A37 hand remains under felt");
   assert.equal(L.feltBottom, grown.feltBottom);
 
   const tablet = { width: 1280, height: 800 };
@@ -179,8 +207,8 @@ for (const vp of LANDSCAPE) {
   assert.equal(classic2p.feltTop, grown.feltTop, "A37 Classic 2p table top uses the Rival 1 hug");
   assert.equal(classic2p.chromeFeltGap, AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX);
   assert.equal(classic2p.feltBottom, base.feltBottom, "A37 Classic 2p table bottom stays put");
-  assert.equal(classic2p.handTop, base.handTop, "A37 Classic 2p Player 1 hand stays put");
-  assert.equal(classic2p.dockTop, base.dockTop, "A37 Classic 2p dock stays put");
+  assert.equal(classic2p.handTop, grown.handTop, "A37 Classic 2p Player 1 hand matches the compact HUD stack");
+  assert.equal(classic2p.dockTop, grown.dockTop, "A37 Classic 2p dock matches the compact HUD stack");
   assert.equal(classic2p.playedShort, base.playedShort, "A37 Classic 2p tile short unchanged");
   assert.equal(classic2p.playedLong, base.playedLong, "A37 Classic 2p tile long unchanged");
   const { C: classic2C } = assertFill("a37-class Classic 2p", a37, {
@@ -189,14 +217,14 @@ for (const vp of LANDSCAPE) {
   });
   assert.ok(classic2C.score.bottom <= classic2C.felt.top + 0.01, "A37 Classic 2p score stays above table");
   assert.ok(classic2C.menu.bottom <= classic2C.felt.top + 0.01, "A37 Classic 2p menu stays above table");
-  assert.ok(classic2C.hand.top >= classic2C.felt.bottom - 0.01, "A37 Classic 2p hand stays below table");
+  assert.ok(classic2C.hand.top >= classic2C.felt.bottom - 0.01, "A37 Classic 2p hand stays under the felt");
 
   const classic3p = resolveGameplayLayout(a37, { playerCount: 3, rulesetId: "legacy" });
   assert.equal(classic3p.feltTop, grown.feltTop, "A37 Classic 3p table top uses the Rival 1 hug");
   assert.equal(classic3p.chromeFeltGap, AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX);
   assert.equal(classic3p.feltBottom, base.feltBottom, "A37 Classic 3p table bottom stays put");
-  assert.equal(classic3p.handTop, base.handTop, "A37 Classic 3p Player 1 hand stays put");
-  assert.equal(classic3p.dockTop, base.dockTop, "A37 Classic 3p dock stays put");
+  assert.equal(classic3p.handTop, grown.handTop, "A37 Classic 3p Player 1 hand matches the compact HUD stack");
+  assert.equal(classic3p.dockTop, grown.dockTop, "A37 Classic 3p dock matches the compact HUD stack");
   assert.equal(classic3p.feltWidth, base.feltWidth, "A37 Classic 3p table width unchanged");
   assert.equal(classic3p.playedShort, base.playedShort, "A37 Classic 3p tile short unchanged");
   assert.equal(classic3p.playedLong, base.playedLong, "A37 Classic 3p tile long unchanged");
@@ -204,11 +232,11 @@ for (const vp of LANDSCAPE) {
   assert.equal(am3p.feltTop, base.feltTop, "A37 American 3p table top stays on the shared chrome");
 
   assert.equal(grown.chromeHeight, 75, "A37 chrome hug stays at 75");
-  assert.equal(grown.feltTop, 77, "A37 table top stays at 77");
-  assert.equal(grown.feltBottom, 328, "A37 table bottom stays at 328");
-  assert.equal(grown.feltHeight, 251, "A37 felt height stays at 251");
-  assert.equal(grown.handTop, 332, "A37 hand top stays at 332");
-  assert.equal(grown.dockTop, 332, "A37 dock top stays at 332");
+  assert.equal(grown.feltTop, 77, "A37 table top sits under the compact HUD");
+  assert.equal(grown.feltBottom, 336, "felt ends at the player dock");
+  assert.equal(grown.feltHeight, 259, "felt uses the leftover height above the dock");
+  assert.equal(grown.handTop, 336, "Player 1 hand sits at the bottom of the felt");
+  assert.equal(grown.dockTop, 336, "dock sits at the bottom of the felt");
 
   const classicA37 = resolveGameplayLayout(a37, { playerCount: 4, rulesetId: "legacy" });
   assert.equal(classicA37.chromeHeight, grown.chromeHeight, "A37 Classic 4p chrome matches American");
@@ -259,8 +287,8 @@ for (const vp of LANDSCAPE) {
 
   assert.equal(gameplayDensityClass(grown), "short", "440px phone safes stay phone-landscape after insets");
   assert.equal(grown.feltBottom, base.feltBottom, "tall-phone table bottom stays anchored");
-  assert.equal(grown.handTop, base.handTop, "tall-phone Player 1 hand stays put");
-  assert.equal(grown.dockTop, base.dockTop, "tall-phone dock stays put");
+  assert.equal(grown.handTop, base.handTop, "tall-phone Player 1 hand stays at the felt bottom");
+  assert.equal(grown.dockTop, base.dockTop, "tall-phone dock stays at the felt bottom");
   assert.equal(grown.dockHeight, base.dockHeight, "tall-phone dock height stays put");
   assert.equal(grown.chromeFeltGap, AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX);
   assert.ok(
@@ -273,7 +301,7 @@ for (const vp of LANDSCAPE) {
   );
   assert.ok(C.score.bottom <= C.felt.top + 0.01, "tall-phone score stays above table");
   assert.ok(C.menu.bottom <= C.felt.top + 0.01, "tall-phone menu stays above table");
-  assert.ok(C.hand.top >= C.felt.bottom - 0.01, "tall-phone hand stays below table");
+  assert.ok(C.hand.top >= C.felt.bottom - 0.01, "tall-phone hand stays under the felt");
 
   const classic = resolveGameplayLayout(box, { playerCount: 4, rulesetId: "legacy" });
   assert.equal(classic.feltTop, grown.feltTop, "Classic 4p uses the same 4p phone upward hug");
@@ -286,8 +314,8 @@ for (const vp of LANDSCAPE) {
   const classic2 = resolveGameplayLayout(box, { playerCount: 2, rulesetId: "legacy" });
   assert.equal(classic2.feltTop, grown.feltTop, "Classic 2p phone uses the Rival 1 upward hug");
   assert.equal(classic2.feltBottom, base.feltBottom, "Classic 2p table bottom stays anchored");
-  assert.equal(classic2.handTop, base.handTop, "Classic 2p Player 1 hand stays put");
-  assert.equal(classic2.dockTop, base.dockTop, "Classic 2p dock stays put");
+  assert.equal(classic2.handTop, grown.handTop, "Classic 2p Player 1 hand matches the compact HUD stack");
+  assert.equal(classic2.dockTop, grown.dockTop, "Classic 2p dock matches the compact HUD stack");
   assert.equal(classic2.playedShort, base.playedShort, "Classic 2p tile short unchanged");
   assert.equal(classic2.playedLong, base.playedLong, "Classic 2p tile long unchanged");
   const { C: classic2C } = assertFill("tall-phone-landscape Classic 2p", {
@@ -296,14 +324,14 @@ for (const vp of LANDSCAPE) {
   }, { playerCount: 2, rulesetId: "legacy" });
   assert.ok(classic2C.score.bottom <= classic2C.felt.top + 0.01, "Classic 2p score stays above table");
   assert.ok(classic2C.menu.bottom <= classic2C.felt.top + 0.01, "Classic 2p menu stays above table");
-  assert.ok(classic2C.hand.top >= classic2C.felt.bottom - 0.01, "Classic 2p hand stays below table");
+  assert.ok(classic2C.hand.top >= classic2C.felt.bottom - 0.01, "Classic 2p hand stays under the felt");
 
   const classic3 = resolveGameplayLayout(box, { playerCount: 3, rulesetId: "legacy" });
   assert.equal(classic3.feltTop, grown.feltTop, "Classic 3p phone uses the Rival 1 upward hug");
   assert.equal(classic3.chromeFeltGap, AMERICAN_4P_PHONE_CHROME_FELT_GAP_PX);
   assert.equal(classic3.feltBottom, base.feltBottom, "Classic 3p table bottom stays anchored");
-  assert.equal(classic3.handTop, base.handTop, "Classic 3p Player 1 hand stays put");
-  assert.equal(classic3.dockTop, base.dockTop, "Classic 3p dock stays put");
+  assert.equal(classic3.handTop, grown.handTop, "Classic 3p Player 1 hand matches the compact HUD stack");
+  assert.equal(classic3.dockTop, grown.dockTop, "Classic 3p dock matches the compact HUD stack");
   assert.equal(classic3.feltWidth, base.feltWidth, "Classic 3p table width unchanged");
   assert.equal(classic3.playedShort, base.playedShort, "Classic 3p tile short unchanged");
   assert.equal(classic3.playedLong, base.playedLong, "Classic 3p tile long unchanged");
@@ -315,7 +343,7 @@ for (const vp of LANDSCAPE) {
   }, { playerCount: 3, rulesetId: "legacy" });
   assert.ok(classic3C.score.bottom <= classic3C.felt.top + 0.01, "Classic 3p score stays above table");
   assert.ok(classic3C.menu.bottom <= classic3C.felt.top + 0.01, "Classic 3p menu stays above table");
-  assert.ok(classic3C.hand.top >= classic3C.felt.bottom - 0.01, "Classic 3p hand stays below table");
+  assert.ok(classic3C.hand.top >= classic3C.felt.bottom - 0.01, "Classic 3p hand stays under the felt");
 
   const tabA9 = resolveGameplayLayout({ width: 1340, height: 800 }, am4);
   const tabA9Base = resolveGameplayLayout({ width: 1340, height: 800 });
@@ -325,7 +353,7 @@ for (const vp of LANDSCAPE) {
   );
   assert.equal(tabA9.feltTop, tabA9Base.feltTop, "Tab A9+ felt top unchanged");
   assert.equal(tabA9.feltBottom, tabA9Base.feltBottom, "Tab A9+ felt bottom unchanged");
-  assert.equal(tabA9.feltHeight, 578, "Tab A9+ felt height stays on the 1280×800 reference");
+  assert.equal(tabA9.feltHeight, tabA9Base.feltHeight, "Tab A9+ felt height is the shared tablet felt");
   assert.equal(tabA9.handTop, tabA9Base.handTop, "Tab A9+ hand unchanged");
   assert.equal(tabA9Classic.feltTop, tabA9Base.feltTop, "Tab A9+ Classic 4p felt top unchanged");
   assert.equal(tabA9Classic.feltBottom, tabA9Base.feltBottom, "Tab A9+ Classic 4p felt bottom unchanged");
@@ -336,6 +364,32 @@ for (const vp of LANDSCAPE) {
   );
   assert.equal(tabA9Classic3.feltTop, tabA9Base.feltTop, "Tab A9+ Classic 3p felt top unchanged");
   assert.equal(tabA9Classic3.feltBottom, tabA9Base.feltBottom, "Tab A9+ Classic 3p felt bottom unchanged");
+}
+
+{
+  const phone = { width: 832, height: 384 };
+  const portrait = { width: 390, height: 844 };
+  const v1 = [
+    { name: "Classic", playerCount: 2, rulesetId: "legacy" },
+    { name: "Haitian", playerCount: 2, rulesetId: "haitian" },
+    { name: "American", playerCount: 2, rulesetId: "allFives" },
+  ];
+  for (const vp of [phone, portrait]) {
+    for (const opts of v1) {
+      const label = `${opts.name} ${vp.height > vp.width ? "portrait" : "landscape"}`;
+      const { L, C } = assertFill(label, vp, opts);
+      const unused = L.dockHeight - L.playerHandLong;
+      const pad = L.orientation === "portrait" ? PORTRAIT_DOCK_PAD_PX : DOCK_PAD_PX;
+      assert.ok(
+        unused <= pad + 8,
+        `${label} dock hugs the hand (unused ${unused.toFixed(1)}px)`
+      );
+      assert.ok(
+        C.hand.top - C.felt.bottom <= FELT_HAND_GAP_MAX_PX + 0.5,
+        `${label} hand sits flush under the felt`
+      );
+    }
+  }
 }
 
 console.log("Gameplay landscape viewport fill tests passed.");

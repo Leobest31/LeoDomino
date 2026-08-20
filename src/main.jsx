@@ -9,6 +9,7 @@ import "@fontsource/source-serif-4/600.css";
 import "@fontsource/source-serif-4/700.css";
 import { I18nProvider } from "./i18n";
 import { AudioProvider } from "./audio";
+import { AuthProvider } from "./auth";
 import { PrefsProvider } from "./hooks/PrefsProvider.jsx";
 import { applyTheme, applyTileSkin, loadPrefs } from "./persistence/index.js";
 import "./styles/global.css";
@@ -23,7 +24,9 @@ createRoot(document.getElementById("root")).render(
     <I18nProvider>
       <PrefsProvider>
         <AudioProvider>
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </AudioProvider>
       </PrefsProvider>
     </I18nProvider>

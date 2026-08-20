@@ -101,12 +101,12 @@ for (const vp of VIEWPORTS) {
     `${vp.name} Player 1 hand is ~20% larger (${L.playerHandLong.toFixed(1)} vs ${L.handLong.toFixed(1)})`
   );
   assert.ok(
-    L.playerHandLong + 6 <= L.dockHeight + 0.5,
+    L.playerHandLong + 4 <= L.dockHeight + 0.5,
     `${vp.name} scaled hand stays inside the existing dock (${L.playerHandLong} vs dock ${L.dockHeight})`
   );
   assert.ok(
     Math.abs(
-      L.chromeHeight + L.chromeFeltGap + L.feltHeight + L.feltDockGap + L.dockHeight - L.safeH
+      L.chromeHeight + L.chromeFeltGap + L.opponentRailHeight + L.feltHeight + L.feltDockGap + L.dockHeight - L.safeH
     ) < 1.5,
     `${vp.name} chrome+felt+dock must fill safe height`
   );
@@ -150,8 +150,25 @@ console.log("Gameplay composition ratios:\n", comparison);
     portrait.playerHandLong >= portrait.handLong,
     `portrait hand stays at least as large as the chrome tile (${portrait.playerHandLong} vs ${portrait.handLong})`
   );
-  assert.ok(portrait.playerHandShort >= 26, "portrait hand remains touchable");
+  assert.ok(portrait.playerHandShort >= 34, "portrait hand remains readable");
   assert.equal(portrait.playerHandOverlap, 0, "portrait uses scroll instead of overlap");
+  for (const vp of [
+    { name: "360x640", width: 360, height: 640 },
+    { name: "384x832", width: 384, height: 832 },
+    { name: "390x844", width: 390, height: 844 },
+    { name: "412x915", width: 412, height: 915 },
+    { name: "412x1024", width: 412, height: 1024 },
+  ]) {
+    const L = resolveGameplayLayout(vp);
+    const row = 7 * L.playerHandShort + 6 * (L.playerHandGap + L.playerHandOverlap);
+    assert.equal(L.orientation, "portrait", `${vp.name} portrait`);
+    assert.equal(L.playerHandOverlap, 0, `${vp.name} player tiles must not overlap`);
+    assert.ok(L.playerHandGap >= 2 - 0.05, `${vp.name} keeps a visible tile gap (${L.playerHandGap})`);
+    assert.ok(row <= L.handBudget + 1, `${vp.name} 7-tile row ${row} vs budget ${L.handBudget}`);
+    assert.ok(L.playerHandShort >= 32, `${vp.name} hand stays readable (${L.playerHandShort})`);
+    assert.ok(L.passWidth <= 48, `${vp.name} Pass stays compact (${L.passWidth})`);
+    assert.ok(L.matchWidth <= 56, `${vp.name} New Match stays compact (${L.matchWidth})`);
+  }
   const vars = gameplayLayoutCssVars(tablet);
   assert.match(vars["--player-hand-h"], /px$/);
   assert.match(vars["--player-hand-gap"], /px$/);
@@ -373,8 +390,8 @@ function dbl(id, pip) {
   const classic2Phone = resolveGameplayLayout(phone, classic2);
   assert.equal(classic2Phone.feltTop, grown.feltTop, "Classic 2p phone uses the Rival 1 upward hug");
   assert.equal(classic2Phone.feltBottom, base.feltBottom, "Classic 2p phone table bottom stays put");
-  assert.equal(classic2Phone.handTop, base.handTop, "Classic 2p phone Player 1 hand stays put");
-  assert.equal(classic2Phone.dockTop, base.dockTop, "Classic 2p phone dock stays put");
+  assert.equal(classic2Phone.handTop, grown.handTop, "Classic 2p phone Player 1 hand matches the compact HUD stack");
+  assert.equal(classic2Phone.dockTop, grown.dockTop, "Classic 2p phone dock matches the compact HUD stack");
   assert.equal(classic2Phone.playedShort, base.playedShort, "Classic 2p phone tile short unchanged");
   assert.equal(classic2Phone.playedLong, base.playedLong, "Classic 2p phone tile long unchanged");
   const classic2Tablet = resolveGameplayLayout(tablet, classic2);
@@ -387,8 +404,8 @@ function dbl(id, pip) {
   assert.equal(classic3Phone.feltTop, grown.feltTop, "Classic 3p phone uses the Rival 1 upward hug");
   assert.equal(classic3Phone.chromeFeltGap, grown.chromeFeltGap, "Classic 3p phone keeps the 2px frame gap");
   assert.equal(classic3Phone.feltBottom, base.feltBottom, "Classic 3p phone table bottom stays put");
-  assert.equal(classic3Phone.handTop, base.handTop, "Classic 3p phone Player 1 hand stays put");
-  assert.equal(classic3Phone.dockTop, base.dockTop, "Classic 3p phone dock stays put");
+  assert.equal(classic3Phone.handTop, grown.handTop, "Classic 3p phone Player 1 hand matches the compact HUD stack");
+  assert.equal(classic3Phone.dockTop, grown.dockTop, "Classic 3p phone dock matches the compact HUD stack");
   assert.equal(classic3Phone.feltWidth, base.feltWidth, "Classic 3p phone table width unchanged");
   assert.equal(classic3Phone.playedShort, base.playedShort, "Classic 3p phone tile short unchanged");
   assert.equal(classic3Phone.playedLong, base.playedLong, "Classic 3p phone tile long unchanged");

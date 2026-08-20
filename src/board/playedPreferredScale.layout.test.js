@@ -172,7 +172,7 @@ function assertContained(layout, L, label) {
     assert.ok(t.y + t.h <= safe.maxY + 0.75, `${label} ${t.tileId} bottom`);
   }
   const C = gameplayComposition(L);
-  assert.ok(C.felt.bottom <= C.hand.top + 0.01, `${label} feltBottom <= handTop`);
+  assert.ok(C.hand.top >= C.felt.bottom - 0.01, `${label} hand sits at the bottom of the felt`);
   assert.ok(!rectsOverlap(C.felt, C.hand, 0.5), `${label} felt vs hand`);
   return { play, safe, boxes };
 }
@@ -190,7 +190,7 @@ assert.equal(LOCKED_BOARD_TILE_LONG_PX, GAMEPLAY_REF.playedLong);
 assert.ok(Math.abs(TILE_RATIO - OLD_RATIO) < 1e-9, "aspect ratio unchanged");
 assert.equal(GAMEPLAY_REF.handShort, 33);
 assert.equal(GAMEPLAY_REF.handLong, 60);
-assert.equal(GAMEPLAY_REF.felt, 578);
+assert.equal(GAMEPLAY_REF.felt, 586);
 section("one +20% source of truth; hand size unchanged");
 
 const reports = [];

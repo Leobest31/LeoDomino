@@ -1,0 +1,21 @@
+.player-avatar {
+  display: block;
+  flex-shrink: 0;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #0a1220;
+  border: 1px solid rgba(201, 162, 39, 0.55);
+  box-shadow: 0 0 0 1px rgba(0, 184, 92, 0.28);
+}
+
+.player-avatar--sm {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+.player-avatar--lg {
+  width: 2.85rem;
+  height: 2.85rem;
+}

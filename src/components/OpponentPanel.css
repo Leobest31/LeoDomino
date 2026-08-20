@@ -251,7 +251,17 @@
   margin-inline: auto;
 }
 
-.opponent-panel--compact .opponent-panel__tile > * {
-  transform: scale(0.72);
-  transform-origin: center center;
+.opponent-panel--tiles-only {
+  gap: 0;
+  padding: 0;
+}
+
+.opponent-panel--tiles-only .opponent-panel__tray {
+  min-height: 0;
+  height: 100%;
+  align-items: center;
+}
+
+.opponent-panel--tiles-only .opponent-panel__hand {
+  height: 100%;
 }

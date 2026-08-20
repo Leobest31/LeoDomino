@@ -5,17 +5,18 @@
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-start;
-  gap: clamp(0.28rem, 1.1vw, 0.7rem);
+  gap: clamp(0.4rem, 1.4vw, 0.9rem);
   width: 100%;
   min-width: 0;
-  padding: 0.28rem 0.5rem;
+  padding: 0.34rem 0.58rem;
   background:
-    linear-gradient(165deg, rgba(14, 18, 26, 0.95) 0%, rgba(4, 8, 10, 0.93) 100%);
-  border: 1px solid rgba(201, 162, 39, 0.5);
+    linear-gradient(165deg, rgba(18, 24, 34, 0.96) 0%, rgba(5, 10, 14, 0.94) 100%);
+  border: 1px solid rgba(201, 162, 39, 0.62);
   border-radius: var(--radius-hud);
   box-shadow:
     var(--shadow-hud),
-    0 0 0 1px rgba(47, 125, 255, 0.08);
+    0 0 0 1px rgba(47, 125, 255, 0.1),
+    inset 0 1px 0 rgba(255, 236, 200, 0.08);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -100,12 +101,13 @@
   width: auto;
   flex-shrink: 0;
   font-family: var(--font-ui);
-  font-size: 0.92rem;
-  font-weight: 700;
+  font-size: clamp(1.12rem, 3.4vw, 1.42rem);
+  font-weight: 800;
   color: #ffffff;
   line-height: 1;
   text-align: left;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px rgba(0, 184, 92, 0.28);
   transition:
     color var(--duration-fast) var(--ease-out),
     transform var(--duration-fast) var(--ease-out);
@@ -127,6 +129,31 @@
   padding-left: 0.38rem;
   border-top: none;
   border-left: 1px solid rgba(201, 162, 39, 0.28);
+}
+
+.scoreboard__seat-score {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  line-height: 1;
+}
+
+.scoreboard__seat-score .scoreboard__points,
+.scoreboard__seat-score .scoreboard__of-target-sep {
+  font-size: var(--game-hud-score, 1.7rem);
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow:
+    0 0 12px rgba(0, 184, 92, 0.35),
+    0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.scoreboard--meta {
+  justify-content: center;
+  padding: 0.18rem 0.42rem;
+  gap: 0.45rem;
+  width: auto;
+  max-width: 100%;
 }
 
 @media (max-width: 719px) {
@@ -156,7 +183,7 @@
   .scoreboard__points,
   .scoreboard__value--target,
   .scoreboard__of-target-sep {
-    font-size: 0.78rem;
+    font-size: 1.08rem;
   }
 
   .scoreboard__line--target {
@@ -185,6 +212,6 @@
   .game-page--players-4 .scoreboard__value,
   .game-page--players-4 .scoreboard__points,
   .game-page--players-4 .scoreboard__value--target {
-    font-size: 0.72rem;
+    font-size: 1rem;
   }
 }

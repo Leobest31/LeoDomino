@@ -6,6 +6,7 @@ import {
   normalizeDifficulty,
   applyAiTurn,
   applyAutoAction,
+  chooseAiAction,
   chooseAutoAction,
   chooseThinkTimeMs,
   drawTile,
@@ -142,6 +143,7 @@ export function useMatch(options = {}) {
   const [errorKey, setErrorKey] = useState(null);
   const [aiThinking, setAiThinking] = useState(false);
   const [motionLock, setMotionLock] = useState(false);
+  const [pendingAiDraw, setPendingAiDraw] = useState(null);
   const stateRef = useRef(state);
   stateRef.current = state;
   const difficultyRef = useRef(difficulty);
@@ -152,6 +154,7 @@ export function useMatch(options = {}) {
   rulesetIdRef.current = rulesetId;
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
+  const abandonedRef = useRef(false);
   const matchStartedAtRef = useRef(matchStartedAt);
   matchStartedAtRef.current = matchStartedAt;
   const prevPhaseRef = useRef(state.phase);
@@ -163,6 +166,7 @@ export function useMatch(options = {}) {
     !motionLock;
 
   const persist = useCallback(() => {
+    if (abandonedRef.current) return;
     saveMatch({
       state: stateRef.current,
       difficulty: difficultyRef.current,
@@ -188,6 +192,7 @@ export function useMatch(options = {}) {
     setErrorKey(null);
     setAiThinking(false);
     setMotionLock(false);
+    setPendingAiDraw(null);
     const startedAt = Date.now();
     setMatchStartedAt(startedAt);
     matchStartedAtRef.current = startedAt;
@@ -213,6 +218,17 @@ export function useMatch(options = {}) {
       matchStartedAt: startedAt,
     });
   }, [targetScore]);
+
+  const abandonMatch = useCallback(() => {
+    const current = stateRef.current;
+    abandonedRef.current = true;
+    recordMatch({
+      won: false,
+      humanScore: current?.scores?.[HUMAN_INDEX] ?? 0,
+      fingerprint: `${current?.seed ?? "match"}:forfeit:${Date.now()}`,
+    });
+    clearMatchSave();
+  }, []);
 
   const continueRound = useCallback(() => {
     setSelectedId(null);
@@ -306,6 +322,29 @@ export function useMatch(options = {}) {
 
   const draw = useCallback(() => commitDraw(), [commitDraw]);
 
+  const confirmAiDraw = useCallback((tileId) => {
+    const current = stateRef.current;
+    const drawnId =
+      typeof tileId === "string" && current.reserve.includes(tileId)
+        ? tileId
+        : current.reserve[0];
+    if (!drawnId) return null;
+    try {
+      const next = drawTile(current, drawnId);
+      stateRef.current = next;
+      setState(next);
+      setErrorKey(null);
+      return { tileId: drawnId, nextState: next };
+    } catch {
+      setErrorKey("errors.reserveEmpty");
+      return null;
+    }
+  }, []);
+
+  const clearPendingAiDraw = useCallback(() => {
+    setPendingAiDraw(null);
+  }, []);
+
   const pass = useCallback(() => {
     if (!isHumanTurn || !actions.canPass) return;
     try {
@@ -363,8 +402,9 @@ export function useMatch(options = {}) {
   }, [state]);
 
   // Multi-AI orchestration: every non-human seat takes its own turn.
+  // Draws pause for a face-down reserve visualization; play/pass apply immediately.
   useEffect(() => {
-    if (motionLock) return undefined;
+    if (motionLock || pendingAiDraw) return undefined;
     if (state.phase !== PHASE.PLAYING) {
       setAiThinking(false);
       return undefined;
@@ -379,37 +419,78 @@ export function useMatch(options = {}) {
     const delay = chooseThinkTimeMs(state, difficulty);
 
     const timer = window.setTimeout(() => {
-      setState((current) => {
-        if (current.phase !== PHASE.PLAYING || current.currentPlayer !== seat) {
-          return current;
+      const current = stateRef.current;
+      if (current.phase !== PHASE.PLAYING || current.currentPlayer !== seat) {
+        setAiThinking(false);
+        return;
+      }
+
+      let action = null;
+      try {
+        action = chooseAiAction(current, {
+          difficulty,
+          aiIndex: seat,
+        });
+      } catch {
+        action = null;
+      }
+
+      if (action?.type === "draw" && current.reserve[0]) {
+        setPendingAiDraw({
+          seat,
+          tileId: current.reserve[0],
+          tileIds: current.reserve.slice(),
+        });
+        setAiThinking(false);
+        return;
+      }
+
+      let queuedDraw = null;
+      setState((latest) => {
+        if (latest.phase !== PHASE.PLAYING || latest.currentPlayer !== seat) {
+          return latest;
         }
         try {
-          const next = applyAiTurn(current, {
+          const next = applyAiTurn(latest, {
             difficulty,
             aiIndex: seat,
           });
           stateRef.current = next;
           return next;
         } catch {
-          // Last-ditch legal recovery (draw/pass/play) — no AI heuristics.
           try {
-            const unlocked = sanitizeMatchState(current);
-            const action = chooseAutoAction(unlocked);
-            const recovered = action ? applyAutoAction(unlocked, action) : unlocked;
+            const unlocked = sanitizeMatchState(latest);
+            const recoveredAction = chooseAutoAction(unlocked);
+            if (recoveredAction?.type === "draw" && unlocked.reserve[0]) {
+              queuedDraw = {
+                seat,
+                tileId: unlocked.reserve[0],
+                tileIds: unlocked.reserve.slice(),
+              };
+              return latest;
+            }
+            const recovered = recoveredAction
+              ? applyAutoAction(unlocked, recoveredAction)
+              : unlocked;
             stateRef.current = recovered;
             return recovered;
           } catch {
-            return current;
+            return latest;
           }
         }
       });
+      if (queuedDraw) {
+        setPendingAiDraw(queuedDraw);
+        setAiThinking(false);
+        return;
+      }
       setAiThinking(false);
     }, delay);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [state, difficulty, motionLock]);
+  }, [state, difficulty, motionLock, pendingAiDraw]);
 
   useEffect(() => {
     if (state.phase !== PHASE.ROUND_OVER) return undefined;
@@ -492,9 +573,13 @@ export function useMatch(options = {}) {
     playSelected,
     commitPlay,
     commitDraw,
+    confirmAiDraw,
+    clearPendingAiDraw,
+    pendingAiDraw,
     draw,
     pass,
     restart,
+    abandonMatch,
     continueRound,
     setMotionLock,
     HUMAN_INDEX,

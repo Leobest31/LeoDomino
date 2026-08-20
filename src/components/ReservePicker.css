@@ -10,10 +10,13 @@
 
 .reserve-picker__well {
   pointer-events: auto;
-  width: min(92%, 22rem);
-  max-height: min(46%, 16.5rem);
+  width: min(94%, 26rem);
+  max-height: min(62%, 22rem);
   overflow: auto;
-  padding: 0.7rem 0.75rem 0.8rem;
+  padding: 0.75rem 0.8rem 0.85rem;
+  --domino-w: clamp(2.15rem, 7.4vw, 2.9rem);
+  --domino-h: calc(var(--domino-w) * 1.88);
+  --domino-pip: calc(var(--domino-w) * 0.12);
   border-radius: 14px;
   border: 1px solid rgba(201, 162, 39, 0.38);
   background:
@@ -46,7 +49,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.38rem;
+  gap: 0.5rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -74,4 +77,23 @@
 .reserve-picker__tile:focus-visible {
   outline: 2px solid var(--color-gold-bright);
   outline-offset: 2px;
+}
+
+.reserve-picker__tile--selected {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 3px;
+  filter: drop-shadow(0 0 10px rgba(232, 197, 71, 0.45));
+}
+
+.reserve-picker__tile--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reserve-picker--watch {
+  pointer-events: none;
+}
+
+.reserve-picker--watch .reserve-picker__well {
+  pointer-events: none;
 }

@@ -1,6 +1,7 @@
 import { useI18n } from "../i18n";
 import BoardContainer from "../board/BoardContainer";
 import RoundHandSummary from "./RoundHandSummary";
+import { homeLeoBestLion } from "../assets";
 import "./GameTable.css";
 
 /**
@@ -20,7 +21,11 @@ function GameTable({
   scoreHighlights = [],
   roundSummary = null,
   playerNames = [],
+  status = "",
+  statusActive = false,
   hiddenIds = null,
+  dock = null,
+  children = null,
 }) {
   const { t } = useI18n();
 
@@ -28,6 +33,23 @@ function GameTable({
     <section className="game-table" aria-label={t("game.table")}>
       <div className="game-table__frame">
         <div className="game-table__felt">
+          <div className="game-table__mark" aria-hidden="true">
+            <img src={homeLeoBestLion} alt="" />
+            <p className="game-table__mark-word">{t("auth.wordmark")}</p>
+            <p className="game-table__mark-tag">{t("auth.brandTagline")}</p>
+          </div>
+
+          {status ? (
+            <p
+              className={`game-table__status${
+                statusActive ? " game-table__status--active" : ""
+              }`}
+            >
+              <span className="game-table__status-dot" aria-hidden="true" />
+              <span>{status}</span>
+            </p>
+          ) : null}
+
           <BoardContainer
             tiles={tiles}
             newestId={newestId}
@@ -48,7 +70,9 @@ function GameTable({
           ) : null}
 
           <RoundHandSummary view={roundSummary} playerNames={playerNames} />
+          {children}
         </div>
+        {dock}
       </div>
     </section>
   );

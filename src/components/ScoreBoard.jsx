@@ -67,20 +67,27 @@ function ScoreBoard({
   target = 100,
   round = 1,
   scoreFormat = "absolute",
+  hideSeatNames = false,
+  metaOnly = false,
 }) {
   const { t, formatNumber } = useI18n();
   const ofTarget = scoreFormat === "ofTarget";
   const rows =
-    scores.length > 0
-      ? scores.map((score, index) => ({
+    metaOnly || scores.length === 0
+      ? []
+      : scores.map((score, index) => ({
           score,
           name: names[index] ?? t("game.playerN", { n: index + 1 }),
           isHuman: index === humanIndex,
-        }))
-      : [];
+        }));
 
   return (
-    <aside className="scoreboard scoreboard--table scoreboard--inline" aria-label={t("game.scoreboard")}>
+    <aside
+      className={`scoreboard scoreboard--table scoreboard--inline${
+        metaOnly ? " scoreboard--meta" : ""
+      }`}
+      aria-label={t("game.scoreboard")}
+    >
       <div className="scoreboard__line">
         <span className="scoreboard__label scoreboard__label--gold">
           <span className="scoreboard__icon" aria-hidden="true">
@@ -92,7 +99,7 @@ function ScoreBoard({
       </div>
 
       {rows.map((row, index) => (
-        <div className="scoreboard__line" key={`score-${index}`}>
+        <div className="scoreboard__line" key={`score-${index}`} aria-label={t("game.scoreAria", { name: row.name })}>
           <span
             className={`scoreboard__label${
               row.isHuman ? " scoreboard__label--you" : " scoreboard__label--rival"
@@ -101,7 +108,7 @@ function ScoreBoard({
             <span className="scoreboard__icon" aria-hidden="true">
               {row.isHuman ? "👤" : "🤖"}
             </span>
-            {row.name}
+            {hideSeatNames ? null : row.name}
           </span>
           {ofTarget ? (
             <span
@@ -130,6 +137,37 @@ function ScoreBoard({
         <span className="scoreboard__value scoreboard__value--target">{formatNumber(target)}</span>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Seat point value glued to a HUD avatar. The display name sits beside it
+ * in the HUD identity cluster.
+ */
+export function SeatScore({
+  value = 0,
+  name = "",
+  ofTarget = false,
+  target = 0,
+}) {
+  const { t, formatNumber } = useI18n();
+  return (
+    <div
+      className="scoreboard__seat-score"
+      aria-label={t("game.scoreAria", { name })}
+    >
+      {ofTarget ? (
+        <span className="scoreboard__of-target">
+          <AnimatedValue value={value} />
+          <span className="scoreboard__of-target-sep" aria-hidden="true">
+            {" "}
+            / {formatNumber(target)}
+          </span>
+        </span>
+      ) : (
+        <AnimatedValue value={value} />
+      )}
+    </div>
   );
 }
 
