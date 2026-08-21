@@ -25,7 +25,11 @@ dist-ssr
 
 # QA artifacts / local dumps
 .qa-screens/
+
+# Local environment / credentials (never commit real keys)
 .env
+.env.local
+.env.*.local
 .env.*
 !.env.example
 
