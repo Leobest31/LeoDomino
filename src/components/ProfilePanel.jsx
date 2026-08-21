@@ -1,0 +1,122 @@
+import { useEffect, useState } from "react";
+import { useI18n } from "../i18n";
+import { useAudio } from "../audio";
+import { AUTH_ERROR, DEFAULT_AVATAR_ID, useAuth } from "../auth";
+import { PLAYER_AVATARS } from "../auth/avatars.media.js";
+import { countryFlag, countryName } from "../auth/countries.js";
+import CountryPicker from "./CountryPicker";
+import PlayerAvatar from "./PlayerAvatar";
+import { IconClose } from "./Icon";
+import "./ProfilePanel.css";
+
+function ProfilePanel({ open, onClose }) {
+  const { t, locale } = useI18n();
+  const { play } = useAudio();
+  const { session, updateProfile, busy } = useAuth();
+  const [username, setUsername] = useState("");
+  const [avatarId, setAvatarId] = useState(DEFAULT_AVATAR_ID);
+  const [countryCode, setCountryCode] = useState("");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!open || !session) return;
+    setUsername(session.displayName || session.username || "");
+    setAvatarId(session.avatarId || DEFAULT_AVATAR_ID);
+    setCountryCode(session.countryCode || "");
+    setError("");
+    setSaved(false);
+  }, [open, session]);
+
+  if (!open || !session) return null;
+
+  const flag = countryFlag(countryCode);
+  const country = countryName(countryCode, locale);
+
+  const save = async (event) => {
+    event.preventDefault();
+    play("button");
+    setError("");
+    setSaved(false);
+    try {
+      await updateProfile({ username, avatarId, countryCode });
+      setSaved(true);
+    } catch (err) {
+      setError(err?.code || AUTH_ERROR.GENERIC);
+    }
+  };
+
+  return (
+    <div className="profile-panel" role="dialog" aria-modal="true" aria-label={t("profile.title")}>
+      <button type="button" className="profile-panel__backdrop" aria-label={t("common.close")} onClick={onClose} />
+      <section className="profile-panel__sheet">
+        <header className="profile-panel__header">
+          <h2>{t("profile.title")}</h2>
+          <button type="button" className="profile-panel__close" onClick={onClose} aria-label={t("common.close")}>
+            <IconClose />
+          </button>
+        </header>
+        <div className="profile-panel__hero">
+          <PlayerAvatar avatarId={avatarId} size="md" alt="" />
+          <p className="profile-panel__name">{username || session.displayName}</p>
+          <p className="profile-panel__country">
+            {flag ? (
+              <>
+                <span className="profile-panel__flag" aria-hidden="true">{flag}</span>
+                <span>{country}</span>
+              </>
+            ) : (
+              t("auth.countryPlaceholder")
+            )}
+          </p>
+        </div>
+        <form className="profile-panel__form" onSubmit={save}>
+          <label className="profile-panel__field">
+            <span>{t("auth.username")}</span>
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              autoComplete="name"
+            />
+          </label>
+          <div className="profile-panel__field">
+            <span>{t("auth.avatar")}</span>
+            <div className="profile-panel__avatars" role="listbox" aria-label={t("auth.avatar")}>
+              {PLAYER_AVATARS.map((avatar) => {
+                const selected = avatar.id === avatarId;
+                return (
+                  <button
+                    key={avatar.id}
+                    type="button"
+                    className={`profile-panel__avatar${selected ? " is-selected" : ""}`}
+                    role="option"
+                    aria-selected={selected}
+                    aria-label={t("auth.avatarChoice")}
+                    onClick={() => setAvatarId(avatar.id)}
+                  >
+                    <img src={avatar.src} alt="" draggable={false} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <label className="profile-panel__field">
+            <span>{t("auth.country")}</span>
+            <CountryPicker value={countryCode} onChange={setCountryCode} error={error === AUTH_ERROR.COUNTRY} />
+          </label>
+          {error ? (
+            <p className="profile-panel__error" role="alert">
+              {t(error === AUTH_ERROR.USERNAME ? "auth.errorUsername" : error === AUTH_ERROR.COUNTRY ? "auth.errorCountry" : "auth.errorGeneric")}
+            </p>
+          ) : null}
+          {saved ? <p className="profile-panel__saved">{t("profile.saved")}</p> : null}
+          <button type="submit" className="profile-panel__save" disabled={busy}>
+            {t("profile.save")}
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+export default ProfilePanel;

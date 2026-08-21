@@ -9,6 +9,7 @@ import {
   winPercentage,
 } from "../persistence/index.js";
 import { LEGAL_URLS } from "../legal/urls.js";
+import { useAuth } from "../auth";
 import { IconClose } from "./Icon";
 import LanguageSwitcher from "./LanguageSwitcher";
 import DifficultySwitcher from "./DifficultySwitcher";
@@ -26,6 +27,7 @@ function SettingsPanel({
   const { t } = useI18n();
   const { volume, muted, ambient, setVolume, setMuted, setAmbient, play } = useAudio();
   const { theme, tileSkin, vibration, setTheme, setTileSkin, setVibration } = usePrefs();
+  const { session, logout, openCreate, openLogin } = useAuth();
   const [stats, setStats] = useState(() => loadStats());
   const wasOpen = useRef(false);
 
@@ -104,6 +106,44 @@ function SettingsPanel({
         </header>
 
         <div className="settings-panel__body">
+          <section className="settings-panel__account" aria-label={t("auth.accountSection")}>
+            <h3 className="settings-panel__label">{t("auth.accountSection")}</h3>
+            {session ? (
+              <>
+                <p className="settings-panel__account-name">{session.displayName}</p>
+                <p className="settings-panel__account-meta">{session.email}</p>
+                <p className="settings-panel__account-meta">{t("auth.playerId", { id: session.playerId })}</p>
+                <button
+                  type="button"
+                  className="btn btn--ghost settings-panel__account-btn"
+                  onClick={() => tap(logout)}
+                >
+                  {t("auth.logout")}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="settings-panel__hint">{t("auth.guest")}</p>
+                <div className="settings-panel__account-actions">
+                  <button
+                    type="button"
+                    className="btn btn--primary settings-panel__account-btn"
+                    onClick={() => tap(() => { onClose(); openCreate(); })}
+                  >
+                    {t("auth.createCta")}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost settings-panel__account-btn"
+                    onClick={() => tap(() => { onClose(); openLogin(); })}
+                  >
+                    {t("auth.loginCta")}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+
           <label className="settings-panel__field">
             <span className="settings-panel__label">{t("language.label")}</span>
             <LanguageSwitcher />

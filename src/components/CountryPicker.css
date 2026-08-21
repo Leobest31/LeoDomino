@@ -1,0 +1,100 @@
+.country-picker {
+  position: relative;
+}
+
+.country-picker__value {
+  appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.55rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(196, 163, 108, 0.28);
+  border-radius: 12px;
+  background: rgba(8, 12, 20, 0.88);
+  color: #f4ead2;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.country-picker__value.is-open,
+.country-picker__value:focus-visible {
+  border-color: rgba(232, 197, 71, 0.8);
+  outline: none;
+}
+
+.country-picker__value.is-error {
+  border-color: rgba(248, 113, 113, 0.85);
+}
+
+.country-picker__panel {
+  position: absolute;
+  z-index: 8;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.28rem);
+  max-height: 14rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  border-radius: 12px;
+  background: #0a1018;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.45);
+}
+
+.country-picker__search {
+  appearance: none;
+  width: 100%;
+  min-height: 2.2rem;
+  padding: 0.4rem 0.65rem;
+  border: 0;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.18);
+  background: transparent;
+  color: #f4ead2;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+}
+
+.country-picker__search:focus-visible {
+  outline: none;
+}
+
+.country-picker__list {
+  margin: 0;
+  padding: 0.2rem;
+  list-style: none;
+  overflow: auto;
+  max-height: 11.2rem;
+}
+
+.country-picker__option {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.15rem;
+  padding: 0.28rem 0.5rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #f4ead2;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.country-picker__option.is-selected,
+.country-picker__option:hover {
+  background: rgba(0, 184, 92, 0.14);
+}
+
+.country-picker__flag {
+  width: 1.5rem;
+  text-align: center;
+  font-size: 1.15rem;
+  line-height: 1;
+}

@@ -23,6 +23,8 @@ import {
 } from "../assets";
 import BrandLogo from "../components/BrandLogo";
 import SettingsPanel from "../components/SettingsPanel";
+import ProfilePanel from "../components/ProfilePanel";
+import { resolvePlayerAvatar } from "../auth/avatars.media.js";
 import {
   DominoSpread,
   HomeGlyph,
@@ -37,6 +39,7 @@ import {
   DEFAULT_DIFFICULTY,
   normalizeDifficulty,
 } from "../game/ai/difficulties.js";
+import { useAuth } from "../auth";
 import { loadMatch } from "../persistence/index.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import "./HomePage.css";
@@ -69,7 +72,9 @@ const HOME_PREVIEW = Object.freeze({
 function HomePage({ onPlayVsLeoBest, onResume }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
+  const { session, openLogin } = useAuth();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [canResume, setCanResume] = useState(() => Boolean(loadMatch()));
   const [difficulty, setDifficulty] = useState(() =>
@@ -98,6 +103,10 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
 
   const openSettings = () => {
     tap(() => setSettingsOpen(true));
+  };
+
+  const openProfile = () => {
+    tap(() => setProfileOpen(true));
   };
 
   const handleDifficultyChange = (next) => {
@@ -168,10 +177,19 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
           <button
             type="button"
             className="home__avatar-btn"
-            onClick={openSettings}
+            data-home-cta="account"
+            onClick={() => {
+              if (session) openProfile();
+              else tap(() => openLogin());
+            }}
             aria-label={t("home.profile")}
           >
-            <img className="home__avatar-img" src={homeAvatarLion} alt="" draggable={false} />
+            <img
+              className="home__avatar-img"
+              src={session ? resolvePlayerAvatar(session.avatarId).src : homeAvatarLion}
+              alt=""
+              draggable={false}
+            />
             <img className="home__online-dot" src={homeOnlineDot} alt="" aria-hidden="true" draggable={false} />
           </button>
         </div>
@@ -441,6 +459,7 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
         difficulty={difficulty}
         onDifficultyChange={handleDifficultyChange}
       />
+      <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
     </main>
   );
 }

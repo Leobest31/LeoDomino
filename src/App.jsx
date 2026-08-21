@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "./auth";
 import SplashPage from "./pages/SplashPage";
 import HomePage from "./pages/HomePage";
+import AuthPage from "./pages/AuthPage";
 import GameStylePage from "./pages/GameStylePage";
 import GamePage from "./pages/GamePage";
 import "./App.css";
@@ -8,11 +10,12 @@ import "./App.css";
 /** @typedef {"intro" | "home" | "gameStyle" | "game"} AppPhase */
 
 /**
- * Startup: brand intro → Home → Game Style → table.
+ * Startup: brand intro → Login (or Home if signed in) → Game Style → table.
  * PLAY VS LEOBEST opens Game Style. PLAY on that screen starts the 1v1 match.
- * Main Menu returns to Home.
+ * Main Menu returns to Home when signed in.
  */
 function App() {
+  const { signedIn, authView, openLogin } = useAuth();
   /** @type {[AppPhase, function]} */
   const [phase, setPhase] = useState("intro");
   const [splashExiting, setSplashExiting] = useState(false);
@@ -23,6 +26,16 @@ function App() {
     document.documentElement.dataset.boot = phase;
   }, [phase]);
 
+  useEffect(() => {
+    if (phase === "intro" || signedIn) return undefined;
+    if (!authView) openLogin();
+    if (phase === "game" || phase === "gameStyle") {
+      setMatchOptions(null);
+      setPhase("home");
+    }
+    return undefined;
+  }, [signedIn, phase, authView, openLogin]);
+
   const handleSplashFinished = () => {
     setSplashExiting(true);
   };
@@ -30,6 +43,7 @@ function App() {
   const handleSplashExitEnd = () => {
     setSplashExiting(false);
     setPhase("home");
+    if (!signedIn) openLogin();
   };
 
   const handlePlay = (config) => {
@@ -58,6 +72,7 @@ function App() {
 
   const bootShell =
     phase === "intro" || phase === "home" || phase === "gameStyle";
+  const showAuth = Boolean(authView) || (phase !== "intro" && !signedIn);
 
   return (
     <div className={`app app--game${bootShell ? " app--booting" : ""}`}>
@@ -69,14 +84,14 @@ function App() {
         />
       ) : null}
 
-      {phase === "home" ? (
+      {phase === "home" && signedIn ? (
         <HomePage
           onPlayVsLeoBest={() => setPhase("gameStyle")}
           onResume={handleResume}
         />
       ) : null}
 
-      {phase === "gameStyle" ? (
+      {phase === "gameStyle" && signedIn ? (
         <GameStylePage
           onBack={() => setPhase("home")}
           onMainMenu={() => setPhase("home")}
@@ -84,13 +99,15 @@ function App() {
         />
       ) : null}
 
-      {phase === "game" ? (
+      {phase === "game" && signedIn ? (
         <GamePage
           key={gameKey}
           matchOptions={matchOptions}
           onMainMenu={handleMainMenu}
         />
       ) : null}
+
+      {showAuth ? <AuthPage /> : null}
     </div>
   );
 }

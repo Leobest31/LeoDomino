@@ -184,6 +184,16 @@ export function IconUser({ className = "" }) {
   );
 }
 
+export function IconUserPlus({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
+      <circle cx="10" cy="8.2" r="3.1" {...stroke} />
+      <path d="M4.2 19.2c.6-3.4 2.8-5.2 5.8-5.2s5.2 1.8 5.8 5.2" {...stroke} />
+      <path d="M18.2 9.2v6.2M15.1 12.3h6.2" {...stroke} />
+    </svg>
+  );
+}
+
 export function IconGlobe({ className = "" }) {
   return (
     <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
@@ -217,6 +227,34 @@ export function IconLock({ className = "" }) {
     <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
       <rect x="6" y="11" width="12" height="9" rx="2" {...stroke} />
       <path d="M8.5 11V8.2a3.5 3.5 0 0 1 7 0V11" {...stroke} />
+    </svg>
+  );
+}
+
+export function IconMail({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" {...stroke} />
+      <path d="M4.2 7.2 12 13.2 19.8 7.2" {...stroke} />
+    </svg>
+  );
+}
+
+export function IconEye({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
+      <path d="M2.8 12S6.2 6.5 12 6.5 21.2 12 21.2 12 17.8 17.5 12 17.5 2.8 12 2.8 12z" {...stroke} />
+      <circle cx="12" cy="12" r="2.4" {...stroke} />
+    </svg>
+  );
+}
+
+export function IconEyeOff({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
+      <path d="M2.8 12S6.2 6.5 12 6.5 21.2 12 21.2 12 17.8 17.5 12 17.5 2.8 12 2.8 12z" {...stroke} />
+      <circle cx="12" cy="12" r="2.4" {...stroke} />
+      <path d="M5 19 19 5" {...stroke} />
     </svg>
   );
 }

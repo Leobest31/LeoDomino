@@ -48,6 +48,31 @@ assert.match(home, /data-home-nav-item="league"/, "League is a bottom-nav destin
 assert.match(home, /data-home-nav-item="store"/, "Store is a bottom-nav destination");
 assert.match(home, /data-home-nav-item="menu"/, "Menu is a bottom-nav destination");
 assert.match(home, /handlePlayOnline/, "Play Online has a dedicated future-activation handler");
+assert.match(home, /ProfilePanel/, "Home opens player profile from the avatar");
+assert.match(home, /openProfile/, "signed-in avatar opens Profile");
+assert.match(home, /openLogin/, "signed-out profile opens Login");
+assert.match(home, /data-home-cta="account"/, "Home has an account entry control");
+assert.match(app, /AuthPage/, "Create Account / Login overlay is mounted from App");
+assert.match(app, /phase === "home" && signedIn/, "Home is gated on a signed-in session");
+assert.match(app, /phase === "gameStyle" && signedIn/, "Game Style is gated on a signed-in session");
+assert.match(app, /phase === "game" && signedIn/, "the table is gated on a signed-in session");
+{
+  const authPage = read("pages/AuthPage.jsx");
+  const provider = read("auth/AuthProvider.jsx");
+  const config = read("i18n/config.js");
+  assert.doesNotMatch(authPage, /closeAuth/, "logged-out users cannot dismiss Login onto Home");
+  assert.match(authPage, /auth__forgot/, "forgot-password copy is visible");
+  assert.doesNotMatch(authPage, /resetPassword|forgotPassword\(/, "forgot password does not pretend to work");
+  assert.match(authPage, /PASSWORD_MIN_LENGTH/, "password rules use the current length requirement");
+  assert.match(authPage, /LanguageSwitcher/, "Login uses the existing language selector");
+  assert.match(authPage, /authEarthNight/, "Login uses the realistic night Earth asset");
+  assert.match(authPage, /CountryPicker/, "Create Account includes a country picker");
+  assert.match(authPage, /PLAYER_AVATARS/, "Create Account includes avatar choices");
+  assert.match(authPage, /LEGAL_URLS/, "Login includes Terms and Privacy");
+  assert.match(provider, /setAuthView\("login"\)/, "logout returns immediately to Login");
+  assert.match(config, /FIRST_LAUNCH_LOCALE = "en"/, "first-ever launch defaults to English");
+}
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "game"/, "App phases stay Home-first");
 assert.match(home, /id="online"/, "Find Match card exists");
 assert.match(home, /id="friend"/, "Play with a Friend card exists");
 assert.match(home, /id="private"/, "Private Table is visible as a future shell");
