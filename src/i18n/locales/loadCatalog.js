@@ -3,10 +3,14 @@
  */
 
 import ht from "./ht.js";
+import en from "./en.js";
 import { DEFAULT_LOCALE } from "../config.js";
 
 /** @type {Map<string, object>} */
-const cache = new Map([["ht", ht]]);
+const cache = new Map([
+  ["ht", ht],
+  ["en", en],
+]);
 
 /**
  * Dynamic import map. Add new languages here only.
@@ -14,7 +18,7 @@ const cache = new Map([["ht", ht]]);
  */
 const loaders = {
   ht: () => Promise.resolve({ default: ht }),
-  en: () => import("./en.js"),
+  en: () => Promise.resolve({ default: en }),
   fr: () => import("./fr.js"),
   es: () => import("./es.js"),
   pt: () => import("./pt.js"),
@@ -27,6 +31,11 @@ const loaders = {
  */
 export function getCachedCatalog(code) {
   return cache.get(code) ?? cache.get(DEFAULT_LOCALE);
+}
+
+/** @param {string} code */
+export function hasCatalog(code) {
+  return cache.has(code);
 }
 
 /**

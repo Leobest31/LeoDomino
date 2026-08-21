@@ -6,7 +6,7 @@ import {
   getLocaleMeta,
   isSupportedLocale,
 } from "./config.js";
-import { getCachedCatalog, loadCatalog } from "./locales/loadCatalog.js";
+import { getCachedCatalog, hasCatalog, loadCatalog } from "./locales/loadCatalog.js";
 import { translate } from "./translate.js";
 import { formatCurrency, formatDate, formatNumber } from "./format.js";
 import { writeStorage } from "../utils/storage.js";
@@ -15,21 +15,21 @@ import { readInitialLocale, syncDocumentLocale } from "./documentLocale.js";
 
 /**
  * App-wide i18n provider.
- * - Default locale is always Haitian Creole.
+ * - First launch uses English; Haitian Creole remains the catalog fallback.
  * - Preference restored from localStorage.
- * - Non-default catalogs are lazy-loaded.
+ * - Non-eager catalogs are lazy-loaded.
  * - Sets `dir` for RTL-ready layout switching.
  */
 export function I18nProvider({ children }) {
   const [locale, setLocaleState] = useState(readInitialLocale);
   const [messages, setMessages] = useState(() => getCachedCatalog(locale));
-  const [ready, setReady] = useState(() => locale === DEFAULT_LOCALE || Boolean(getCachedCatalog(locale)));
+  const [ready, setReady] = useState(() => hasCatalog(locale));
 
   useEffect(() => {
     let cancelled = false;
 
     async function ensure() {
-      setReady(locale === DEFAULT_LOCALE && Boolean(getCachedCatalog(DEFAULT_LOCALE)));
+      if (!hasCatalog(locale)) setReady(false);
       const catalog = await loadCatalog(locale);
       if (cancelled) return;
       setMessages(catalog);

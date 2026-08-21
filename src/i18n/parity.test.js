@@ -5,7 +5,7 @@
  */
 
 import assert from "node:assert/strict";
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./config.js";
+import { DEFAULT_LOCALE, FIRST_LAUNCH_LOCALE, SUPPORTED_LOCALES } from "./config.js";
 import { loadAllCatalogs } from "./locales/loadCatalog.js";
 
 const PLURAL_CATEGORIES = new Set([
@@ -48,7 +48,14 @@ const source = catalogs[DEFAULT_LOCALE];
 assert.ok(source, `Default locale "${DEFAULT_LOCALE}" must exist`);
 const sourceKeys = flattenKeys(source);
 
-assert.equal(DEFAULT_LOCALE, "ht", "Haitian Creole must remain the default locale");
+assert.equal(DEFAULT_LOCALE, "ht", "Haitian Creole must remain the catalog fallback");
+assert.equal(FIRST_LAUNCH_LOCALE, "en", "first launch defaults to English");
+assert.equal(SUPPORTED_LOCALES[0].code, "en", "language selector lists English first");
+assert.deepEqual(
+  SUPPORTED_LOCALES.map((locale) => locale.code).sort(),
+  ["en", "es", "fr", "ht", "pt"],
+  "exactly five supported languages"
+);
 
 assert.deepEqual(
   SUPPORTED_LOCALES.map((l) => l.code).sort(),

@@ -14,6 +14,7 @@
 
 export {
   DEFAULT_LOCALE,
+  FIRST_LAUNCH_LOCALE,
   LOCALE_STORAGE_KEY,
   SUPPORTED_LOCALES,
   isSupportedLocale,

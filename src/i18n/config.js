@@ -5,8 +5,11 @@
 
 /** @typedef {"ht" | "en" | "fr" | "es" | "pt" | string} LocaleCode */
 
-/** Default language: Haitian Creole — always the fallback and first paint locale. */
+/** Catalog fallback / key source of truth: Haitian Creole. */
 export const DEFAULT_LOCALE = "ht";
+
+/** First-launch language when no preference is saved. */
+export const FIRST_LAUNCH_LOCALE = "en";
 
 /** localStorage key for the persisted language choice. */
 export const LOCALE_STORAGE_KEY = "leodomino.locale";
@@ -24,8 +27,8 @@ export const LOCALE_STORAGE_KEY = "leodomino.locale";
  * }>}
  */
 export const SUPPORTED_LOCALES = Object.freeze([
-  { code: "ht", nativeName: "Kreyòl Ayisyen", intl: "ht-HT", dir: "ltr" },
   { code: "en", nativeName: "English", intl: "en", dir: "ltr" },
+  { code: "ht", nativeName: "Kreyòl Ayisyen", intl: "ht-HT", dir: "ltr" },
   { code: "fr", nativeName: "Français", intl: "fr-FR", dir: "ltr" },
   { code: "es", nativeName: "Español", intl: "es-ES", dir: "ltr" },
   { code: "pt", nativeName: "Português", intl: "pt-BR", dir: "ltr" },

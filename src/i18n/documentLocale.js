@@ -1,5 +1,5 @@
 import {
-  DEFAULT_LOCALE,
+  FIRST_LAUNCH_LOCALE,
   LOCALE_STORAGE_KEY,
   getLocaleMeta,
   isSupportedLocale,
@@ -7,7 +7,7 @@ import {
 import { readStorage } from "../utils/storage.js";
 
 /**
- * Resolve the initial locale from storage, falling back to Haitian Creole.
+ * Resolve the initial locale from storage, falling back to English on first launch.
  * @returns {string}
  */
 export function readInitialLocale() {
@@ -15,7 +15,7 @@ export function readInitialLocale() {
   if (saved && isSupportedLocale(saved)) {
     return saved;
   }
-  return DEFAULT_LOCALE;
+  return FIRST_LAUNCH_LOCALE;
 }
 
 /**
