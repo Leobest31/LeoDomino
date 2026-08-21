@@ -53,6 +53,7 @@ assert.match(home, /openProfile/, "signed-in avatar opens Profile");
 assert.match(home, /openLogin/, "signed-out profile opens Login");
 assert.match(home, /data-home-cta="account"/, "Home has an account entry control");
 assert.match(app, /AuthPage/, "Create Account / Login overlay is mounted from App");
+assert.match(app, /authReady && !signedIn/, "Login waits until the cloud session has been restored");
 assert.match(app, /phase === "home" && signedIn/, "Home is gated on a signed-in session");
 assert.match(app, /phase === "gameStyle" && signedIn/, "Game Style is gated on a signed-in session");
 assert.match(app, /phase === "game" && signedIn/, "the table is gated on a signed-in session");
@@ -69,6 +70,7 @@ assert.match(app, /phase === "game" && signedIn/, "the table is gated on a signe
   assert.match(authPage, /CountryPicker/, "Create Account includes a country picker");
   assert.match(authPage, /PLAYER_AVATARS/, "Create Account includes avatar choices");
   assert.match(authPage, /LEGAL_URLS/, "Login includes Terms and Privacy");
+  assert.match(provider, /onAuthStateChange/, "AuthProvider observes Supabase auth-state changes");
   assert.match(provider, /setAuthView\("login"\)/, "logout returns immediately to Login");
   assert.match(config, /FIRST_LAUNCH_LOCALE = "en"/, "first-ever launch defaults to English");
 }

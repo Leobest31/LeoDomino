@@ -42,16 +42,18 @@ const liveImports = [
   "src/pages/AuthPage.jsx",
   "src/pages/GamePage.jsx",
   "src/hooks/useMatch.js",
-  "src/auth/AuthProvider.jsx",
-  "src/auth/service.js",
 ];
 for (const rel of liveImports) {
   assert.doesNotMatch(
     read(rel),
     /supabaseClient|@supabase\/supabase-js/,
-    `${rel} does not depend on Supabase yet`
+    `${rel} does not import the Supabase client directly`
   );
 }
+
+const clientSourceAuth = read("src/online/supabaseClient.js");
+assert.match(clientSourceAuth, /detectSessionInUrl: false/, "Capacitor email/password skips URL session parsing");
+assert.match(clientSourceAuth, /persistSession: true/, "Supabase session persistence stays enabled");
 
 const home = read("src/pages/HomePage.jsx");
 assert.match(home, /handlePlayOnline/, "Find Match handler still exists");

@@ -32,7 +32,7 @@ function storedRaw() {
 }
 
 reset();
-assert.equal(authService.getSession(), null, "starts signed out");
+assert.equal(await authService.getSession(), null, "starts signed out");
 
 {
   await assert.rejects(
@@ -120,7 +120,7 @@ assert.equal(JSON.parse(raw)[0].password.hash.length > 20, true);
 assert.equal(JSON.parse(raw)[0].password.salt.length > 8, true);
 assert.equal(JSON.parse(raw)[0].playerId, created.playerId);
 
-const session = authService.getSession();
+const session = await authService.getSession();
 assert.equal(session.playerId, created.playerId);
 assert.equal(session.displayName, "Leonard B Philostin");
 assert.equal(loadSession().playerId, created.playerId);
@@ -149,8 +149,8 @@ await assert.rejects(
   (error) => error instanceof AuthError && error.code === AUTH_ERROR.EMAIL_TAKEN
 );
 
-authService.logout();
-assert.equal(authService.getSession(), null);
+await authService.logout();
+assert.equal(await authService.getSession(), null);
 assert.equal(loadSession(), null);
 assert.equal(loadAccounts().length, 2, "logout keeps the local account records");
 
@@ -164,8 +164,8 @@ const loggedIn = await authService.login({
   password: "secret12",
 });
 assert.equal(loggedIn.playerId, created.playerId);
-assert.equal(authService.getSession().displayName, "Leonard B Philostin");
-assert.equal(authService.getSession().playerId, created.playerId);
+assert.equal((await authService.getSession()).displayName, "Leonard B Philostin");
+assert.equal((await authService.getSession()).playerId, created.playerId);
 
 {
   await assert.rejects(
@@ -182,7 +182,7 @@ assert.equal(authService.getSession().playerId, created.playerId);
 
 assert.equal(created.countryCode, "HT");
 assert.equal(created.avatarId, DEFAULT_AVATAR_ID, "Create Account uses a default avatar");
-assert.equal(authService.getSession().avatarId, DEFAULT_AVATAR_ID);
+assert.equal((await authService.getSession()).avatarId, DEFAULT_AVATAR_ID);
 
 {
   const ids = PLAYER_AVATAR_IDS;
@@ -206,7 +206,7 @@ assert.equal(authService.getSession().avatarId, DEFAULT_AVATAR_ID);
   });
   assert.equal(withAvatar.avatarId, chosen);
   assert.equal(withAvatar.playerId.startsWith("leo_"), true);
-  authService.logout();
+  await authService.logout();
   const restored = await authService.login({
     email: "avatar@leodomino.test",
     password: "secret12",

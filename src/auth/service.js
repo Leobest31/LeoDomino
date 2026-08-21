@@ -1,7 +1,10 @@
 import { AUTH_ERROR } from "./constants.js";
+import { AuthError } from "./errors.js";
 import { createPlayerId, hashPassword, randomToken, verifyPassword } from "./crypto.js";
 import { normalizeAvatarId } from "./avatars.js";
 import { normalizeCountryCode } from "./countries.js";
+import { isSupabaseConfigured } from "../online/supabaseClient.js";
+import { cloudAuth } from "./cloudAuth.js";
 import {
   clearSession,
   findAccount,
@@ -21,21 +24,14 @@ import {
   validateUsername,
 } from "./validation.js";
 
-export class AuthError extends Error {
-  /**
-   * @param {string} code
-   * @param {string} [field]
-   */
-  constructor(code, field) {
-    super(code);
-    this.name = "AuthError";
-    this.code = code;
-    this.field = field || null;
-  }
-}
+export { AuthError };
 
 function fail(code, field) {
   throw new AuthError(code, field);
+}
+
+function failIf(code, field) {
+  if (code) fail(code, field);
 }
 
 function restoreSession() {
@@ -53,15 +49,12 @@ function restoreSession() {
 }
 
 /**
- * Local account foundation (hashed passwords, persisted session).
- * Not a cloud identity provider. Swap localStore later for online auth.
+ * Device-local accounts (PBKDF2). Kept for unit tests and offline-only fallback
+ * when Vite Supabase env vars are not configured. Not trusted as cloud identity.
  */
-export const authService = {
+export const localAuth = {
   getSession: restoreSession,
 
-  /**
-   * @param {{ email: string, username: string, password: string, confirmPassword: string }} input
-   */
   async createAccount(input) {
     const email = normalizeEmail(input.email);
     const playerName = normalizeUsername(input.username);
@@ -100,9 +93,6 @@ export const authService = {
     return publicAccount(record);
   },
 
-  /**
-   * @param {{ email: string, password: string }} input
-   */
   async login(input) {
     const email = normalizeEmail(input.email);
     failIf(validateEmail(email), "email");
@@ -122,10 +112,6 @@ export const authService = {
     return publicAccount(account);
   },
 
-  /**
-   * Update the visible profile fields for the signed-in playerId.
-   * Does not change email, password, or playerId.
-   */
   async updateProfile(input) {
     const session = loadSession();
     if (!session?.playerId) fail(AUTH_ERROR.CREDENTIALS);
@@ -154,12 +140,41 @@ export const authService = {
     return publicAccount(next);
   },
 
-  logout() {
+  async logout() {
     clearSession();
     return null;
   },
+
+  onAuthStateChange() {
+    return () => {};
+  },
 };
 
-function failIf(code, field) {
-  if (code) fail(code, field);
+function adapter() {
+  return isSupabaseConfigured() ? cloudAuth : localAuth;
 }
+
+/**
+ * Production uses Supabase when VITE_SUPABASE_* are set.
+ * Node unit tests without Vite env keep the local adapter.
+ */
+export const authService = {
+  async getSession() {
+    return adapter().getSession();
+  },
+  async createAccount(input) {
+    return adapter().createAccount(input);
+  },
+  async login(input) {
+    return adapter().login(input);
+  },
+  async updateProfile(input) {
+    return adapter().updateProfile(input);
+  },
+  async logout() {
+    return adapter().logout();
+  },
+  onAuthStateChange(handler) {
+    return adapter().onAuthStateChange(handler);
+  },
+};

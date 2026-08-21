@@ -1,14 +1,41 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthContext } from "./AuthContext.js";
 import { AuthError, authService } from "./service.js";
 
 /**
- * Local session + auth screen intent. Overlay is rendered by App.
+ * Cloud session (Supabase when configured) + auth screen intent.
+ * Overlay is rendered by App.
  */
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(() => authService.getSession());
+  const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [authView, setAuthView] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let unsubscribe = () => {};
+
+    async function hydrate() {
+      try {
+        const initial = await authService.getSession();
+        if (!cancelled) setSession(initial);
+      } catch {
+        if (!cancelled) setSession(null);
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+      unsubscribe = authService.onAuthStateChange((next) => {
+        if (!cancelled) setSession(next);
+      });
+    }
+
+    hydrate();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
 
   const openLogin = useCallback(() => setAuthView("login"), []);
   const openCreate = useCallback(() => setAuthView("create"), []);
@@ -55,8 +82,8 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    authService.logout();
+  const logout = useCallback(async () => {
+    await authService.logout();
     setSession(null);
     setAuthView("login");
   }, []);
@@ -65,6 +92,7 @@ export function AuthProvider({ children }) {
     () => ({
       session,
       signedIn: Boolean(session),
+      authReady,
       authView,
       busy,
       openLogin,
@@ -77,6 +105,7 @@ export function AuthProvider({ children }) {
     }),
     [
       session,
+      authReady,
       authView,
       busy,
       openLogin,

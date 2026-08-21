@@ -4,7 +4,8 @@ export {
   SESSION_STORAGE_KEY,
   PASSWORD_MIN_LENGTH,
 } from "./constants.js";
-export { AuthError, authService } from "./service.js";
+export { AuthError } from "./errors.js";
+export { authService, localAuth } from "./service.js";
 export { AuthProvider } from "./AuthProvider.jsx";
 export { useAuth } from "./useAuth.js";
 export { publicAccount } from "./validation.js";

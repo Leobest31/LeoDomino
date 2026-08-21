@@ -15,7 +15,7 @@ import "./App.css";
  * Main Menu returns to Home when signed in.
  */
 function App() {
-  const { signedIn, authView, openLogin } = useAuth();
+  const { signedIn, authReady, authView, openLogin } = useAuth();
   /** @type {[AppPhase, function]} */
   const [phase, setPhase] = useState("intro");
   const [splashExiting, setSplashExiting] = useState(false);
@@ -27,14 +27,14 @@ function App() {
   }, [phase]);
 
   useEffect(() => {
-    if (phase === "intro" || signedIn) return undefined;
+    if (!authReady || phase === "intro" || signedIn) return undefined;
     if (!authView) openLogin();
     if (phase === "game" || phase === "gameStyle") {
       setMatchOptions(null);
       setPhase("home");
     }
     return undefined;
-  }, [signedIn, phase, authView, openLogin]);
+  }, [authReady, signedIn, phase, authView, openLogin]);
 
   const handleSplashFinished = () => {
     setSplashExiting(true);
@@ -43,7 +43,7 @@ function App() {
   const handleSplashExitEnd = () => {
     setSplashExiting(false);
     setPhase("home");
-    if (!signedIn) openLogin();
+    if (authReady && !signedIn) openLogin();
   };
 
   const handlePlay = (config) => {
@@ -72,7 +72,7 @@ function App() {
 
   const bootShell =
     phase === "intro" || phase === "home" || phase === "gameStyle";
-  const showAuth = Boolean(authView) || (phase !== "intro" && !signedIn);
+  const showAuth = Boolean(authView) || (phase !== "intro" && authReady && !signedIn);
 
   return (
     <div className={`app app--game${bootShell ? " app--booting" : ""}`}>

@@ -1,12 +1,19 @@
 /**
- * Checkpoint 0 — Supabase client foundation only.
- * Does not implement auth, matchmaking, presence, or match sync.
- * The live app must not import this until a later online checkpoint.
+ * Supabase browser client — public anon/publishable key only.
+ * persistSession stays on for Capacitor WebView; no OAuth/deep-link parsing.
  */
 import { createClient } from "@supabase/supabase-js";
 
 export const SUPABASE_URL_ENV = "VITE_SUPABASE_URL";
 export const SUPABASE_ANON_KEY_ENV = "VITE_SUPABASE_ANON_KEY";
+
+const AUTH_CLIENT_OPTIONS = Object.freeze({
+  auth: Object.freeze({
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+  }),
+});
 
 function readViteEnv(name) {
   const env = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
@@ -30,10 +37,27 @@ export function isSupabaseConfigured() {
   return Boolean(url && anonKey);
 }
 
+function readAuthStorage() {
+  try {
+    const storage = globalThis.localStorage;
+    if (
+      storage &&
+      typeof storage.getItem === "function" &&
+      typeof storage.setItem === "function" &&
+      typeof storage.removeItem === "function"
+    ) {
+      return storage;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 let client = null;
 
 /**
- * Reusable browser client using the public anon key only.
+ * Reusable browser client using the public anon/publishable key only.
  * Throws if URL or anon key are missing.
  */
 export function getSupabaseClient() {
@@ -46,7 +70,13 @@ export function getSupabaseClient() {
     throw error;
   }
   if (!client) {
-    client = createClient(url, anonKey);
+    const storage = readAuthStorage();
+    client = createClient(url, anonKey, {
+      auth: {
+        ...AUTH_CLIENT_OPTIONS.auth,
+        ...(storage ? { storage } : {}),
+      },
+    });
   }
   return client;
 }
