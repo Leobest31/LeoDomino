@@ -132,7 +132,7 @@ export default {
     playerId: "ID jwè: {{id}}",
     accountSection: "Kont",
     localNote: "Kont sa a rete sou aparèy sa a pou kounye a. Li pare pou yon sèvis online pita.",
-    securityNote: "Modpas ou rete sèlman sou aparèy sa a.",
+    securityNote: "Kont ou pwoteje.",
     legalLead: "Lè ou kontinye, ou dakò ak",
     legalAnd: "ak",
     errorRequired: "Ranpli chan sa a.",

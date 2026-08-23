@@ -154,6 +154,10 @@ function adapter() {
   return isSupabaseConfigured() ? cloudAuth : localAuth;
 }
 
+export function isCloudAuth() {
+  return isSupabaseConfigured();
+}
+
 /**
  * Production uses Supabase when VITE_SUPABASE_* are set.
  * Node unit tests without Vite env keep the local adapter.

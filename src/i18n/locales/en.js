@@ -129,7 +129,7 @@ export default {
     playerId: "Player ID: {{id}}",
     accountSection: "Account",
     localNote: "This account stays on this device for now. It is ready to connect to an online service later.",
-    securityNote: "Your password stays on this device.",
+    securityNote: "Your account is protected.",
     legalLead: "By continuing, you agree to",
     legalAnd: "and",
     errorRequired: "This field is required.",

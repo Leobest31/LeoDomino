@@ -13,7 +13,7 @@ import {
   IconUser,
   IconUserPlus,
 } from "../components/Icon";
-import { AUTH_ERROR, DEFAULT_AVATAR_ID, PASSWORD_MIN_LENGTH, useAuth } from "../auth";
+import { AUTH_ERROR, DEFAULT_AVATAR_ID, PASSWORD_MIN_LENGTH, isCloudAuth, useAuth } from "../auth";
 import { PLAYER_AVATARS } from "../auth/avatars.media.js";
 import CountryPicker from "../components/CountryPicker";
 import { authEarthNight, authLeoEmblem } from "../assets";
@@ -325,7 +325,7 @@ function AuthPage() {
               )}
               <p className="auth__secure">
                 <IconShield className="auth__secure-icon" />
-                <span>{t("auth.securityNote")}</span>
+                <span>{t(isCloudAuth() ? "auth.securityNote" : "auth.localNote")}</span>
               </p>
               <p className="auth__legal">
                 <span>{t("auth.legalLead")}</span>

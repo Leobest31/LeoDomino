@@ -129,7 +129,7 @@ export default {
     playerId: "ID joueur : {{id}}",
     accountSection: "Compte",
     localNote: "Ce compte reste sur cet appareil pour le moment. Il pourra se connecter à un service en ligne plus tard.",
-    securityNote: "Votre mot de passe reste uniquement sur cet appareil.",
+    securityNote: "Votre compte est protégé.",
     legalLead: "En continuant, vous acceptez les",
     legalAnd: "et",
     errorRequired: "Ce champ est obligatoire.",

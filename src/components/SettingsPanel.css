@@ -23,6 +23,7 @@
   z-index: 135;
   display: flex;
   flex-direction: column;
+  pointer-events: none;
   width: min(21rem, 92vw);
   height: 100%;
   padding:
@@ -42,6 +43,7 @@
 
 .settings-panel--open {
   transform: translateX(0);
+  pointer-events: auto;
 }
 
 .settings-panel__header {

@@ -15,7 +15,7 @@ import "./App.css";
  * Main Menu returns to Home when signed in.
  */
 function App() {
-  const { signedIn, authReady, authView, openLogin } = useAuth();
+  const { signedIn, authReady, authView, openLogin, session } = useAuth();
   /** @type {[AppPhase, function]} */
   const [phase, setPhase] = useState("intro");
   const [splashExiting, setSplashExiting] = useState(false);
@@ -86,6 +86,7 @@ function App() {
 
       {phase === "home" && signedIn ? (
         <HomePage
+          key={session?.playerId ?? "home"}
           onPlayVsLeoBest={() => setPhase("gameStyle")}
           onResume={handleResume}
         />

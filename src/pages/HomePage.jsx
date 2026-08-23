@@ -87,6 +87,11 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
   }, []);
 
   useEffect(() => {
+    setSettingsOpen(false);
+    setProfileOpen(false);
+  }, [session?.playerId]);
+
+  useEffect(() => {
     const node = homeRef.current;
     if (!node) return undefined;
     const apply = () => {

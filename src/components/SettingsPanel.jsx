@@ -86,11 +86,13 @@ function SettingsPanel({
         className={`settings-backdrop${open ? " settings-backdrop--open" : ""}`}
         aria-label={t("common.close")}
         tabIndex={open ? 0 : -1}
+        inert={!open ? true : undefined}
         onClick={onClose}
       />
       <aside
         className={`settings-panel${open ? " settings-panel--open" : ""}`}
         aria-hidden={!open}
+        inert={!open ? true : undefined}
         aria-label={t("common.settings")}
       >
         <header className="settings-panel__header">
