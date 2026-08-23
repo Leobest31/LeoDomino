@@ -89,9 +89,15 @@ assert.match(gamePage, /tone="leoBest"/, "gameplay opponent uses the LeoBest ava
 assert.match(gamePage, /t\("game\.leoBest"\)/, "opponent name stays LeoBest");
 assert.match(gamePage, /showBrand=\{false\}/, "gameplay HUD does not mount the LeoDomino logo");
 assert.match(gamePage, /handleHomeTap/, "Home opens the forfeit warning instead of leaving immediately");
+assert.match(gamePage, /requestLeave\("home"\)/, "Home uses the shared abandon request");
+assert.match(gamePage, /requestLeave\("new-match"\)/, "New Match uses the shared abandon request");
+assert.match(gamePage, /onNewGame=\{handleNewMatchTap\}/, "dock New Match does not restart immediately");
+assert.doesNotMatch(gamePage, /onNewGame=\{restart\}/, "dock New Match is not wired straight to restart");
+assert.match(gamePage, /isMatchForfeitable/, "abandon warning uses the real forfeitable-match check");
 assert.match(gamePage, /<AbandonMatchDialog/, "forfeit confirmation is mounted");
 assert.match(gamePage, /abandonMatch\(\)/, "Leave Match records a forfeit then returns Home");
 assert.match(read("components/AbandonMatchDialog.jsx"), /game\.leaveMatch/, "Leave Match is localized");
+assert.match(read("components/AbandonMatchDialog.jsx"), /game\.abandonStartNewMatch/, "New Match confirm is localized");
 assert.match(read("components/AbandonMatchDialog.jsx"), /common\.cancel/, "Cancel is localized");
 assert.match(gamePage, /playerCount: state\.players\.length/, "layout sees 4-player matches");
 assert.match(gamePage, /rulesetId: state\.rulesetId/, "layout sees American ruleset");

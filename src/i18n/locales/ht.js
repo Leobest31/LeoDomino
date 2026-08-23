@@ -222,6 +222,10 @@ export default {
     leaveMatch: "Kite match la",
     abandonTitle: "Ou vle kite match la?",
     abandonBody: "Si ou ale kounye a, ou abandone epi ou pèdi match la.",
+    abandonNewMatchTitle: "Kòmanse yon nouvo match?",
+    abandonNewMatchBody:
+      "Match sa a deja kòmanse. Si ou kòmanse yon nouvo, ou abandone match sa a epi sa konte kòm yon defèt.",
+    abandonStartNewMatch: "Kòmanse nouvo match",
     aiSeat: "Advèsè {{n}}",
     playerN: "Jwè {{n}}",
     playerCount: "Jwè",

@@ -161,15 +161,25 @@
 }
 
 .game-page[data-orientation="portrait"] .game-page__dock .bottom-bar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  width: 100%;
 }
 
 .game-page[data-orientation="portrait"] .game-page__dock .bottom-bar__inner {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
   align-items: center;
+  grid-template-columns:
+    var(--game-pass-col, 42px)
+    minmax(0, 1fr)
+    var(--game-match-col, 48px);
   gap: var(--game-dock-col-gap, 6px);
-  padding: 0 clamp(0.12rem, 0.8vw, 0.28rem);
+  padding:
+    0
+    max(clamp(0.12rem, 0.8vw, 0.28rem), env(safe-area-inset-right, 0px))
+    0
+    max(clamp(0.12rem, 0.8vw, 0.28rem), env(safe-area-inset-left, 0px));
   min-height: 100%;
   height: 100%;
 }
@@ -203,13 +213,16 @@
 
 .game-page[data-orientation="portrait"] .game-page__dock .bottom-bar__actions,
 .game-page[data-orientation="portrait"] .game-page__dock .bottom-bar__end {
-  width: var(--game-pass-col, 42px);
-  max-width: var(--game-pass-col, 42px);
+  width: 100%;
+  max-width: none;
+}
+
+.game-page[data-orientation="portrait"] .game-page__dock .bottom-bar__actions {
+  justify-self: start;
 }
 
 .game-page[data-orientation="portrait"] .game-page__dock .bottom-bar__end {
-  width: var(--game-match-col, 48px);
-  max-width: var(--game-match-col, 48px);
+  justify-self: end;
 }
 
 .game-page[data-orientation="portrait"] .game-page__dock .bottom-bar__btn,

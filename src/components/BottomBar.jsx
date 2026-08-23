@@ -24,6 +24,7 @@ function BottomBar({ canPass = false, onPass, onNewGame, children = null }) {
           <button
             type="button"
             className="btn btn--pass bottom-bar__btn"
+            data-dock-pass="true"
             aria-disabled={!canPass}
             onClick={() => tap(canPass, onPass)}
           >
@@ -38,6 +39,7 @@ function BottomBar({ canPass = false, onPass, onNewGame, children = null }) {
           <button
             type="button"
             className="btn btn--new bottom-bar__new"
+            data-dock-new-match="true"
             onClick={() => {
               play("button");
               onNewGame?.();

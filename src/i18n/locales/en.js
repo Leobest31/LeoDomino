@@ -219,6 +219,10 @@ export default {
     leaveMatch: "Leave match",
     abandonTitle: "Leave this match?",
     abandonBody: "If you leave now, you forfeit and lose the match.",
+    abandonNewMatchTitle: "Start a new match?",
+    abandonNewMatchBody:
+      "This match has already started. Starting a new match will abandon this one and count as a loss.",
+    abandonStartNewMatch: "Start new match",
     aiSeat: "Rival {{n}}",
     playerN: "Player {{n}}",
     playerCount: "Players",

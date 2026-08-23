@@ -15,7 +15,7 @@
     "test:engine": "node src/game/verify.test.js",
     "test:rules": "node src/game/rules.test.js",
     "test:ai": "node src/game/ai.test.js",
-    "test:orientation": "node src/ui/gameplayOrientation.test.js && node src/ui/gameplayLayout.test.js && node src/ui/gameplayChrome.ui.test.js && node src/ui/gameplayComposition.test.js && node src/ui/gameplayViewport.test.js && node src/ui/playFlight.ui.test.js && node src/board/playedPreferredScale.layout.test.js && node src/ui/v1Portrait.layout.test.js && node src/ui/homeFlow.test.js",
+    "test:orientation": "node src/ui/gameplayOrientation.test.js && node src/ui/gameplayLayout.test.js && node src/ui/gameplayChrome.ui.test.js && node src/ui/gameplayComposition.test.js && node src/ui/gameplayViewport.test.js && node src/ui/playFlight.ui.test.js && node src/board/playedPreferredScale.layout.test.js && node src/ui/v1Portrait.layout.test.js && node src/ui/homeFlow.test.js && node src/ui/dockControls.layout.test.js && node src/ui/abandonFlow.ui.test.js && node src/game/matchForfeit.test.js",
     "test:i18n": "node src/i18n/parity.test.js",
     "test:i18n:ui": "node src/i18n/checkHardcodedUi.js",
     "test:audio": "node src/audio/audio.test.js",

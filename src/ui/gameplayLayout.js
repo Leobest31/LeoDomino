@@ -526,6 +526,57 @@ export function rectsOverlap(a, b, slop = 0) {
   );
 }
 
+/**
+ * Portrait dock geometry with PASS / NEW MATCH independent of hand width.
+ * Button boxes come from layout tokens only; tile count recenters the hand
+ * inside `handLeft`–`handRight` and must not move the outer controls.
+ *
+ * @param {ReturnType<typeof resolveGameplayLayout>} layout
+ * @param {number} handCount
+ */
+export function resolveDockControlGeometry(layout, handCount) {
+  const count = Math.max(0, Math.min(7, Math.floor(Number(handCount) || 0)));
+  const dockBottom = layout.dockTop + layout.dockHeight;
+  const actionTop = dockBottom - layout.actionHeight;
+  const pass = {
+    left: layout.passLeft,
+    right: layout.passRight,
+    top: actionTop,
+    bottom: dockBottom,
+  };
+  const newMatch = {
+    left: layout.matchLeft,
+    right: layout.matchRight,
+    top: actionTop,
+    bottom: dockBottom,
+  };
+  const handRegion = {
+    left: layout.handLeft,
+    right: layout.handRight,
+    top: layout.handTop,
+    bottom: dockBottom,
+  };
+  const regionW = Math.max(0, handRegion.right - handRegion.left);
+  const spacing = layout.playerHandGap + layout.playerHandOverlap;
+  const occupied =
+    count <= 0
+      ? 0
+      : count * layout.playerHandShort + Math.max(0, count - 1) * spacing;
+  const handW = Math.min(Math.max(0, occupied), regionW);
+  const handLeft = handRegion.left + (regionW - handW) / 2;
+  return {
+    pass,
+    newMatch,
+    handRegion,
+    hand: {
+      left: handLeft,
+      right: handLeft + handW,
+      top: handRegion.top,
+      bottom: dockBottom,
+    },
+  };
+}
+
 /** Layout-behavior class — aspect/height, never a device name. */
 export function gameplayDensityClass(layout) {
   const w = Number(layout?.safeW) || 0;

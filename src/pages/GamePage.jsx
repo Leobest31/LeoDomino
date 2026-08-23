@@ -31,6 +31,7 @@ import {
   opponentFeltPosition,
   resolveRuleset,
 } from "../game/index.js";
+import { isMatchForfeitable } from "../game/matchForfeit.js";
 import {
   destinationHighlightMap,
   destinationTileId,
@@ -188,7 +189,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const summaryGenRef = useRef(0);
   const summaryDoneRef = useRef("");
   const [summaryElapsedMs, setSummaryElapsedMs] = useState(0);
-  const [abandonOpen, setAbandonOpen] = useState(false);
+  const [abandonIntent, setAbandonIntent] = useState(null);
   const [enteringIds, setEnteringIds] = useState(() => new Set());
   const [drag, setDrag] = useState(null);
   const [hotEnd, setHotEnd] = useState(null);
@@ -936,21 +937,36 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     onMainMenu?.();
   };
 
-  const handleHomeTap = () => {
+  const requestLeave = (intent) => {
     play("button");
-    setAbandonOpen(true);
+    if (!isMatchForfeitable(state)) {
+      if (intent === "new-match") restart();
+      else onMainMenu?.();
+      return;
+    }
+    setAbandonIntent(intent);
+  };
+
+  const handleHomeTap = () => {
+    requestLeave("home");
+  };
+
+  const handleNewMatchTap = () => {
+    requestLeave("new-match");
   };
 
   const handleAbandonCancel = () => {
     play("button");
-    setAbandonOpen(false);
+    setAbandonIntent(null);
   };
 
   const handleAbandonLeave = () => {
     play("button");
-    setAbandonOpen(false);
+    const intent = abandonIntent;
+    setAbandonIntent(null);
     abandonMatch();
-    onMainMenu?.();
+    if (intent === "new-match") restart();
+    else onMainMenu?.();
   };
 
   const hudScoreFormat = resolveRuleset(state.rulesetId).hudScoreFormat ?? "absolute";
@@ -1073,7 +1089,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
                 <BottomBar
                   canPass={isHumanTurn && actions.canPass}
                   onPass={pass}
-                  onNewGame={restart}
+                  onNewGame={handleNewMatchTap}
                 >
                   <PlayerPanel
                     name={humanName}
@@ -1142,7 +1158,8 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       />
 
       <AbandonMatchDialog
-        open={abandonOpen}
+        open={Boolean(abandonIntent)}
+        intent={abandonIntent}
         onLeave={handleAbandonLeave}
         onCancel={handleAbandonCancel}
       />

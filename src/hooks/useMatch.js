@@ -28,6 +28,7 @@ import {
   isAiSeat,
 } from "../game/players.js";
 import { V1_PLAYER_COUNT } from "../game/v1Product.js";
+import { forfeitFingerprint } from "../game/matchForfeit.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import { MOTION } from "../utils/motion.js";
 import {
@@ -188,6 +189,7 @@ export function useMatch(options = {}) {
   }, []);
 
   const restart = useCallback(() => {
+    abandonedRef.current = false;
     setSelectedId(null);
     setErrorKey(null);
     setAiThinking(false);
@@ -220,12 +222,13 @@ export function useMatch(options = {}) {
   }, [targetScore]);
 
   const abandonMatch = useCallback(() => {
+    if (abandonedRef.current) return;
     const current = stateRef.current;
     abandonedRef.current = true;
     recordMatch({
       won: false,
       humanScore: current?.scores?.[HUMAN_INDEX] ?? 0,
-      fingerprint: `${current?.seed ?? "match"}:forfeit:${Date.now()}`,
+      fingerprint: forfeitFingerprint(current),
     });
     clearMatchSave();
   }, []);
@@ -391,11 +394,13 @@ export function useMatch(options = {}) {
 
     if (state.phase === PHASE.MATCH_OVER) {
       setMatchEndedAt((current) => current ?? Date.now());
-      recordMatch({
-        won: state.matchWinner === HUMAN_INDEX,
-        humanScore: state.scores[HUMAN_INDEX] ?? 0,
-        fingerprint: `${state.seed}:m:${state.scores.join("-")}:${state.matchWinner}`,
-      });
+      if (!abandonedRef.current) {
+        recordMatch({
+          won: state.matchWinner === HUMAN_INDEX,
+          humanScore: state.scores[HUMAN_INDEX] ?? 0,
+          fingerprint: `${state.seed}:m:${state.scores.join("-")}:${state.matchWinner}`,
+        });
+      }
     } else if (prev === PHASE.MATCH_OVER) {
       setMatchEndedAt(null);
     }

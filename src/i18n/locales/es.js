@@ -219,6 +219,10 @@ export default {
     leaveMatch: "Abandonar partida",
     abandonTitle: "¿Salir de esta partida?",
     abandonBody: "Si sales ahora, abandonas y pierdes la partida.",
+    abandonNewMatchTitle: "¿Empezar una partida nueva?",
+    abandonNewMatchBody:
+      "Esta partida ya ha empezado. Empezar una nueva la abandona y cuenta como una derrota.",
+    abandonStartNewMatch: "Empezar partida nueva",
     aiSeat: "Rival {{n}}",
     playerN: "Jugador {{n}}",
     playerCount: "Jugadores",

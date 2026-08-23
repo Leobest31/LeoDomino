@@ -1,6 +1,7 @@
 .bottom-bar {
   position: relative;
   flex-shrink: 0;
+  width: 100%;
   min-height: var(--bottom-bar-height);
   background:
     linear-gradient(180deg, rgba(8, 14, 18, 0.98) 0%, #030605 100%);
@@ -16,19 +17,22 @@
 
 .bottom-bar__inner {
   display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
   grid-template-columns:
-    minmax(var(--game-pass-col, 6.1rem), auto)
+    var(--game-pass-col, 6.1rem)
     minmax(0, 1fr)
-    minmax(var(--game-match-col, 6.4rem), auto);
+    var(--game-match-col, 6.4rem);
   align-items: end;
   justify-content: stretch;
   gap: var(--game-dock-col-gap, 0.45rem);
-  max-width: var(--game-max);
-  margin: 0 auto;
   padding:
     0
-    clamp(0.45rem, 1.4vw, 0.9rem)
-    0;
+    max(clamp(0.45rem, 1.4vw, 0.9rem), env(safe-area-inset-right, 0px))
+    0
+    max(clamp(0.45rem, 1.4vw, 0.9rem), env(safe-area-inset-left, 0px));
   min-height: var(--game-dock-height, var(--bottom-bar-height));
 }
 
@@ -37,7 +41,8 @@
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-start;
-  flex: 0 0 auto;
+  justify-self: start;
+  width: 100%;
   min-width: 0;
 }
 
@@ -70,8 +75,9 @@
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
+  justify-self: end;
+  width: 100%;
   gap: 0.22rem;
-  flex-shrink: 0;
   min-width: 0;
 }
 
@@ -91,11 +97,16 @@
 @media (max-width: 520px) {
   .bottom-bar__inner {
     grid-template-columns:
-      minmax(var(--game-pass-col, 5.2rem), auto)
+      var(--game-pass-col, 5.2rem)
       minmax(0, 1fr)
-      minmax(var(--game-match-col, 5.4rem), auto);
+      var(--game-match-col, 5.4rem);
     align-items: end;
-    padding: 0 0.35rem 0;
+    width: 100%;
+    padding:
+      0
+      max(0.35rem, env(safe-area-inset-right, 0px))
+      0
+      max(0.35rem, env(safe-area-inset-left, 0px));
     gap: var(--game-dock-col-gap, 0.32rem);
   }
 
@@ -119,16 +130,18 @@
 
   .bottom-bar__inner {
     display: grid;
+    width: 100%;
     grid-template-columns:
-      minmax(var(--game-pass-col, 6.1rem), auto)
+      var(--game-pass-col, 6.1rem)
       minmax(0, 1fr)
-      minmax(var(--game-match-col, 6.4rem), auto);
+      var(--game-match-col, 6.4rem);
     align-items: end;
     justify-content: stretch;
     padding:
       0
-      clamp(0.4rem, 1.2vw, 0.85rem)
-      0;
+      max(clamp(0.4rem, 1.2vw, 0.85rem), env(safe-area-inset-right, 0px))
+      0
+      max(clamp(0.4rem, 1.2vw, 0.85rem), env(safe-area-inset-left, 0px));
     min-height: var(--game-dock-height, 0px);
     gap: var(--game-dock-col-gap, 0.4rem);
   }
