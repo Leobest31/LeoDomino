@@ -46,6 +46,7 @@ function layoutFromMatch(match, extra = {}) {
     spinnerNorth: topology.branches.SPINNER_TOP,
     spinnerSouth: topology.branches.SPINNER_BOTTOM,
     topology,
+    rulesetId: match.rulesetId,
     // Live BoardContainer used to pass the non-double opener as centerTileId.
     centerTileId: extra.centerTileId ?? topology.spinnerId ?? match.board[0]?.id,
     ...extra,
@@ -152,7 +153,7 @@ function assertHorizontalChain(layout, board, label) {
   const layout = layoutFromMatch(match);
   const map = byId(layout);
   assert.equal(map["2-2"].branch, SPINNER_NODE);
-  assert.ok(map["2-2"].h > map["2-2"].w, "C spinner is visually vertical");
+  assert.ok(map["2-2"].w > map["2-2"].h, "C spinner is visually horizontal");
   assert.equal(map["3-6"].branch, BRANCH.MAIN_RIGHT);
   assert.equal(map["2-3"].branch, BRANCH.MAIN_RIGHT);
   assert.equal(map["3-6"].orientation, "horizontal");
@@ -181,10 +182,11 @@ function assertHorizontalChain(layout, board, label) {
       hudRight: 0,
       spinnerId: id,
       topology,
+      rulesetId: "allFives",
     });
     const map = byId(layout);
     assert.equal(map[id].branch, SPINNER_NODE, `${id} node`);
-    assert.ok(map[id].h > map[id].w, `${id} vertical spinner`);
+    assert.ok(map[id].w > map[id].h, `${id} horizontal spinner`);
     assert.equal(map[`L${pip}`].branch, BRANCH.MAIN_LEFT);
     assert.equal(map[`R${pip}`].branch, BRANCH.MAIN_RIGHT);
     assert.equal(map[`L${pip}`].orientation, "horizontal");

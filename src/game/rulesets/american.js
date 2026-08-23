@@ -1,22 +1,31 @@
 /**
- * American Draw Dominoes ruleset.
- * Engine id is "american". V1 Play vs LeoBest exposes this as the American
- * Game Style. Gameplay matches Classic/legacy behind a distinct id.
+ * American Game Style — All Fives-style count scoring.
+ * Engine id is "american". V1 Play vs LeoBest exposes this as American 🇺🇸.
  *
- * Audit: Classic/legacy already implements American Draw behavior
- * (double-six, hand 7, draw-until-playable, pass when empty, sum opponent
- * pips, first to 100, R1 highest double else highest). This ruleset is a
- * thin identity wrapper so American matches isolate behind their own id
- * without changing legacy.js or Haitian behavior.
+ * Live play: sum currently exposed terminal ends after every legal placement.
+ * Award that exact total when it is a positive multiple of 5 (5, 10, 15, …).
+ * An exposed double counts both halves. Spinner branches use the All Fives
+ * terminal topology. Target 150.
+ *
+ * Deal / draw / pass chassis matches Classic. Scoring does not.
  */
 
 import { legacyRuleset } from "./legacy.js";
+import {
+  allFivesScorePlay,
+  explainAllFivesScore,
+  explainAllFivesRoundEnd,
+  calculateAllFivesRoundPoints,
+} from "../rules/allFivesScoring.js";
 
 /** Engine ruleset id. */
 export const AMERICAN_RULESET_ID = "american";
 
+/** Cumulative match target for American (All Fives-style) scoring. */
+export const AMERICAN_MATCH_TARGET = 150;
+
 /**
- * Frozen config + policies — same gameplay as Classic/legacy, distinct id.
+ * Frozen config — Classic chassis + All Fives count / round-end policies.
  */
 export const americanRuleset = Object.freeze({
   ...legacyRuleset,
@@ -27,9 +36,24 @@ export const americanRuleset = Object.freeze({
   descriptionKey: "setup.gameStyle.americanDescription",
   summaryKey: "setup.gameStyle.americanSummary",
 
-  /** Mirror Classic seats [2,3,4] with handSize 7 for isolation reuse. */
   supportedPlayerCounts: Object.freeze([2, 3, 4]),
 
-  /** Shared legacy policy functions (chooseStartingPlayer, calculateRoundPoints). */
-  policies: legacyRuleset.policies,
+  /**
+   * Mid-play count scoring via scorePlay; round-end uses All Fives
+   * nearest-5 remaining pips, not Classic raw pip sums.
+   */
+  roundScoreMode: "sumOpponentPips",
+  defaultTargetScore: AMERICAN_MATCH_TARGET,
+  matchWinMode: "firstToReach",
+  hudScoreFormat: "ofTarget",
+  spinner: true,
+  roundSummary: true,
+
+  policies: Object.freeze({
+    ...legacyRuleset.policies,
+    scorePlay: allFivesScorePlay,
+    explainPlayScore: explainAllFivesScore,
+    explainRoundEnd: explainAllFivesRoundEnd,
+    calculateRoundPoints: calculateAllFivesRoundPoints,
+  }),
 });

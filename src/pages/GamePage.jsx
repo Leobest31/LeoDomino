@@ -972,6 +972,9 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const hudScoreFormat = resolveRuleset(state.rulesetId).hudScoreFormat ?? "absolute";
   const vsHud = state.players.length === 2;
   const ofTargetHud = hudScoreFormat === "ofTarget";
+  const americanHud =
+    state.rulesetId === "american" || state.rulesetId === "allFives";
+  const seatOfTarget = ofTargetHud && !americanHud;
 
   const showReservePicker =
     Boolean(pendingAiDraw) ||
@@ -993,7 +996,10 @@ function GamePage({ onMainMenu, matchOptions = null }) {
             compact
             showBrand={false}
             startBelow={
-              <div className="game-page__hud-cluster game-page__hud-cluster--human">
+              <div
+                className="game-page__hud-cluster game-page__hud-cluster--human"
+                data-hud-zone="human"
+              >
                 <div className="game-page__seat-avatar" aria-label={humanName}>
                   <PlayerAvatar avatarId={humanAvatarId} size="lg" alt="" />
                 </div>
@@ -1003,7 +1009,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
                     <SeatScore
                       value={displayScores[HUMAN_INDEX] ?? 0}
                       name={humanName}
-                      ofTarget={ofTargetHud}
+                      ofTarget={seatOfTarget}
                       target={state.targetScore}
                     />
                   ) : null}
@@ -1011,26 +1017,32 @@ function GamePage({ onMainMenu, matchOptions = null }) {
               </div>
             }
             centerBelow={
-              <ScoreBoard
-                scores={displayScores}
-                names={playerNames}
-                humanIndex={HUMAN_INDEX}
-                target={state.targetScore}
-                round={state.round}
-                hideSeatNames
-                metaOnly={vsHud}
-                scoreFormat={hudScoreFormat}
-              />
+              <div data-hud-zone="match-points">
+                <ScoreBoard
+                  scores={displayScores}
+                  names={playerNames}
+                  humanIndex={HUMAN_INDEX}
+                  target={state.targetScore}
+                  round={state.round}
+                  hideSeatNames
+                  metaOnly={vsHud}
+                  hideRound={Boolean(vsHud && americanHud)}
+                  scoreFormat={hudScoreFormat}
+                />
+              </div>
             }
             endBefore={
-              <div className="game-page__hud-cluster game-page__hud-cluster--rival">
+              <div
+                className="game-page__hud-cluster game-page__hud-cluster--rival"
+                data-hud-zone="rival"
+              >
                 <div className="game-page__hud-id game-page__hud-id--end">
                   <span className="game-page__hud-name">{t("game.leoBest")}</span>
                   {vsHud ? (
                     <SeatScore
                       value={displayScores[opponentSeats[0]?.index ?? 1] ?? 0}
                       name={t("game.leoBest")}
-                      ofTarget={ofTargetHud}
+                      ofTarget={seatOfTarget}
                       target={state.targetScore}
                     />
                   ) : null}
@@ -1080,6 +1092,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
             status={humanStatus}
             statusActive={isHumanTurn}
             hiddenIds={hiddenIds}
+            rulesetId={state.rulesetId}
             dock={
               <div
                 className="game-page__dock"

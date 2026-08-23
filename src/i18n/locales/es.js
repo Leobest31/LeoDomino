@@ -173,9 +173,9 @@ export default {
         "Doble seis · 7 fichas · dos extremos · primero a 4 puntos de partida · victoria +1 · bloqueo +1 · Dekabès +2 · 6-6 abre la ronda 1",
       american: "Americano",
       americanDescription:
-        "Roba hasta poder jugar. Pasa cuando el pozo está vacío. Primero a 100.",
+        "Puntuación All Fives. Anota cuando los extremos suman un múltiplo de 5. Primero a 150.",
       americanSummary:
-        "Doble seis · 7 fichas · dos extremos abiertos · robar hasta poder jugar · pasar si vacío · jugar a 100",
+        "Doble seis · 7 fichas · puntos en juego · múltiplos de 5 · ramas spinner · jugar a 150",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives americano. Anota cuando los extremos suman un múltiplo de 5 (mínimo 10). Primero a 200.",

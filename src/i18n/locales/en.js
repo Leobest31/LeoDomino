@@ -173,9 +173,9 @@ export default {
         "Double-six · 7 tiles · two open ends · first to 4 match points · win +1 · blocked +1 · Dekabès +2 · 6-6 opens round 1",
       american: "American",
       americanDescription:
-        "Draw until you can play. Pass when the boneyard is empty. First to 100.",
+        "All Fives scoring. Score when open ends total a multiple of 5. First to 150.",
       americanSummary:
-        "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
+        "Double-six · 7 tiles · count scoring · multiples of 5 · spinner branches · play to 150",
       allFives: "All Fives",
       allFivesDescription:
         "American All Fives. Score when open ends total a multiple of 5 (minimum 10). First to 200.",

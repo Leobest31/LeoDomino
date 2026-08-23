@@ -58,7 +58,7 @@ export const GAME_STYLES = Object.freeze([
     nameKey: "setup.gameStyle.american",
     descriptionKey: "setup.gameStyle.americanDescription",
     countryCode: "US",
-    // V1 Play vs LeoBest picker includes American Draw (Classic/legacy policies).
+    // V1 Play vs LeoBest picker: American is All Fives-style count scoring.
     enabled: true,
     available: true,
   }),

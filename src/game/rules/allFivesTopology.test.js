@@ -269,8 +269,8 @@ function allFivesState(overrides = {}) {
   board = placeTile(board, createTile(0, 5), END.RIGHT);
   const rep = report(board);
   assert.equal(rep.exposedTotal, 5);
-  assert.equal(rep.pointsAwarded, 0);
-  section("M. live exact 5 awards 0");
+  assert.equal(rep.pointsAwarded, 5);
+  section("M. live exact 5 awards +5");
 }
 
 {

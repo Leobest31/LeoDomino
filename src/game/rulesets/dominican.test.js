@@ -593,7 +593,7 @@ function playingState({
     rulesetId: AMERICAN_RULESET_ID,
   });
   assert.equal(american.rulesetId, "american");
-  assert.equal(american.targetScore, 100);
+  assert.equal(american.targetScore, 150);
   assert.equal(resolveRuleset("american").drawPolicy, "drawUntilPlayable");
   assert.equal(resolveRuleset("american").blockedWinnerMode, "lowestPips");
 

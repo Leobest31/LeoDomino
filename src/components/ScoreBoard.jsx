@@ -69,6 +69,7 @@ function ScoreBoard({
   scoreFormat = "absolute",
   hideSeatNames = false,
   metaOnly = false,
+  hideRound = false,
 }) {
   const { t, formatNumber } = useI18n();
   const ofTarget = scoreFormat === "ofTarget";
@@ -85,18 +86,20 @@ function ScoreBoard({
     <aside
       className={`scoreboard scoreboard--table scoreboard--inline${
         metaOnly ? " scoreboard--meta" : ""
-      }`}
+      }${hideRound ? " scoreboard--target-only" : ""}`}
       aria-label={t("game.scoreboard")}
     >
-      <div className="scoreboard__line">
-        <span className="scoreboard__label scoreboard__label--gold">
-          <span className="scoreboard__icon" aria-hidden="true">
-            🏆
+      {hideRound ? null : (
+        <div className="scoreboard__line">
+          <span className="scoreboard__label scoreboard__label--gold">
+            <span className="scoreboard__icon" aria-hidden="true">
+              🏆
+            </span>
+            {t("game.round")}
           </span>
-          {t("game.round")}
-        </span>
-        <span className="scoreboard__value">{formatNumber(round)}</span>
-      </div>
+          <span className="scoreboard__value">{formatNumber(round)}</span>
+        </div>
+      )}
 
       {rows.map((row, index) => (
         <div className="scoreboard__line" key={`score-${index}`} aria-label={t("game.scoreAria", { name: row.name })}>

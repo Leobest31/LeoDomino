@@ -3,9 +3,8 @@
  *
  * LIVE PLAY (this module's scorePlay path):
  *   post-move topology → getCurrentTerminalEnds() → exact terminal sum
- *   award that sum only when exactTotal >= 10 and exactTotal % 5 === 0.
- *   A live total of 5 is NOT a table score. No rounding.
- *   5 → 0, 8 → 0, 10 → +10, 13 → 0, 15 → +15.
+ *   award that sum when it is a positive multiple of 5. No rounding.
+ *   5 → +5, 8 → 0, 10 → +10, 13 → 0, 15 → +15.
  *
  * ROUND END (calculateAllFivesRoundPoints only):
  *   opponents' remaining hand pips, then roundToNearestFive.
@@ -33,7 +32,9 @@ function tableTileIds(board, north, south) {
 }
 
 function awardFromExactTotal(exactTotal) {
-  return exactTotal >= 10 && exactTotal % 5 === 0 ? exactTotal : 0;
+  return Number.isFinite(exactTotal) && exactTotal > 0 && exactTotal % 5 === 0
+    ? exactTotal
+    : 0;
 }
 
 /**
@@ -90,7 +91,7 @@ export function exposedEndTotal(board, layout) {
  * Inspectable live-scoring report from post-move topology.
  *
  * `isOpening` is ignored. Opening and later plays use the same rule:
- * award the exact terminal total iff it is >= 10 and a multiple of 5.
+ * award the exact terminal total iff it is a positive multiple of 5.
  *
  * @param {object} options
  * @returns {{
@@ -197,8 +198,8 @@ export function formatAllFivesScoreReport(report) {
  * Always uses the post-move board topology. Never uses hand/reserve tiles,
  * previous-move ends, visual layout, or round-end rounding.
  *
- * Award the exact terminal total if it is >= 10 and a multiple of 5; else 0.
- * Live 5 does not score. Round-end nearest-5 may still produce 5.
+ * Award the exact terminal total if it is a positive multiple of 5; else 0.
+ * Live 5 scores +5. Round-end nearest-5 is a separate pipeline.
  */
 export function scoreAllFivesPlay(options) {
   return explainAllFivesScore(options).awarded;

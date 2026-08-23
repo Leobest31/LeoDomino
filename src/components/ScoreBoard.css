@@ -156,6 +156,15 @@
   max-width: 100%;
 }
 
+.scoreboard--target-only .scoreboard__line--target {
+  margin-top: 0;
+  padding-left: 0;
+  border-left: none;
+  flex-direction: column;
+  align-items: center;
+  row-gap: 0.04rem;
+}
+
 @media (max-width: 719px) {
   .scoreboard--table {
     padding: 0.2rem 0.36rem;

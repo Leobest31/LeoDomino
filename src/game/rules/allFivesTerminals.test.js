@@ -266,7 +266,7 @@ function allFivesState(overrides = {}) {
     {
       label: "5",
       exact: 5,
-      award: 0,
+      award: 5,
       board: [spin(0), { id: "0-5", left: 0, right: 5 }],
       extra: { spinnerId: "0-0" },
     },

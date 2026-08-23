@@ -176,9 +176,9 @@ export default {
         "Doub-sis · 7 donmino · de bout ouvè · premye ki rive 4 pwen match · genyen +1 · bloke +1 · Dekabès +2 · 6-6 louvri premye wo a",
       american: "Ameriken",
       americanDescription:
-        "Tire jiskaske ou ka jwe. Pase lè rezèv la vid. Premye ki rive 100.",
+        "Pwen All Fives. Fè pwen lè bout ouvè yo ajoute yon miltip 5. Premye ki rive 150.",
       americanSummary:
-        "Doub-sis · 7 donmino · de bout ouvè · tire jiskaske ou ka jwe · pase lè vid · jwe jiska 100",
+        "Doub-sis · 7 donmino · pwen pandan jwèt · miltip 5 · branch spinner · jwe jiska 150",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives Ameriken. Fè pwen lè bout ouvè yo ajoute yon miltip 5 (minimòm 10). Premye ki rive 200.",

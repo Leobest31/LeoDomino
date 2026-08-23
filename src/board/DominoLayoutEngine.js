@@ -21,8 +21,11 @@
  *      complete AABB into the exclusive playable felt (HUD and Player 1
  *      dock are outside this rectangle) before any uniform auto-fit scale.
  *      Later horizontal runs fold to the felt width so unused vertical
- *      felt is used before shrinking. The spinner may leave the geometric
- *      felt mid so unused space above a south branch is used.
+ *      felt is used before shrinking. Parallel runs keep a tile-short
+ *      alley on American / All Fives so neighboring rows never crowd.
+ *      The American spinner hub stays horizontal; Classic/Haitian doubles
+ *      stay vertical. The spinner may leave the geometric felt mid so
+ *      unused space above a south branch is used.
  *
  * Preferred first turns when they fit at preferred size:
  *   LEFT  up to 5 straight west  → next tile turns UP
@@ -465,6 +468,66 @@ const SNAP_CLEARANCE = 0.5;
 const OPP = Object.freeze({ E: "W", W: "E", N: "S", S: "N" });
 const RESERVE_PREFIX = "__spin-";
 
+/**
+ * American / All Fives board policy (not Classic or Haitian).
+ * Spinner hub stays horizontal. Parallel (non-connected) chain runs keep a
+ * tile-short + face-gap alley so a 1-tile wrap cannot pack rows to ~0px.
+ */
+export function usesAmericanBoardLayout(rulesetId) {
+  const id = String(rulesetId || "");
+  return id === "american" || id === "allFives";
+}
+
+/**
+ * Minimum face-to-face gap between neighboring parallel chain runs.
+ * Scales with the rendered tile short side plus the connected-face gap —
+ * not a per-device CSS or coordinate constant.
+ */
+export function parallelRunClearance(size, gap = CHAIN_GAP) {
+  const short = Math.min(
+    Math.max(1, Number(size?.w) || 0),
+    Math.max(1, Number(size?.h) || 0)
+  );
+  const g = Math.max(0, Number(gap) || 0);
+  return short + g;
+}
+
+const DEFAULT_LAYOUT_POLICY = Object.freeze({
+  rulesetId: "",
+  american: false,
+  horizontalSpinner: false,
+  spinnerId: null,
+  runClear: CHAIN_GAP + SNAP_CLEARANCE,
+});
+
+/** @type {typeof DEFAULT_LAYOUT_POLICY | null} */
+let activeLayoutPolicy = null;
+
+function layoutPolicy() {
+  return activeLayoutPolicy || DEFAULT_LAYOUT_POLICY;
+}
+
+export function createBoardLayoutPolicy(options, size, gap) {
+  const american = usesAmericanBoardLayout(options?.rulesetId);
+  const spinnerId =
+    typeof options?.spinnerId === "string" && options.spinnerId
+      ? options.spinnerId
+      : null;
+  return {
+    rulesetId: String(options?.rulesetId || ""),
+    american,
+    horizontalSpinner: Boolean(american && spinnerId),
+    spinnerId,
+    runClear: american
+      ? parallelRunClearance(size, gap)
+      : Math.max(0, Number(gap) || 0) + SNAP_CLEARANCE,
+  };
+}
+
+function asLayoutPolicy(value) {
+  return value && typeof value === "object" ? value : null;
+}
+
 function isReserveId(id) {
   return typeof id === "string" && id.startsWith(RESERVE_PREFIX);
 }
@@ -535,10 +598,16 @@ export function collisionBox(p) {
 }
 
 /**
- * Doubles always stay vertical (spinner on E/W rails; end-to-end on bridges).
+ * Doubles stay vertical on the chain (spinner on E/W rails; end-to-end on
+ * bridges), except the American / All Fives spinner hub, which stays
+ * horizontal as the visual center of the four-way topology.
  * Non-doubles align with the path.
  */
-export function rotationForTravel(tile, dir) {
+export function rotationForTravel(tile, dir, policyArg = null) {
+  const p = asLayoutPolicy(policyArg) || layoutPolicy();
+  if (p?.horizontalSpinner && p.spinnerId && tile?.id === p.spinnerId) {
+    return 0;
+  }
   if (isDouble(tile)) return 90;
   const alongEW = dir === "E" || dir === "W";
   return alongEW ? 0 : 90;
@@ -616,7 +685,9 @@ function axisClearance(a, b) {
  * At emergency-tiny spans, fall back to essential boxes so routing stays feasible.
  */
 function findWrapCollision(box, occupied, gap, attachId = null) {
-  const minClear = Math.max(0, Number(gap) || 0);
+  const minClear = layoutPolicy().american
+    ? layoutPolicy().runClear
+    : Math.max(0, Number(gap) || 0);
   for (const other of occupied) {
     if (other.id === box.id) continue;
     if (other.id === attachId) {
@@ -634,7 +705,8 @@ function findWrapCollision(box, occupied, gap, attachId = null) {
   return null;
 }
 
-function findCollision(box, occupied, gap, attachId = null, minClear = gap + SNAP_CLEARANCE) {
+function findCollision(box, occupied, gap, attachId = null, minClear) {
+  const required = minClear ?? layoutPolicy().runClear;
   const span = Math.max(box.w || 0, box.h || 0, 0);
   const useEssential = span < 20;
   const probe = useEssential ? essentialCollisionBox(box) : collisionBox(box);
@@ -650,10 +722,17 @@ function findCollision(box, occupied, gap, attachId = null, minClear = gap + SNA
     const xOv = probe.x < hull.x + hull.w && probe.x + probe.w > hull.x;
     const yOv = probe.y < hull.y + hull.h && probe.y + probe.h > hull.y;
     const clear = axisClearance(probe, hull);
-    if (xOv && clear < minClear - 0.05) {
+    const probeH = (probe.w || 0) >= (probe.h || 0) - 0.5;
+    const hullH = (hull.w || 0) >= (hull.h || 0) - 0.5;
+    const probeV = (probe.h || 0) > (probe.w || 0) + 0.5;
+    const hullV = (hull.h || 0) > (hull.w || 0) + 0.5;
+    const faceClear = Math.max(0, Number(gap) || 0) + SNAP_CLEARANCE;
+    const rowNeed = probeH && hullH ? required : faceClear;
+    const colNeed = probeV && hullV ? required : faceClear;
+    if (xOv && clear < rowNeed - 0.05) {
       return { other, reason: "row-clearance", clearance: clear };
     }
-    if (yOv && clear < minClear - 0.05) {
+    if (yOv && clear < colNeed - 0.05) {
       return { other, reason: "col-clearance", clearance: clear };
     }
   }
@@ -814,12 +893,13 @@ function placeSpinnerWrapRail(prev, tile, dir, size, gap, fromDir, awayDir, prio
   const box = placeAgainst(prev, tile, dir, size, gap, fromDir);
   if (!priorRail || (dir !== "E" && dir !== "W")) return box;
   const g = Math.max(0, Number(gap) || 0);
+  const rowClear = layoutPolicy().american ? layoutPolicy().runClear : g;
   let y = box.y;
   if (awayDir === "N") {
-    const clearBottom = priorRail.y - g;
+    const clearBottom = priorRail.y - rowClear;
     if (box.y + box.h > clearBottom + 0.01) y = clearBottom - box.h;
   } else if (awayDir === "S") {
-    const clearTop = priorRail.y + priorRail.h + g;
+    const clearTop = priorRail.y + priorRail.h + rowClear;
     if (box.y < clearTop - 0.01) y = clearTop;
   }
   const nudged = { ...box, y: snap(y) };
@@ -1600,7 +1680,8 @@ function essentialCollisionBox(p) {
   return collisionBox({ ...p, isCorner: false, isBridge: false });
 }
 
-function chainCollisionFree(placements, gap, tiles, minClear = gap + SNAP_CLEARANCE) {
+function chainCollisionFree(placements, gap, tiles, minClear) {
+  const required = minClear ?? layoutPolicy().runClear;
   const attach = new Map();
   if (tiles) {
     for (let i = 0; i < tiles.length - 1; i += 1) {
@@ -1617,7 +1698,7 @@ function chainCollisionFree(placements, gap, tiles, minClear = gap + SNAP_CLEARA
       const a = placements[i];
       const b = placements[j];
       const linked = attach.get(a.id)?.has(b.id);
-      if (findCollision(a, [b], gap, linked ? b.id : null, minClear)) return false;
+      if (findCollision(a, [b], gap, linked ? b.id : null, required)) return false;
     }
   }
   return true;
@@ -2018,6 +2099,13 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
 
   const size = { w: baseW, h: baseH };
   const gap = effectiveGap(size.w, size.h, requestedGap);
+  const prevLayoutPolicy = activeLayoutPolicy;
+  activeLayoutPolicy = createBoardLayoutPolicy(
+    { ...options, spinnerId: layoutSpinnerId },
+    size,
+    gap
+  );
+  try {
   const scaleCap = Math.max(
     EMERGENCY_MIN_SCALE,
     Math.min(1, options.maxScale != null ? Number(options.maxScale) : 1)
@@ -2650,6 +2738,9 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     return materializeComplete(null, "result-incomplete");
   }
   return result;
+  } finally {
+    activeLayoutPolicy = prevLayoutPolicy;
+  }
 }
 
 /* ---------- Compatibility shims for legacy layoutBoard callers ---------- */

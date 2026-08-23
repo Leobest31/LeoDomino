@@ -26,6 +26,7 @@ function GameTable({
   hiddenIds = null,
   dock = null,
   children = null,
+  rulesetId = "",
 }) {
   const { t } = useI18n();
 
@@ -61,6 +62,7 @@ function GameTable({
             emptyLabel={t("game.tableReady")}
             scoreHighlights={scoreHighlights}
             hiddenIds={hiddenIds}
+            rulesetId={rulesetId}
           />
 
           {playScore && !roundSummary ? (

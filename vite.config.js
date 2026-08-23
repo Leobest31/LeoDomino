@@ -36,6 +36,10 @@ export default defineConfig({
   // Relative base so Capacitor native WebViews can load bundled dist assets offline.
   // Also valid for the web/PWA deploy (absolute hosting still works with relative asset URLs).
   base: "./",
+  server: {
+    // Temporary Quick Tunnel testing: Cloudflare Host header is *.trycloudflare.com.
+    allowedHosts: [".trycloudflare.com"],
+  },
   plugins: [
     legalPrettyPathsPlugin(),
     react(),

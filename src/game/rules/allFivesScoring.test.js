@@ -51,15 +51,15 @@ function openWith(tile) {
 {
   const board = openWith(createTile(2, 3));
   assert.equal(exposedEndTotal(board), 5);
-  assert.equal(scoreAllFivesPlay({ board, isOpening: true }), 0);
-  section("opening 3–2 → exact 5 awards 0 live points");
+  assert.equal(scoreAllFivesPlay({ board, isOpening: true }), 5);
+  section("opening 3–2 → exact 5 awards +5");
 }
 
 {
   const board = openWith(createTile(1, 4));
   assert.equal(exposedEndTotal(board), 5);
-  assert.equal(scoreAllFivesPlay({ board, isOpening: true }), 0);
-  section("opening 4–1 → exact 5 awards 0 live points");
+  assert.equal(scoreAllFivesPlay({ board, isOpening: true }), 5);
+  section("opening 4–1 → exact 5 awards +5");
 }
 
 {
@@ -70,13 +70,13 @@ function openWith(tile) {
 }
 
 {
-  // 0-0 spinner both halves still 0; 0-5 on one main side → 0+0+5 = 5, live 5 = 0.
+  // 0-0 spinner both halves still 0; 0-5 on one main side → 0+0+5 = 5, live 5 = +5.
   let board = openWith(createTile(0, 0));
   assert.equal(scoreAllFivesPlay({ board, isOpening: true }), 0);
   board = placeTile(board, createTile(0, 5), END.RIGHT);
   assert.equal(exposedEndTotal(board), 5);
-  assert.equal(scoreAllFivesPlay({ board, isOpening: false }), 0);
-  section("live exact 5 from 0-0 + 0-5 awards 0");
+  assert.equal(scoreAllFivesPlay({ board, isOpening: false }), 5);
+  section("live exact 5 from 0-0 + 0-5 awards +5");
 }
 
 {
@@ -168,14 +168,14 @@ function openingState(tileId, handExtras = []) {
 
 {
   const after = playTile(openingState("2-3", ["5-5", "1-2"]), "2-3");
-  assert.equal(after.scores[0], 0);
-  section("engine: opening 3–2 awards 0 live (exact 5 is not a table score)");
+  assert.equal(after.scores[0], 5);
+  section("engine: opening 3–2 awards +5 live");
 }
 
 {
   const after = playTile(openingState("1-4", ["5-5", "1-2"]), "1-4");
-  assert.equal(after.scores[0], 0);
-  section("engine: opening 4–1 awards 0 live (exact 5 is not a table score)");
+  assert.equal(after.scores[0], 5);
+  section("engine: opening 4–1 awards +5 live");
 }
 
 {
@@ -185,7 +185,7 @@ function openingState(tileId, handExtras = []) {
 }
 
 {
-  // Live 5 from 0-0 + 0-5 does not award.
+  // Live 5 from 0-0 + 0-5 awards +5.
   let state = openingState("0-0", ["0-5", "1-2", "2-3"]);
   state = playTile(state, "0-0");
   assert.equal(state.scores[0], 0);
@@ -199,8 +199,8 @@ function openingState(tileId, handExtras = []) {
   };
   state = playTile(state, "0-5", END.RIGHT);
   assert.equal(exposedEndTotal(state.board), 5);
-  assert.equal(state.scores[0], 0);
-  section("engine: live exact 5 awards 0");
+  assert.equal(state.scores[0], 5);
+  section("engine: live exact 5 awards +5");
 }
 
 {
@@ -279,9 +279,9 @@ function openingState(tileId, handExtras = []) {
   );
   assert.equal(
     scoreAllFivesPlay({ board: openWith(createTile(2, 3)), isOpening: true }),
-    0
+    5
   );
-  section("round-end may award 5; live table scoring cannot");
+  section("round-end 3 pips → 5; live exposed 5 also awards +5");
 }
 
 console.log("\nAll Fives opening-tile scoring tests passed.");

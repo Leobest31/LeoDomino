@@ -43,6 +43,11 @@ assert.match(header, /t\("common\.home"\)/, "Home control is labeled Home");
 assert.doesNotMatch(header, /header__menu-btn/, "long Main Menu control is gone");
 assert.match(headerCss, /header__end-tools/, "tools row is CSS flex row");
 assert.match(headerCss, /flex-direction:\s*row/, "Reserve and Home share one row");
+assert.match(
+  headerCss,
+  /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+minmax\(0,\s*1fr\)/,
+  "portrait HUD columns cannot overlap"
+);
 
 assert.doesNotMatch(gamePage, /game-page__hud-reserve/, "Reserve is not permanently mounted in the HUD");
 assert.match(gamePage, /game-page__hud-name/, "player name sits in the HUD identity cluster");
@@ -52,6 +57,9 @@ assert.match(gamePage, /tilesOnly/, "opponent rail does not duplicate HUD identi
 assert.doesNotMatch(header, /OpponentPanel/, "opponent tiles are not inside the HUD header");
 assert.match(gamePage, /game-page__seat-avatar/, "header shows compact seat avatars");
 assert.match(gamePage, /<SeatScore/, "seat scores sit beside the two HUD avatars");
+assert.match(gamePage, /data-hud-zone="human"/, "human score is its own HUD zone");
+assert.match(gamePage, /data-hud-zone="match-points"/, "MATCH POINTS is the center HUD zone");
+assert.match(gamePage, /data-hud-zone="rival"/, "LeoBest score is its own HUD zone");
 assert.match(gamePage, /status=\{humanStatus\}/, "status pill lives on the felt");
 assert.doesNotMatch(gamePage, /playerLabel=/, "name is not a full-width table banner");
 assert.match(gamePage, /hideSeatNames/, "scoreboard does not repeat the full player name");

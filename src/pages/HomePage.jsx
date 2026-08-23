@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import { useAudio } from "../audio";
 import {
@@ -80,9 +80,32 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
   const [difficulty, setDifficulty] = useState(() =>
     normalizeDifficulty(readStorage(AI_DIFFICULTY_STORAGE_KEY, DEFAULT_DIFFICULTY))
   );
+  const homeRef = useRef(null);
 
   useEffect(() => {
     setCanResume(Boolean(loadMatch()));
+  }, []);
+
+  useEffect(() => {
+    const node = homeRef.current;
+    if (!node) return undefined;
+    const apply = () => {
+      const visual = window.visualViewport;
+      const height = Math.round(visual?.height || window.innerHeight);
+      const offsetTop = Math.round(visual?.offsetTop || 0);
+      node.style.setProperty("--home-vvh", `${height}px`);
+      node.style.setProperty("--home-vv-top", `${offsetTop}px`);
+    };
+    apply();
+    const visual = window.visualViewport;
+    visual?.addEventListener("resize", apply);
+    visual?.addEventListener("scroll", apply);
+    window.addEventListener("resize", apply);
+    return () => {
+      visual?.removeEventListener("resize", apply);
+      visual?.removeEventListener("scroll", apply);
+      window.removeEventListener("resize", apply);
+    };
   }, []);
 
   useEffect(() => {
@@ -134,7 +157,7 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
   };
 
   return (
-    <main className="home" data-home="true" aria-label={t("home.aria")}>
+    <main ref={homeRef} className="home" data-home="true" aria-label={t("home.aria")}>
       <div className="home__atmosphere" aria-hidden="true">
         <div className="home__wood" />
         <div className="home__vignette" />

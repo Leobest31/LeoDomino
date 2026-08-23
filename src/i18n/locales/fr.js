@@ -173,9 +173,9 @@ export default {
         "Double-six · 7 tuiles · deux bouts ouverts · premier à 4 points de match · victoire +1 · bloqué +1 · Dekabès +2 · 6-6 ouvre la manche 1",
       american: "Américain",
       americanDescription:
-        "Piochez jusqu’à pouvoir jouer. Passez quand la réserve est vide. Premier à 100.",
+        "Score All Fives. Marquez quand les bouts ouverts totalisent un multiple de 5. Premier à 150.",
       americanSummary:
-        "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
+        "Double-six · 7 tuiles · points en cours · multiples de 5 · branches spinner · jouer à 150",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives américain. Marquez quand les bouts ouverts totalisent un multiple de 5 (minimum 10). Premier à 200.",

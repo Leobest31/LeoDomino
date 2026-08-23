@@ -158,6 +158,7 @@ function layoutCross(vp, board, north, south, tile = locked) {
     spinnerId: "3-3",
     spinnerNorth: north,
     spinnerSouth: south,
+    rulesetId: "american",
   });
 }
 

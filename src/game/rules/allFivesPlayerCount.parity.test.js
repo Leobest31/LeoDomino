@@ -132,8 +132,8 @@ function sameAward(makeState, tileId, end) {
   const byId = indexTiles([createTile(2, 3)]);
   const make = liveState(createBoard(), { byId, hand0: ["2-3"] });
   const result = sameAward(make, "2-3");
-  assert.equal(result.awarded, 0);
-  section("B. 3-2 opener exact 5 → live 0 for 2P/3P/4P");
+  assert.equal(result.awarded, 5);
+  section("B. 3-2 opener exact 5 → live +5 for 2P/3P/4P");
 }
 
 {
@@ -238,12 +238,12 @@ function sameAward(makeState, tileId, end) {
 }
 
 {
-  assert.equal(scoreAllFivesPlay({ board: [{ id: "x", left: 2, right: 3 }] }), 0);
+  assert.equal(scoreAllFivesPlay({ board: [{ id: "x", left: 2, right: 3 }] }), 5);
   const byId = indexTiles([createTile(0, 5)]);
   const make = liveState(createBoard(), { byId, hand0: ["0-5"] });
   const result = sameAward(make, "0-5");
-  assert.equal(result.awarded, 0);
-  section("F. live exact 5 → 0 for 2P/3P/4P");
+  assert.equal(result.awarded, 5);
+  section("F. live exact 5 → +5 for 2P/3P/4P");
 }
 
 {
@@ -286,10 +286,10 @@ function sameAward(makeState, tileId, end) {
 
 {
   assert.equal(PLAY_SCORE_HOLD_MS, 2000);
+  assert.equal(shouldShowPlayScorePopup(5), true);
   assert.equal(shouldShowPlayScorePopup(10), true);
   assert.equal(shouldShowPlayScorePopup(15), true);
   assert.equal(shouldShowPlayScorePopup(20), true);
-  assert.equal(shouldShowPlayScorePopup(5), false);
   assert.equal(shouldShowPlayScorePopup(0), false);
   section("H. 2-second live glow/popup is independent of player count");
 }

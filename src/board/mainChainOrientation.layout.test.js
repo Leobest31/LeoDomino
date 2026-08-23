@@ -1,6 +1,6 @@
 /**
  * American / All Fives main-chain orientation.
- * Spinner is a vertical hub; MAIN_LEFT / MAIN_RIGHT stay on one E–W rail.
+ * Spinner is a horizontal hub; MAIN_LEFT / MAIN_RIGHT stay on one E–W rail.
  * SPINNER_TOP / SPINNER_BOTTOM are explicit arms only.
  *
  * Run: node src/board/mainChainOrientation.layout.test.js
@@ -54,6 +54,7 @@ function layoutFromMatch(match) {
     spinnerNorth: topology.branches.SPINNER_TOP,
     spinnerSouth: topology.branches.SPINNER_BOTTOM,
     topology,
+    rulesetId: match.rulesetId,
   });
 }
 
@@ -88,8 +89,8 @@ function assertHorizontalMain(layout, board, spinnerId, label) {
   const spin = map[spinnerId];
   assert.ok(spin, `${label}: missing spinner ${spinnerId}`);
   assert.equal(spin.branch, SPINNER_NODE, `${label}: spinner branch`);
-  assert.equal(spin.orientation, "vertical", `${label}: spinner must be vertical`);
-  assert.ok(spin.h > spin.w + 0.5, `${label}: spinner footprint ${spin.w}x${spin.h}`);
+  assert.equal(spin.orientation, "horizontal", `${label}: spinner must be horizontal`);
+  assert.ok(spin.w > spin.h + 0.5, `${label}: spinner footprint ${spin.w}x${spin.h}`);
 
   const spinY = centerOf(spin).y;
   for (const tile of board) {
@@ -138,7 +139,7 @@ function assertHorizontalMain(layout, board, spinnerId, label) {
   const painted = displaysFor(match.board, layout);
   const six = painted.find((e) => e.tile.id === "6-6");
   const five = painted.find((e) => e.tile.id === "5-6");
-  assert.equal(six.display.orientation, "vertical");
+  assert.equal(six.display.orientation, "horizontal");
   assert.equal(five.display.orientation, "horizontal");
   console.log("✓ A. 6-6 spinner + 6-5 is a horizontal main chain");
 }
@@ -208,7 +209,7 @@ function assertHorizontalMain(layout, board, spinnerId, label) {
   const map = byId(layout);
   assert.ok(centerOf(map["3-4"]).x < centerOf(map["4-4"]).x, "E LEFT is west");
   assert.ok(centerOf(map["4-6"]).x > centerOf(map["4-4"]).x, "E RIGHT is east");
-  console.log("✓ E. LEFT ← vertical spinner → RIGHT");
+  console.log("✓ E. LEFT ← horizontal spinner → RIGHT");
 }
 
 {
@@ -228,7 +229,7 @@ function assertHorizontalMain(layout, board, spinnerId, label) {
   match = applyPlace(match, 0, "2-5", END.SOUTH);
   const layout = layoutFromMatch(match);
   const map = byId(layout);
-  assert.equal(map["5-5"].orientation, "vertical");
+  assert.equal(map["5-5"].orientation, "horizontal");
   assert.equal(map["4-5"].branch, BRANCH.MAIN_LEFT);
   assert.equal(map["5-6"].branch, BRANCH.MAIN_RIGHT);
   assert.equal(map["4-5"].orientation, "horizontal");
@@ -284,6 +285,7 @@ function assertHorizontalMain(layout, board, spinnerId, label) {
       hudRight: 0,
       spinnerId: id,
       topology,
+      rulesetId: "american",
     });
     assertHorizontalMain(layout, [leftTile, spin, rightTile], id, `${id}`);
     const map = byId(layout);

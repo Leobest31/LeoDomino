@@ -93,6 +93,21 @@ export const PLAYED_SHORT_OF_FELT_W_PORTRAIT = 0.165;
 export const PLAYED_LONG_MAX_OF_FELT_H_PORTRAIT = 0.28;
 export const PORTRAIT_CHROME_MIN_PX = 64;
 export const PORTRAIT_CHROME_MAX_PX = 80;
+/** Header padding: clamp(0.55rem, 1.5vw, 1rem) at a 16px root. */
+export const HUD_PAD_MIN_PX = 8.8;
+export const HUD_PAD_MAX_PX = 16;
+export const HUD_COL_GAP_MIN_PX = 3.2;
+export const HUD_COL_GAP_MAX_PX = 8;
+export const HUD_HOME_MIN_PX = 36;
+export const HUD_HOME_MAX_PX = 44;
+export const HUD_CLUSTER_GAP_MIN_PX = 4.48;
+export const HUD_CLUSTER_GAP_MAX_PX = 8.8;
+export const HUD_TOOLS_GAP_PX = 4;
+export const HUD_SCORE_GLYPH = 0.62;
+export const HUD_SCORE_MIN_PX = 24;
+export const HUD_SCORE_MAX_PX = 38;
+/** Compact MATCH POINTS pill — label stacked over the target number. */
+export const HUD_MATCH_POINTS_MIN_PX = 58;
 /** Portrait dock is tall enough for the full Player 1 tile plus padding. */
 export const PORTRAIT_DOCK_MIN_PX = 80;
 export const PORTRAIT_DOCK_MAX_PX = 148;
@@ -180,6 +195,132 @@ export function fitPlayerHandRow(tileShort, budget, options = {}) {
 
 function clamp(n, lo, hi) {
   return Math.min(hi, Math.max(lo, n));
+}
+
+export function hudPadX(width) {
+  return clamp(Number(width) * 0.015, HUD_PAD_MIN_PX, HUD_PAD_MAX_PX);
+}
+
+export function hudColGap(width) {
+  return clamp(Number(width) * 0.012, HUD_COL_GAP_MIN_PX, HUD_COL_GAP_MAX_PX);
+}
+
+export function hudClusterGap(width) {
+  return clamp(Number(width) * 0.014, HUD_CLUSTER_GAP_MIN_PX, HUD_CLUSTER_GAP_MAX_PX);
+}
+
+/** Home control: clamp(36px, 2.25rem * hud-scale, 44px). */
+export function hudHomeSize(uiScale) {
+  const scale = Math.max(0.42, Number(uiScale) || 1);
+  return clamp(Math.round(36 * scale), HUD_HOME_MIN_PX, HUD_HOME_MAX_PX);
+}
+
+export function estimateHudScoreWidth(fontPx, digits = 3) {
+  const n = Math.max(1, Math.floor(Number(digits) || 1));
+  return Math.max(Number(fontPx) || 0, (Number(fontPx) || 0) * HUD_SCORE_GLYPH * n);
+}
+
+export function estimateMatchPointsWidth(target = 150) {
+  const label = 52;
+  const value = 10 + String(Math.abs(Number(target) || 0)).length * 10;
+  return Math.max(HUD_MATCH_POINTS_MIN_PX, Math.max(label, value) + 12);
+}
+
+/**
+ * Portrait 1v1 HUD: Human score | MATCH POINTS | LeoBest score.
+ * Models the stacked header as `minmax(0,1fr) auto minmax(0,1fr)` plus Home
+ * in the trailing column, so the three score regions cannot overlap.
+ */
+export function resolveHudZoneGeometry(layout, options = {}) {
+  const width = Math.max(0, Number(layout?.safeW) || 0);
+  const chrome = Math.max(0, Number(layout?.chromeHeight) || 0);
+  const pad = hudPadX(width);
+  const gap = hudColGap(width);
+  const home = hudHomeSize(layout?.uiScale);
+  const avatar = Number(layout?.hudAvatar) || 0;
+  const clusterGap = hudClusterGap(width);
+  const target = Number(options.target);
+  const matchTarget = Number.isFinite(target) && target > 0 ? target : 150;
+  const centerW = estimateMatchPointsWidth(matchTarget);
+  const inner = Math.max(0, width - pad * 2);
+  const sideCol = Math.max(0, (inner - centerW - gap * 2) / 2);
+  const human = {
+    left: pad,
+    right: pad + sideCol,
+    top: 0,
+    bottom: chrome,
+  };
+  const matchPoints = {
+    left: human.right + gap,
+    right: human.right + gap + centerW,
+    top: 0,
+    bottom: chrome,
+  };
+  const endLeft = matchPoints.right + gap;
+  const rival = {
+    left: endLeft,
+    right: endLeft + Math.max(0, sideCol - home - HUD_TOOLS_GAP_PX),
+    top: 0,
+    bottom: chrome,
+  };
+  const homeBox = {
+    left: pad + inner - home,
+    right: pad + inner,
+    top: 0,
+    bottom: chrome,
+  };
+  const scoreFont = Number(layout?.hudScore) || 0;
+  const scoreDigits = Math.max(
+    String(Math.abs(Number(options.humanScore) || 0)).length,
+    String(Math.abs(Number(options.rivalScore) || 0)).length,
+    String(matchTarget).length
+  );
+  const scoreW = estimateHudScoreWidth(scoreFont, scoreDigits);
+  return {
+    pad,
+    gap,
+    home,
+    avatar,
+    clusterGap,
+    centerW,
+    sideCol,
+    scoreFont,
+    scoreW,
+    human,
+    matchPoints,
+    rival,
+    homeBox,
+  };
+}
+
+function packPortraitHudAvatar(safeW, preferred, uiScale) {
+  const zones = resolveHudZoneGeometry(
+    {
+      safeW,
+      chromeHeight: 80,
+      hudAvatar: preferred,
+      uiScale,
+      hudScore: HUD_SCORE_MIN_PX,
+    },
+    { target: 150, humanScore: 150, rivalScore: 150 }
+  );
+  const rivalW = Math.max(0, zones.rival.right - zones.rival.left);
+  const scoreW = estimateHudScoreWidth(HUD_SCORE_MIN_PX, 3);
+  const maxAvatar = Math.floor(rivalW - zones.clusterGap - scoreW);
+  return clamp(Math.min(preferred, maxAvatar), 44, 64);
+}
+
+function packPortraitHudScore(safeW, hudAvatar, uiScale, preferred) {
+  const zones = resolveHudZoneGeometry(
+    { safeW, chromeHeight: 80, hudAvatar, uiScale, hudScore: preferred },
+    { target: 150, humanScore: 150, rivalScore: 150 }
+  );
+  const rivalBudget = Math.max(
+    0,
+    zones.rival.right - zones.rival.left - hudAvatar - zones.clusterGap
+  );
+  const fromBudget = Math.floor(rivalBudget / (HUD_SCORE_GLYPH * 3));
+  return clamp(Math.min(preferred, fromBudget), HUD_SCORE_MIN_PX, HUD_SCORE_MAX_PX);
 }
 
 function occupancyLongCap(usableH, usableW) {
@@ -363,12 +504,21 @@ export function resolveGameplayLayout(viewport, options = {}) {
     ? clamp(Math.round(handLong * 0.7 + 6), PORTRAIT_OPPONENT_RAIL_MIN_PX, PORTRAIT_OPPONENT_RAIL_MAX_PX)
     : 0;
 
-  const hudAvatar = portrait
+  const preferredAvatar = portrait
     ? clamp(chromeHeight - 16, 44, 64)
     : clamp(Math.round(chromeHeight * 0.4), 30, 46);
-  const hudScore = portrait
-    ? clamp(Math.round(hudAvatar * 0.58), 24, 38)
+  const hudAvatar = portrait
+    ? packPortraitHudAvatar(safeW, preferredAvatar, uiScale)
+    : preferredAvatar;
+  const preferredHudScore = portrait
+    ? clamp(Math.round(hudAvatar * 0.58), HUD_SCORE_MIN_PX, HUD_SCORE_MAX_PX)
     : clamp(Math.round(hudAvatar * 0.5), 16, 24);
+  const hudScore = portrait
+    ? packPortraitHudScore(safeW, hudAvatar, uiScale, preferredHudScore)
+    : preferredHudScore;
+  const hudPad = hudPadX(safeW);
+  const hudGap = hudColGap(safeW);
+  const hudHome = hudHomeSize(uiScale);
 
   const feltHeight = Math.max(
     160,
@@ -463,6 +613,9 @@ export function resolveGameplayLayout(viewport, options = {}) {
     handExclusion: 0,
     hudAvatar,
     hudScore,
+    hudPad,
+    hudColGap: hudGap,
+    hudHome,
     density: gameplayDensityClass({ safeW, safeH }),
     orientation: portrait ? "portrait" : "landscape",
   };
@@ -641,6 +794,9 @@ export function gameplayLayoutCssVars(layout) {
     "--game-dock-col-gap": px(layout.colGap ?? (layout.orientation === "portrait" ? PORTRAIT_DOCK_COL_GAP_PX : DOCK_COL_GAP_PX), 0),
     "--game-hud-avatar": px(layout.hudAvatar, 0),
     "--game-hud-score": px(layout.hudScore, 0),
+    "--game-hud-pad": px(layout.hudPad ?? hudPadX(layout.safeW)),
+    "--game-hud-col-gap": px(layout.hudColGap ?? hudColGap(layout.safeW)),
+    "--game-hud-home": px(layout.hudHome ?? hudHomeSize(layout.uiScale), 0),
   };
 }
 

@@ -50,6 +50,7 @@ function BoardContainer({
   debug: debugProp = null,
   scoreHighlights = [],
   hiddenIds = null,
+  rulesetId = "",
 }) {
   const stageRef = useRef(null);
   const probeRef = useRef(null);
@@ -154,6 +155,7 @@ function BoardContainer({
           spinnerNorth: topology.branches.SPINNER_TOP,
           spinnerSouth: topology.branches.SPINNER_BOTTOM,
           topology,
+          rulesetId,
         }
       );
 
@@ -196,7 +198,7 @@ function BoardContainer({
     const resolved = preferredReport.ok || preferred.tiles.length > 0 ? preferred : build(null);
 
     return resolved;
-  }, [tiles, centerIndex, area, tileSize, newestId, spinnerId, spinnerNorth, spinnerSouth, handExclusionPx]);
+  }, [tiles, centerIndex, area, tileSize, newestId, spinnerId, spinnerNorth, spinnerSouth, handExclusionPx, rulesetId]);
 
   const { placements, armPlacements, tileScale, debug, gap, camera } = layout;
   // Pan is exploratory UX only — engine must not rely on overflow+pan.

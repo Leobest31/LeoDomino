@@ -38,7 +38,8 @@ export const PLAY_SCORE_HOLD_MS = 2000;
  * @returns {boolean}
  */
 export function usesAllFivesSpinner(state) {
-  return state?.rulesetId === "allFives";
+  const id = state?.rulesetId;
+  return id === "allFives" || id === "american";
 }
 
 /**
@@ -577,5 +578,5 @@ export function hudScoresDuringHold({
  */
 export function shouldShowPlayScorePopup(points) {
   const pts = Number(points);
-  return Number.isFinite(pts) && pts >= 10 && pts % 5 === 0;
+  return Number.isFinite(pts) && pts > 0 && pts % 5 === 0;
 }

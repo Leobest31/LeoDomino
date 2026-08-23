@@ -247,8 +247,10 @@ function record(pip, state, rep) {
   const liveFive = score([spin(0), rightArm(0, 5)], { spinnerId: "0-0" });
   assert.deepEqual(valuesOf(liveFive), { right: 5, spinner: 0 });
   assert.equal(liveFive.exposedTotal, 5);
-  assert.equal(liveFive.pointsAwarded, 0);
-  assert.deepEqual(liveFive.highlights, []);
+  assert.equal(liveFive.pointsAwarded, 5);
+  assert.equal(liveFive.highlights.length, 1);
+  assert.equal(liveFive.highlights[0].contribution, 5);
+  awards.push({ pts: 5, example: liveFive });
 
   const plus10 = score([spin(5)], { spinnerId: "5-5" });
   assert.equal(plus10.exposedTotal, 10);
@@ -303,7 +305,7 @@ function record(pip, state, rep) {
 
   assert.equal(score([spin(6), rightArm(6, 1)], { spinnerId: "6-6" }).pointsAwarded, 0);
 
-  section("reachable awards +10/+15/+20/+25/+30; live 5 and 13 stay 0");
+  section("reachable awards +10/+15/+20/+25/+30; 8 and 13 stay 0");
 }
 
 {

@@ -169,14 +169,18 @@ function section(title) {
 }
 
 {
-  // Sibling styles unchanged.
-  assert.equal(resolveRuleset(AMERICAN_RULESET_ID).defaultTargetScore, 100);
+  // Classic stays pip-to-100. American now uses the same live count scoring.
   assert.equal(resolveRuleset(LEGACY_RULESET_ID).defaultTargetScore, 100);
   assert.equal(
-    resolveRuleset(AMERICAN_RULESET_ID).policies.calculateRoundPoints,
+    resolveRuleset(LEGACY_RULESET_ID).policies.calculateRoundPoints,
     calculateRoundPoints
   );
-  section("Classic / American round-end unchanged");
+  assert.equal(resolveRuleset(AMERICAN_RULESET_ID).defaultTargetScore, 150);
+  assert.equal(
+    resolveRuleset(AMERICAN_RULESET_ID).policies.scorePlay,
+    resolveRuleset(ALL_FIVES_RULESET_ID).policies.scorePlay
+  );
+  section("Classic round-end unchanged; American shares All Fives count scoring");
 }
 
 console.log("\nAll Fives ruleset tests passed.");

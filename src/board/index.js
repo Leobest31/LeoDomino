@@ -24,6 +24,8 @@ export {
   packFirstRunLimit,
   packLaterRunSearchLimit,
   packSpinnerArmLimit,
+  parallelRunClearance,
+  usesAmericanBoardLayout,
   SPINNER_MAIN_STRAIGHT,
   SPINNER_ARM_STRAIGHT,
   FIRST_FOLD_RIGHT,

@@ -61,17 +61,46 @@
   );
   --home-card-depth: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
+  /* Compact to the visible Safari visual viewport. 844px chrome-less
+     portrait is the clamp max (approved laptop preview). Shorter visual
+     heights — iOS toolbars — use the middle term, not the 844px floor. */
+  --home-vvh: 100svh;
+  --home-vv-top: 0px;
+  --home-header-h: clamp(48px, calc(var(--home-vvh) * 0.08 - 5px), 62px);
+  --home-status-h: clamp(44px, calc(var(--home-vvh) * 0.068 - 1px), 56px);
+  --home-gap: clamp(6px, calc(var(--home-vvh) * 0.045 - 24px), 14px);
+  --home-pad-y: clamp(6px, calc(var(--home-vvh) * 0.023 - 7px), 12px);
+  --home-card-pad: clamp(8px, calc(var(--home-vvh) * 0.023 - 7px), 12px);
+  --home-league-pad: clamp(8px, calc(var(--home-vvh) * 0.034 - 15px), 14px);
+  --home-league-min: clamp(100px, calc(var(--home-vvh) * 0.28 - 95px), 141px);
+  --home-play-min: clamp(68px, calc(var(--home-vvh) * 0.2 - 74px), 95px);
+  --home-mode-min: clamp(118px, calc(var(--home-vvh) * 0.4 - 152px), 186px);
+  --home-tourney-min: clamp(76px, calc(var(--home-vvh) * 0.22 - 79px), 107px);
+  --home-store-min: clamp(68px, calc(var(--home-vvh) * 0.18 - 61px), 91px);
+  --home-mode-icon: clamp(28px, calc(var(--home-vvh) * 0.068 - 17px), 40px);
+  --home-leo-avatar: clamp(44px, calc(var(--home-vvh) * 0.068 - 1px), 56px);
+  --home-stack-gap: clamp(4px, calc(var(--home-vvh) * 0.023 - 11px), 8px);
+
   position: relative;
+  top: var(--home-vv-top, 0px);
   z-index: 40;
   box-sizing: border-box;
   width: 100%;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100svh;
+  height: 100dvh;
+  height: var(--home-vvh);
+  max-height: 100svh;
+  max-height: 100dvh;
+  max-height: var(--home-vvh);
   background: var(--home-navy);
   color: var(--home-ink);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .home__atmosphere {
@@ -113,8 +142,8 @@
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  height: 62px;
-  padding: 12px 16px;
+  height: var(--home-header-h);
+  padding: var(--home-pad-y) 16px;
   background: var(--home-navy);
 }
 
@@ -309,8 +338,8 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-  height: 56px;
-  padding: 10px 12px;
+  height: var(--home-status-h);
+  padding: 8px 12px;
   border-top: 1px solid var(--home-hairline);
   border-bottom: 1px solid var(--home-hairline);
   background: var(--home-card);
@@ -477,10 +506,10 @@
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   width: 100%;
-  padding: 12px 14px calc(var(--home-nav-h) + 28px + env(safe-area-inset-bottom));
+  padding: var(--home-pad-y) 14px calc(var(--home-nav-h) + 12px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--home-gap);
 }
 
 .home__card,
@@ -494,39 +523,39 @@
 .home__card {
   display: grid;
   width: 100%;
-  padding: 12px;
+  padding: var(--home-card-pad);
   border-radius: 14px;
 }
 
 .home__card--play {
-  min-height: 95px;
-  padding: 12px;
+  min-height: var(--home-play-min);
+  padding: var(--home-card-pad);
 }
 
 .home__card--store {
-  min-height: 91px;
+  min-height: var(--home-store-min);
   padding: 0;
   border-radius: 14px;
 }
 
 .home__leo-layout {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 90px;
+  grid-template-columns: var(--home-leo-avatar) minmax(0, 1fr) 90px;
   align-items: center;
   gap: 10px;
 }
 
 .home__leo-identity {
   position: relative;
-  width: 56px;
-  height: 56px;
+  width: var(--home-leo-avatar);
+  height: var(--home-leo-avatar);
   flex-shrink: 0;
 }
 
 .home__leo-identity .home-leo-art,
 .home__leo-identity .home-leo-art__ring {
-  width: 56px;
-  height: 56px;
+  width: var(--home-leo-avatar);
+  height: var(--home-leo-avatar);
 }
 
 .home__leo-identity .home-leo-art__ring {
@@ -581,7 +610,7 @@
 
 .home__leo-side .home-dominos {
   width: 80px;
-  height: 40px;
+  height: clamp(32px, calc(var(--home-vvh) * 0.0474), 40px);
 }
 
 .home__card-title {
@@ -741,7 +770,7 @@
 
 .home__resume {
   width: 100%;
-  min-height: 32px;
+  min-height: clamp(28px, calc(var(--home-vvh) * 0.038), 32px);
   padding: 0 10px;
   border-radius: 8px;
   border: 1px solid #ffe599;
@@ -773,9 +802,9 @@
   align-items: center;
   justify-content: flex-start;
   gap: 0;
-  min-height: 186px;
+  min-height: var(--home-mode-min);
   height: 100%;
-  padding: 12px 10px 10px;
+  padding: var(--home-card-pad) 8px 8px;
   text-align: center;
   border-radius: 12px;
   color: var(--home-ink);
@@ -784,7 +813,7 @@
 .home-mode__title {
   width: 100%;
   max-width: 100%;
-  margin: 0 0 8px;
+  margin: 0 0 var(--home-stack-gap);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.5px;
@@ -802,9 +831,9 @@
 .home-mode__icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  margin: 2px 0 10px;
+  width: var(--home-mode-icon);
+  height: var(--home-mode-icon);
+  margin: 0 0 var(--home-stack-gap);
   overflow: hidden;
   color: var(--home-emerald);
   filter: drop-shadow(0 0 5px rgba(0, 230, 118, 0.4));
@@ -813,8 +842,8 @@
 
 .home-mode__icon svg,
 .home-mode__icon .home-glyph {
-  width: 40px;
-  height: 40px;
+  width: var(--home-mode-icon);
+  height: var(--home-mode-icon);
 }
 
 .home-mode[data-home-card="online"] .home-mode__icon {
@@ -850,7 +879,7 @@
 .home-mode__sub {
   width: 94%;
   max-width: 100px;
-  min-height: 26px;
+  min-height: clamp(22px, calc(var(--home-vvh) * 0.031), 26px);
   margin: 0 auto;
   color: var(--home-muted);
   font-size: 9px;
@@ -926,8 +955,8 @@
 }
 
 .home__card--league {
-  min-height: 141px;
-  padding: 14px;
+  min-height: var(--home-league-min);
+  padding: var(--home-league-pad);
   border-color: rgba(255, 215, 0, 0.2);
   border-radius: 16px;
   background: var(--home-league);
@@ -943,11 +972,9 @@
   gap: 12px;
 }
 
-.home__league-art {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  width: 110px;
+.home__league-art .home-emblem {
+  width: clamp(52px, calc(var(--home-vvh) * 0.0758), 64px);
+  height: clamp(52px, calc(var(--home-vvh) * 0.0758), 64px);
 }
 
 .home__league-art .home__eyebrow {
@@ -958,7 +985,7 @@
 .home__league-copy {
   min-width: 0;
   display: grid;
-  gap: 8px;
+  gap: var(--home-stack-gap);
 }
 
 .home__eyebrow {
@@ -999,14 +1026,14 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  font-size: 20px;
+  font-size: clamp(16px, calc(var(--home-vvh) * 0.0237), 20px);
   font-weight: 800;
   line-height: 1.2;
 }
 
 .home__lp-hero span {
   margin-left: 4px;
-  font-size: 20px;
+  font-size: clamp(16px, calc(var(--home-vvh) * 0.0237), 20px);
   font-weight: 800;
 }
 
@@ -1056,7 +1083,7 @@
   display: flex;
   justify-content: center;
   gap: 6px;
-  padding-bottom: 4px;
+  padding-bottom: 2px;
 }
 
 .home__dot {
@@ -1083,8 +1110,8 @@
 }
 
 .home__card--promo {
-  min-height: 107px;
-  gap: 10px;
+  min-height: var(--home-tourney-min);
+  gap: var(--home-gap);
 }
 
 .home__tourney-icon {
@@ -1195,7 +1222,7 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 12px;
+  padding: var(--home-card-pad);
   border: 0;
   background: transparent;
   color: inherit;
@@ -1206,8 +1233,8 @@
 
 .home__store-wrap {
   display: block;
-  width: 48px;
-  height: 48px;
+  width: clamp(40px, calc(var(--home-vvh) * 0.057), 48px);
+  height: clamp(40px, calc(var(--home-vvh) * 0.057), 48px);
   flex-shrink: 0;
   filter: drop-shadow(0 0 10px rgba(255, 184, 0, 0.35));
 }
@@ -1235,9 +1262,10 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: calc(var(--home-nav-h) + env(safe-area-inset-bottom));
+  flex-shrink: 0;
+  height: calc(var(--home-nav-h) + env(safe-area-inset-bottom, 0px));
   margin: 0;
-  padding: 8px 16px calc(4px + env(safe-area-inset-bottom));
+  padding: 8px 16px calc(4px + env(safe-area-inset-bottom, 0px));
   overflow: visible;
   border-top: 1px solid var(--home-hairline);
   background: rgba(6, 8, 12, 0.97);
@@ -1316,7 +1344,7 @@
 .home__notice {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--home-nav-h) + 12px + env(safe-area-inset-bottom));
+  bottom: calc(var(--home-nav-h) + 12px + env(safe-area-inset-bottom, 0px));
   z-index: 4;
   transform: translateX(-50%);
   width: min(320px, calc(100% - 24px));

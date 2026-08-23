@@ -214,6 +214,7 @@ export {
   HAITIAN_MATCH_TARGET,
   haitianRuleset,
   AMERICAN_RULESET_ID,
+  AMERICAN_MATCH_TARGET,
   americanRuleset,
   DOMINICAN_RULESET_ID,
   dominicanRuleset,

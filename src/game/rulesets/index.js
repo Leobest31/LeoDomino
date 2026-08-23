@@ -15,6 +15,7 @@ export {
 
 export {
   AMERICAN_RULESET_ID,
+  AMERICAN_MATCH_TARGET,
   americanRuleset,
 } from "./american.js";
 

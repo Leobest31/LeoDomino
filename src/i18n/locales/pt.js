@@ -173,9 +173,9 @@ export default {
         "Duplo-seis · 7 peças · duas pontas · primeiro a 4 pontos de partida · vitória +1 · bloqueio +1 · Dekabès +2 · 6-6 abre a ronda 1",
       american: "Americano",
       americanDescription:
-        "Compre até poder jogar. Passe quando o monte estiver vazio. Primeiro a 100.",
+        "Pontuação All Fives. Marque quando as pontas somam um múltiplo de 5. Primeiro a 150.",
       americanSummary:
-        "Duplo-seis · 7 peças · duas pontas abertas · comprar até poder jogar · passar se vazio · jogar até 100",
+        "Duplo-seis · 7 peças · pontos durante o jogo · múltiplos de 5 · ramos spinner · jogar até 150",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives americano. Marque quando as pontas somam um múltiplo de 5 (mínimo 10). Primeiro a 200.",

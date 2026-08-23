@@ -135,4 +135,23 @@ assert.equal(loadHomeProfile().level, 1);
 
 assert.doesNotMatch(home, /href=.*league|navigate.*store/i, "Coming Soon cards do not route to broken screens");
 
+{
+  const homeCss = read("pages/HomePage.css");
+  assert.match(homeCss, /--home-vvh/, "Home tracks the visual viewport height");
+  assert.match(homeCss, /100svh/, "Home falls back to svh");
+  assert.match(homeCss, /100dvh/, "Home falls back to dvh");
+  assert.match(homeCss, /clamp\(/, "Home uses clamp() for compact portrait sizes");
+  assert.match(
+    homeCss,
+    /env\(safe-area-inset-bottom/,
+    "bottom navigation accounts for the iOS safe area"
+  );
+  assert.doesNotMatch(homeCss, /iPhone\s*16/i, "Home has no device-name CSS hacks");
+  assert.doesNotMatch(
+    homeCss,
+    /\.home\s*\{[^}]*transform:\s*scale\(/,
+    "Home is not globally scaled"
+  );
+}
+
 console.log("  ✓ Home + Play vs LeoBest flow contract");

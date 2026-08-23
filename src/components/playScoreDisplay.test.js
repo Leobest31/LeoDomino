@@ -26,7 +26,7 @@ const gamePage = readFileSync(join(here, "../pages/GamePage.jsx"), "utf8");
 {
   assert.equal(PLAY_SCORE_HOLD_MS, 2000);
   assert.equal(MOTION.playScoreHoldMs, 2000);
-  for (const pts of [10, 15, 20, 25]) {
+  for (const pts of [5, 10, 15, 20, 25]) {
     assert.equal(shouldShowPlayScorePopup(pts), true, `+${pts} uses the same popup`);
     const during = hudScoresDuringHold({
       scores: [20 + pts, 0],
@@ -54,8 +54,8 @@ const gamePage = readFileSync(join(here, "../pages/GamePage.jsx"), "utf8");
     assert.deepEqual(after, [20 + pts, 0], `+${pts} HUD after 2s`);
   }
   assert.equal(shouldShowPlayScorePopup(0), false);
-  assert.equal(shouldShowPlayScorePopup(5), false);
-  section("J/K. valid +10/+15/+20/+25 share felt +N then 2s HUD; live 5 has no popup");
+  assert.equal(shouldShowPlayScorePopup(7), false);
+  section("J/K. valid +5/+10/+15/+20/+25 share felt +N then 2s HUD; non-multiples have no popup");
 }
 
 {
