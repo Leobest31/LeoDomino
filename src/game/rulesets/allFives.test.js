@@ -55,10 +55,7 @@ function section(title) {
   assert.equal(normalizeGameStyleId("allFives"), "allFives");
   assert.equal(normalizeGameStyleId(ALL_FIVES_RULESET_ID), "allFives");
   assert.ok(listAvailableGameStyles().some((s) => s.id === "allFives"));
-  assert.equal(
-    listAvailableGameStyles().some((s) => s.id === "american"),
-    false
-  );
+  assert.ok(listAvailableGameStyles().some((s) => s.id === "american"));
   assert.equal(flagEmoji(style), "🇺🇸");
   assert.ok(flagDataUrl(style).startsWith("data:image/svg+xml"));
   assert.equal(isGameStyleCompatibleWithPlayerCount("allFives", 2), true);

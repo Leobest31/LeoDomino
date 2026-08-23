@@ -74,7 +74,6 @@ function advance(state) {
   const home = read("pages/HomePage.jsx");
   const style = read("pages/GameStylePage.jsx");
   const app = read("App.jsx");
-  const setup = read("pages/GameSetupPage.jsx");
   const settings = read("components/SettingsPanel.jsx");
   const page = read("pages/GamePage.jsx");
   assert.doesNotMatch(app, /GameSetupPage/, "App no longer mounts Setup as the hub");
@@ -84,8 +83,6 @@ function advance(state) {
   assert.doesNotMatch(home, /PLAYER_COUNTS/, "Home has no 3/4 player chips");
   assert.doesNotMatch(style, /PLAYER_COUNTS/, "Game Style has no player-count selector");
   assert.doesNotMatch(style, /t\("game\.playersN"/, "Game Style does not list player counts");
-  assert.doesNotMatch(setup, /PLAYER_COUNTS/, "setup has no 3/4 player chips");
-  assert.doesNotMatch(setup, /t\("game\.playersN"/, "setup does not list player counts");
   assert.doesNotMatch(settings, /onPlayerCountChange/, "settings has no player-count control");
   assert.match(style, /V1_PLAYER_COUNT/, "Game Style locks V1 to two seats");
   assert.match(style, /data-game-style-play/, "Game Style has a Play button");

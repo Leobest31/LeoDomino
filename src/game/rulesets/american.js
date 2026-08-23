@@ -1,8 +1,7 @@
 /**
  * American Draw Dominoes ruleset.
- * Engine id is "american". The separate American Game Style option is
- * withdrawn; All Fives is the selectable US-style mode. This ruleset stays
- * registered so in-progress american saves can still resume.
+ * Engine id is "american". V1 Play vs LeoBest exposes this as the American
+ * Game Style. Gameplay matches Classic/legacy behind a distinct id.
  *
  * Audit: Classic/legacy already implements American Draw behavior
  * (double-six, hand 7, draw-until-playable, pass when empty, sum opponent

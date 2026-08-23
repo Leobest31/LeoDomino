@@ -155,26 +155,11 @@ export default {
     tagline: "Mesa clássica",
   },
   setup: {
-    aria: "Configuração de partida LeoDomino",
-    title: "Configuração",
-    vsLeoBest: "Você contra LeoBest",
-    difficulty: "Dificuldade IA",
-    difficultyAdvanced: "Avançado",
-    soundOn: "Ligado",
-    soundOff: "Desligado",
     resumeMatch: "Retomar partida",
     comingSoonLegend: "Em breve",
-    onlineLabel: "Multijogador online",
-    onlineSubtitle: "Jogue com jogadores nos seus próprios telemóveis/tablets",
-    onlineComingSoon: "Multijogador online — Em breve",
-    leagueLabel: "Liga",
-    leagueSubtitle: "Rankings • Campeonatos • Épocas",
-    leagueSoon: "Em breve",
-    leagueComingSoon: "Liga — Em breve",
     gameStyle: {
       label: "Estilo de jogo",
       aria: "Escolher estilo de jogo",
-      openAria: "Abrir ecrã de estilo de jogo",
       screenAria: "Ecrã de estilo de jogo LeoDomino",
       classic: "Clássico",
       classicDescription:
@@ -188,9 +173,9 @@ export default {
         "Duplo-seis · 7 peças · duas pontas · primeiro a 4 pontos de partida · vitória +1 · bloqueio +1 · Dekabès +2 · 6-6 abre a ronda 1",
       american: "Americano",
       americanDescription:
-        "Marque quando as pontas somam um múltiplo de 5 (mínimo 10). Compre até poder jogar. Primeiro a 200.",
+        "Compre até poder jogar. Passe quando o monte estiver vazio. Primeiro a 100.",
       americanSummary:
-        "Duplo-seis · 7 peças · pontos durante o jogo · múltiplos de 5 a partir de 10 · fim da ronda ao 5 mais próximo · jogar até 200",
+        "Duplo-seis · 7 peças · duas pontas abertas · comprar até poder jogar · passar se vazio · jogar até 100",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives americano. Marque quando as pontas somam um múltiplo de 5 (mínimo 10). Primeiro a 200.",
@@ -206,8 +191,6 @@ export default {
         "Padrão porto-riquenho. Sem comprar — passe se não puder jogar. Pontos de pips até 200. Parcerias voltam numa versão futura.",
       puertoricanSummary:
         "Duplo-seis · 2 jogadores · 14 cada · sem reserva · passar se bloqueado · pips até 200 · 6-6 abre a ronda 1",
-      unsupportedPlayerCount:
-        "{{style}} não está disponível para {{n}} jogadores. Escolha um número de jogadores suportado ou outro estilo.",
       chooseThenPlay: "Escolha um estilo de jogo e depois Jogar.",
     },
   },

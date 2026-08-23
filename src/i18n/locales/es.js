@@ -155,26 +155,11 @@ export default {
     tagline: "Mesa clásica",
   },
   setup: {
-    aria: "Configuración de partida LeoDomino",
-    title: "Configuración",
-    vsLeoBest: "Tú contra LeoBest",
-    difficulty: "Dificultad IA",
-    difficultyAdvanced: "Avanzado",
-    soundOn: "Activado",
-    soundOff: "Apagado",
     resumeMatch: "Reanudar partida",
     comingSoonLegend: "Próximamente",
-    onlineLabel: "Multijugador en línea",
-    onlineSubtitle: "Juega con jugadores en sus propios móviles/tablets",
-    onlineComingSoon: "Multijugador en línea — Próximamente",
-    leagueLabel: "Liga",
-    leagueSubtitle: "Clasificaciones • Campeonatos • Temporadas",
-    leagueSoon: "Próximamente",
-    leagueComingSoon: "Liga — Próximamente",
     gameStyle: {
       label: "Estilo de juego",
       aria: "Elegir estilo de juego",
-      openAria: "Abrir pantalla de estilo de juego",
       screenAria: "Pantalla de estilo de juego LeoDomino",
       classic: "Clásico",
       classicDescription:
@@ -188,9 +173,9 @@ export default {
         "Doble seis · 7 fichas · dos extremos · primero a 4 puntos de partida · victoria +1 · bloqueo +1 · Dekabès +2 · 6-6 abre la ronda 1",
       american: "Americano",
       americanDescription:
-        "Anota cuando los extremos suman un múltiplo de 5 (mínimo 10). Roba hasta poder jugar. Primero a 200.",
+        "Roba hasta poder jugar. Pasa cuando el pozo está vacío. Primero a 100.",
       americanSummary:
-        "Doble seis · 7 fichas · puntos en juego · múltiplos de 5 desde 10 · fin de ronda al 5 más cercano · jugar a 200",
+        "Doble seis · 7 fichas · dos extremos abiertos · robar hasta poder jugar · pasar si vacío · jugar a 100",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives americano. Anota cuando los extremos suman un múltiplo de 5 (mínimo 10). Primero a 200.",
@@ -206,8 +191,6 @@ export default {
         "Estándar puertorriqueño. Sin robar — pasa si no puedes jugar. Puntos de pipas hasta 200. Las parejas volverán en una versión futura.",
       puertoricanSummary:
         "Doble seis · 2 jugadores · 14 cada uno · sin reserva · pasar si bloqueado · pipas a 200 · 6-6 abre la ronda 1",
-      unsupportedPlayerCount:
-        "{{style}} no está disponible para {{n}} jugadores. Elige un número de jugadores compatible u otro estilo.",
       chooseThenPlay: "Elige un estilo de juego y luego Jugar.",
     },
   },

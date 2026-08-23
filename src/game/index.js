@@ -236,6 +236,8 @@ export {
   resolveHandSize,
   isPlayerCountSupported,
   listAvailableGameStyles,
+  listV1GameStyles,
+  V1_GAME_STYLE_IDS,
   listGameStyles,
   getGameStyle,
   gameStyleToRulesetId,

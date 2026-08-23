@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_HOME_PROFILE, loadHomeProfile } from "../persistence/homeProfile.js";
-import { listAvailableGameStyles } from "../data/gameStyles.js";
+import { listV1GameStyles } from "../data/gameStyles.js";
 import { V1_PLAYER_COUNT } from "../game/v1Product.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -16,7 +16,6 @@ const read = (rel) => readFileSync(join(root, rel), "utf8");
 const app = read("App.jsx");
 const home = read("pages/HomePage.jsx");
 const style = read("pages/GameStylePage.jsx");
-const setup = read("pages/GameSetupPage.jsx");
 const page = read("pages/GamePage.jsx");
 
 assert.match(app, /"intro" \| "home" \| "gameStyle" \| "game"/, "App phases are Home-first");
@@ -107,19 +106,28 @@ assert.doesNotMatch(style, /persistAndReturn/, "selecting a style does not leave
   );
   assert.doesNotMatch(selectBlock, /onBack/, "style selection stays on Game Style");
 }
-assert.match(style, /listAvailableGameStyles/, "keeps current V1 Game Styles");
+assert.match(style, /listV1GameStyles/, "V1 Game Style picker is Classic/Haitian/American");
+assert.doesNotMatch(style, /listAvailableGameStyles/, "picker does not use the full engine catalog");
 
 assert.equal(V1_PLAYER_COUNT, 2, "product player count is 1v1");
-const styles = listAvailableGameStyles();
-assert.ok(styles.length >= 5, "V1 Game Styles remain listed");
+const styles = listV1GameStyles();
+assert.deepEqual(
+  styles.map((entry) => entry.id),
+  ["classic", "haitian", "american"],
+  "V1 picker shows Classic, Haitian, and American only"
+);
 assert.ok(
-  styles.every((entry) => entry.id !== "american" || entry.enabled === false),
-  "withdrawn American is not a selectable V1 style"
+  styles.every((entry) => entry.enabled !== false && entry.available),
+  "V1 picker styles are selectable"
+);
+assert.equal(
+  styles.some((entry) => entry.id === "allFives" || entry.id === "dominican" || entry.id === "puertorican"),
+  false,
+  "All Fives, Dominican, and Puerto Rican are not in the V1 picker"
 );
 
 assert.match(page, /game\.leoBest/, "table opponent is LeoBest");
 assert.match(page, /<ReservePicker/, "reserve interaction remains");
-assert.doesNotMatch(setup, /PLAYER_COUNTS/, "legacy Setup still has no 3P/4P chips");
 
 assert.equal(DEFAULT_HOME_PROFILE.leoCoins, 250);
 assert.equal(loadHomeProfile().leoCoins, 250);

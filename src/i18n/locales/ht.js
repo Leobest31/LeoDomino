@@ -158,26 +158,11 @@ export default {
     tagline: "Mesa klasik",
   },
   setup: {
-    aria: "Konfigirasyon jwèt LeoDomino",
-    title: "Konfigirasyon",
-    vsLeoBest: "Ou kont LeoBest",
-    difficulty: "Nivo AI",
-    difficultyAdvanced: "Avanse",
-    soundOn: "Aktive",
-    soundOff: "Fèmen",
     resumeMatch: "Kontinye match la",
     comingSoonLegend: "Byento",
-    onlineLabel: "Multijwè sou entènèt",
-    onlineSubtitle: "Jwe ak moun sou pwòp telefòn oswa tablèt yo",
-    onlineComingSoon: "Multijwè sou entènèt — Byento",
-    leagueLabel: "Lig",
-    leagueSubtitle: "Klasman • Chanpyona • Sezon",
-    leagueSoon: "Byento",
-    leagueComingSoon: "Lig — Byento",
     gameStyle: {
       label: "Stil jwèt",
       aria: "Chwazi stil jwèt la",
-      openAria: "Louvri ekran stil jwèt",
       screenAria: "Ekran stil jwèt LeoDomino",
       classic: "Klasik",
       classicDescription:
@@ -191,9 +176,9 @@ export default {
         "Doub-sis · 7 donmino · de bout ouvè · premye ki rive 4 pwen match · genyen +1 · bloke +1 · Dekabès +2 · 6-6 louvri premye wo a",
       american: "Ameriken",
       americanDescription:
-        "Fè pwen lè bout ouvè yo ajoute yon miltip 5 (minimòm 10). Tire jiskaske ou ka jwe. Premye ki rive 200.",
+        "Tire jiskaske ou ka jwe. Pase lè rezèv la vid. Premye ki rive 100.",
       americanSummary:
-        "Doub-sis · 7 donmino · pwen pandan jwèt · miltip 5 depi 10 · fen wo a awondi a 5 · jwe jiska 200",
+        "Doub-sis · 7 donmino · de bout ouvè · tire jiskaske ou ka jwe · pase lè vid · jwe jiska 100",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives Ameriken. Fè pwen lè bout ouvè yo ajoute yon miltip 5 (minimòm 10). Premye ki rive 200.",
@@ -209,8 +194,6 @@ export default {
         "Estanda Pòtoriken. Pa gen tire — pase lè ou pa ka jwe. Pwen pip jiska 200. Patenarya ap tounen nan yon vèsyon kap vini.",
       puertoricanSummary:
         "Doub-sis · 2 jwè · 14 chak · pa gen rezèv · pase lè bloke · pwen pip jiska 200 · 6-6 louvri premye wo a",
-      unsupportedPlayerCount:
-        "{{style}} pa disponib pou {{n}} jwè. Chwazi yon kantite jwè ki sipòte oswa yon lòt stil.",
       chooseThenPlay: "Chwazi yon stil jwèt, epi jwe.",
     },
   },

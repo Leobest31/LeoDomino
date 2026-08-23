@@ -155,26 +155,11 @@ export default {
     tagline: "Table classique",
   },
   setup: {
-    aria: "Configuration de partie LeoDomino",
-    title: "Configuration",
-    vsLeoBest: "Vous contre LeoBest",
-    difficulty: "Niveau IA",
-    difficultyAdvanced: "Avancé",
-    soundOn: "Activé",
-    soundOff: "Coupé",
     resumeMatch: "Reprendre la partie",
     comingSoonLegend: "Bientôt",
-    onlineLabel: "Multijoueur en ligne",
-    onlineSubtitle: "Jouez avec des joueurs sur leurs propres téléphones/tablettes",
-    onlineComingSoon: "Multijoueur en ligne — Bientôt",
-    leagueLabel: "Ligue",
-    leagueSubtitle: "Classements • Championnats • Saisons",
-    leagueSoon: "Bientôt",
-    leagueComingSoon: "Ligue — Bientôt",
     gameStyle: {
       label: "Style de jeu",
       aria: "Choisir le style de jeu",
-      openAria: "Ouvrir l’écran du style de jeu",
       screenAria: "Écran de style de jeu LeoDomino",
       classic: "Classique",
       classicDescription:
@@ -188,9 +173,9 @@ export default {
         "Double-six · 7 tuiles · deux bouts ouverts · premier à 4 points de match · victoire +1 · bloqué +1 · Dekabès +2 · 6-6 ouvre la manche 1",
       american: "Américain",
       americanDescription:
-        "Marquez quand les bouts ouverts totalisent un multiple de 5 (minimum 10). Piochez jusqu’à pouvoir jouer. Premier à 200.",
+        "Piochez jusqu’à pouvoir jouer. Passez quand la réserve est vide. Premier à 100.",
       americanSummary:
-        "Double-six · 7 tuiles · points en cours · multiples de 5 à partir de 10 · fin de manche au plus proche de 5 · jouer à 200",
+        "Double-six · 7 tuiles · deux bouts ouverts · piocher jusqu’à jouer · passer si vide · jouer à 100",
       allFives: "All Fives",
       allFivesDescription:
         "All Fives américain. Marquez quand les bouts ouverts totalisent un multiple de 5 (minimum 10). Premier à 200.",
@@ -206,8 +191,6 @@ export default {
         "Standard portoricain. Pas de pioche — passez si vous ne pouvez pas jouer. Score en pips jusqu’à 200. Les partenariats reviendront dans une version future.",
       puertoricanSummary:
         "Double-six · 2 joueurs · 14 chacun · pas de réserve · passer si bloqué · pips à 200 · 6-6 ouvre la manche 1",
-      unsupportedPlayerCount:
-        "{{style}} n’est pas disponible pour {{n}} joueurs. Choisissez un nombre de joueurs pris en charge ou un autre style.",
       chooseThenPlay: "Choisissez un style de jeu, puis Jouer.",
     },
   },

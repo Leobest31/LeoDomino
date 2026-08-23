@@ -15,14 +15,14 @@ import {
   gameStyleFlagDataUrl,
   gameStyleFlagEmoji,
   gameStyleToRulesetId,
-  listAvailableGameStyles,
+  listV1GameStyles,
   normalizeGameStyleId,
   normalizeRulesetId,
 } from "../data/gameStyles.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import "./GameStylePage.css";
 
-const GAME_STYLES = listAvailableGameStyles();
+const GAME_STYLES = listV1GameStyles();
 
 /**
  * Game Style picker for Play vs LeoBest.
@@ -32,9 +32,14 @@ const GAME_STYLES = listAvailableGameStyles();
 function GameStylePage({ onBack, onMainMenu, onPlay }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
-  const [selectedId, setSelectedId] = useState(() =>
-    normalizeGameStyleId(readStorage(RULESET_STORAGE_KEY, DEFAULT_GAME_STYLE_ID))
-  );
+  const [selectedId, setSelectedId] = useState(() => {
+    const stored = normalizeGameStyleId(
+      readStorage(RULESET_STORAGE_KEY, DEFAULT_GAME_STYLE_ID)
+    );
+    return GAME_STYLES.some((style) => style.id === stored)
+      ? stored
+      : DEFAULT_GAME_STYLE_ID;
+  });
 
   const tap = (fn) => {
     unlock();

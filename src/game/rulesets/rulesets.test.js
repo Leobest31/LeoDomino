@@ -103,20 +103,23 @@ function section(title) {
   assert.equal(normalizeGameStyleId("legacy"), "classic");
   assert.equal(normalizeGameStyleId("classic"), "classic");
   const available = listAvailableGameStyles();
-  assert.equal(available.length, 5);
+  assert.equal(available.length, 6);
   assert.equal(available[0].id, "classic");
   assert.equal(available[1].id, "haitian");
-  assert.equal(available[2].id, "allFives");
-  assert.equal(available[3].id, "dominican");
-  assert.equal(available[4].id, "puertorican");
+  assert.equal(available[2].id, "american");
+  assert.equal(available[3].id, "allFives");
+  assert.equal(available[4].id, "dominican");
+  assert.equal(available[5].id, "puertorican");
   assert.equal(available[1].countryCode, "HT");
   assert.equal(available[1].enabled, true);
   assert.equal(available[2].countryCode, "US");
   assert.equal(available[2].enabled, true);
-  assert.equal(available[3].countryCode, "DO");
+  assert.equal(available[3].countryCode, "US");
   assert.equal(available[3].enabled, true);
-  assert.equal(available[4].countryCode, "PR");
+  assert.equal(available[4].countryCode, "DO");
   assert.equal(available[4].enabled, true);
+  assert.equal(available[5].countryCode, "PR");
+  assert.equal(available[5].enabled, true);
   assert.ok(
     gameStyleFlagDataUrl(available[1]).startsWith("data:image/svg+xml"),
     "Haitian style exposes SVG flag data URL (not letter fallback)"
@@ -124,27 +127,32 @@ function section(title) {
   assert.equal(gameStyleFlagEmoji(available[1]), "🇭🇹");
   assert.ok(
     gameStyleFlagDataUrl(available[2]).startsWith("data:image/svg+xml"),
-    "All Fives style exposes SVG flag data URL"
+    "American style exposes SVG flag data URL"
   );
   assert.equal(gameStyleFlagEmoji(available[2]), "🇺🇸");
   assert.ok(
     gameStyleFlagDataUrl(available[3]).startsWith("data:image/svg+xml"),
-    "Dominican style exposes SVG flag data URL"
+    "All Fives style exposes SVG flag data URL"
   );
-  assert.equal(gameStyleFlagEmoji(available[3]), "🇩🇴");
+  assert.equal(gameStyleFlagEmoji(available[3]), "🇺🇸");
   assert.ok(
     gameStyleFlagDataUrl(available[4]).startsWith("data:image/svg+xml"),
+    "Dominican style exposes SVG flag data URL"
+  );
+  assert.equal(gameStyleFlagEmoji(available[4]), "🇩🇴");
+  assert.ok(
+    gameStyleFlagDataUrl(available[5]).startsWith("data:image/svg+xml"),
     "Puerto Rican style exposes SVG flag data URL"
   );
-  assert.equal(gameStyleFlagEmoji(available[4]), "🇵🇷");
+  assert.equal(gameStyleFlagEmoji(available[5]), "🇵🇷");
   assert.equal(gameStyleToRulesetId("haitian"), "haitian");
   assert.equal(gameStyleForRulesetId("haitian")?.id, "haitian");
   assert.equal(normalizeGameStyleId("haitian"), "haitian");
-  assert.equal(gameStyleToRulesetId("american"), null);
+  assert.equal(gameStyleToRulesetId("american"), "american");
   assert.equal(gameStyleForRulesetId("american")?.id, "american");
-  assert.equal(normalizeGameStyleId("american"), "classic");
-  assert.equal(getGameStyle("american")?.available, false);
-  assert.equal(getGameStyle("american")?.enabled, false);
+  assert.equal(normalizeGameStyleId("american"), "american");
+  assert.equal(getGameStyle("american")?.available, true);
+  assert.equal(getGameStyle("american")?.enabled, true);
   assert.equal(gameStyleToRulesetId("allFives"), "allFives");
   assert.equal(gameStyleForRulesetId("allFives")?.id, "allFives");
   assert.equal(normalizeGameStyleId("allFives"), "allFives");
@@ -157,8 +165,8 @@ function section(title) {
   assert.ok(GAME_STYLES.some((s) => s.id === "american"));
   assert.equal(
     available.some((s) => s.id === "american"),
-    false,
-    "American Draw is withdrawn from the selectable Game Style list"
+    true,
+    "American Draw is selectable in the catalog"
   );
   assert.ok(GAME_STYLES.some((s) => s.id === "allFives"));
   assert.ok(GAME_STYLES.some((s) => s.id === "dominican"));

@@ -58,10 +58,9 @@ export const GAME_STYLES = Object.freeze([
     nameKey: "setup.gameStyle.american",
     descriptionKey: "setup.gameStyle.americanDescription",
     countryCode: "US",
-    // Withdrawn from Setup / Game Style. All Fives is the US-style mode.
-    // Engine ruleset stays registered so in-progress american saves can resume.
-    enabled: false,
-    available: false,
+    // V1 Play vs LeoBest picker includes American Draw (Classic/legacy policies).
+    enabled: true,
+    available: true,
   }),
   Object.freeze({
     id: "allFives",
@@ -203,6 +202,19 @@ export function isPlayerCountSupported(ruleset, playerCount) {
  */
 export function listAvailableGameStyles() {
   return GAME_STYLES.filter((style) => style.enabled !== false && style.available);
+}
+
+/** V1 Play vs LeoBest picker — Classic, Haitian, American only. */
+export const V1_GAME_STYLE_IDS = Object.freeze(["classic", "haitian", "american"]);
+
+/**
+ * User-facing V1 Game Style list. Engine catalog may include additional styles.
+ * @returns {ReadonlyArray<object>}
+ */
+export function listV1GameStyles() {
+  return V1_GAME_STYLE_IDS.map((id) => GAME_STYLES.find((style) => style.id === id)).filter(
+    (style) => Boolean(style) && style.enabled !== false && style.available
+  );
 }
 
 /**

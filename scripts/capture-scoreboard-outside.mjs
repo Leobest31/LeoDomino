@@ -243,15 +243,15 @@ async function main() {
       });
       await cdp.send("Page.navigate", { url: APP });
 
-      // Splash → setup
-      let onSetup = false;
+      // Splash → Home / Game Style (legacy GameSetupPage is gone)
+      let onPlay = false;
       for (let i = 0; i < 80; i += 1) {
         const { result } = await cdp.send("Runtime.evaluate", {
           returnByValue: true,
-          expression: `Boolean(document.querySelector(".game-setup__play"))`,
+          expression: `Boolean(document.querySelector(".game-style__play") || document.querySelector("[data-home-cta=\\"playVsLeoBest\\"]"))`,
         });
         if (result.value) {
-          onSetup = true;
+          onPlay = true;
           break;
         }
         // Tap splash if present to advance
@@ -260,14 +260,14 @@ async function main() {
         });
         await sleep(200);
       }
-      if (!onSetup) {
-        report.push({ name: vp.name, error: "setup not ready" });
-        console.error(`${vp.name}: setup not ready`);
+      if (!onPlay) {
+        report.push({ name: vp.name, error: "home/game style not ready" });
+        console.error(`${vp.name}: home/game style not ready`);
         continue;
       }
 
       await cdp.send("Runtime.evaluate", {
-        expression: `document.querySelector(".game-setup__play")?.click()`,
+        expression: `document.querySelector("[data-home-cta=\\"playVsLeoBest\\"]")?.click(); document.querySelector(".game-style__play")?.click()`,
       });
 
       let ready = false;

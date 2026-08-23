@@ -155,26 +155,11 @@ export default {
     tagline: "Classic table",
   },
   setup: {
-    aria: "LeoDomino game setup",
-    title: "Game setup",
-    vsLeoBest: "You vs LeoBest",
-    difficulty: "AI difficulty",
-    difficultyAdvanced: "Advanced",
-    soundOn: "On",
-    soundOff: "Off",
     resumeMatch: "Resume match",
     comingSoonLegend: "Coming later",
-    onlineLabel: "Online Multiplayer",
-    onlineSubtitle: "Play with players on their own phones/tablets",
-    onlineComingSoon: "Online Multiplayer — Coming Soon",
-    leagueLabel: "League",
-    leagueSubtitle: "Rankings • Championships • Seasons",
-    leagueSoon: "Coming Soon",
-    leagueComingSoon: "League — Coming Soon",
     gameStyle: {
       label: "Game style",
       aria: "Choose game style",
-      openAria: "Open game style screen",
       screenAria: "LeoDomino game style screen",
       classic: "Classic",
       classicDescription:
@@ -188,9 +173,9 @@ export default {
         "Double-six · 7 tiles · two open ends · first to 4 match points · win +1 · blocked +1 · Dekabès +2 · 6-6 opens round 1",
       american: "American",
       americanDescription:
-        "Score when open ends total a multiple of 5 (minimum 10). Draw until you can play. First to 200.",
+        "Draw until you can play. Pass when the boneyard is empty. First to 100.",
       americanSummary:
-        "Double-six · 7 tiles · count scoring · multiples of 5 from 10 · round-end nearest 5 · play to 200",
+        "Double-six · 7 tiles · two open ends · draw until playable · pass when empty · play to 100",
       allFives: "All Fives",
       allFivesDescription:
         "American All Fives. Score when open ends total a multiple of 5 (minimum 10). First to 200.",
@@ -206,8 +191,6 @@ export default {
         "Puerto Rican Standard. No draws — pass when you cannot play. Pip scoring to 200. Partnerships return in a future version.",
       puertoricanSummary:
         "Double-six · 2 players · 14 each · no reserve · pass when stuck · pips to 200 · 6-6 opens round 1",
-      unsupportedPlayerCount:
-        "{{style}} is not available for {{n}} players. Choose a supported player count or another style.",
       chooseThenPlay: "Choose a game style, then Play.",
     },
   },

@@ -1,10 +1,9 @@
 /**
  * UI game-style catalog — single import path for Setup / Game Style screens.
  * Source of truth remains `game/rulesets`
- * (classic→legacy, haitian→haitian, allFives→allFives,
- *  dominican→dominican, puertorican→puertorican).
- * American Draw remains registered for resume but is not selectable.
- * Add future regional variants in the registry only; Configuration stays a single row.
+ * (classic→legacy, haitian→haitian, american→american,
+ *  allFives→allFives, dominican→dominican, puertorican→puertorican).
+ * V1 Play vs LeoBest picker is Classic, Haitian, American.
  */
 
 export {
@@ -17,6 +16,8 @@ export {
   gameStyleToRulesetId,
   isGameStyleCompatibleWithPlayerCount,
   listAvailableGameStyles,
+  listV1GameStyles,
+  V1_GAME_STYLE_IDS,
   listGameStyles,
   normalizeGameStyleId,
   normalizeRulesetId,
