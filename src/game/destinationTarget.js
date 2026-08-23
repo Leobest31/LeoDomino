@@ -16,15 +16,22 @@ const OUTWARD_FACES = new Set(["E", "W", "N", "S"]);
 
 /**
  * Outward exposed face of a destination tile after layout folding.
- * Spinner-hub N/S ports keep their short faces; they must not inherit the
- * spinner's main-chain travelDir.
+ * Classic spinner-hub N/S ports keep their short faces and must not inherit
+ * the spinner's main-chain travelDir. American maps hub LEFT/RIGHT to the
+ * long N/S faces and NORTH/SOUTH to the short W/E faces.
  *
  * @param {"left"|"right"|"north"|"south"} end
  * @param {unknown} travelDir
- * @param {{ spinnerHub?: boolean }} [options]
+ * @param {{ spinnerHub?: boolean, american?: boolean }} [options]
  * @returns {"E"|"W"|"N"|"S"|null}
  */
 export function resolveDestinationOutward(end, travelDir, options = {}) {
+  if (options.spinnerHub && options.american) {
+    if (end === END.NORTH) return "W";
+    if (end === END.SOUTH) return "E";
+    if (end === END.LEFT) return "S";
+    if (end === END.RIGHT) return "N";
+  }
   if (options.spinnerHub && (end === END.NORTH || end === END.SOUTH)) return null;
   if (OUTWARD_FACES.has(travelDir)) return travelDir;
   return null;

@@ -13,8 +13,6 @@ import {
   SPINNER_MAIN_STRAIGHT,
   SPINNER_ARM_STRAIGHT,
   TURN_EVERY,
-  FIRST_FOLD_LEFT,
-  FIRST_FOLD_RIGHT,
 } from "./layoutEngine.js";
 
 const locked = {
@@ -211,12 +209,13 @@ function branchFromSpinner(layout, board) {
 {
   const compact = { w: 40, h: 76 };
   const packed = fourWay(5, 5, 2, 2);
-  const layout = layoutCross(VIEWPORTS.desktop, packed.board, packed.north, packed.south, compact);
+  const tall = { width: 1280, height: 1100 };
+  const layout = layoutCross(tall, packed.board, packed.north, packed.south, compact);
   const { left, right, north, south } = branchFromSpinner(layout, packed.board);
-  assertHorizontalRun([layout.tiles.find((t) => t.tileId === "3-3"), ...left.slice(0, 5)], "compact left 1–5");
-  assertHorizontalRun([layout.tiles.find((t) => t.tileId === "3-3"), ...right.slice(0, 5)], "compact right 1–5");
-  assertVerticalRun(north.slice(0, 2), "compact top 1–2");
-  assertVerticalRun(south.slice(0, 2), "compact bottom 1–2");
+  assertVerticalRun(left.slice(0, 5), "compact left 1–5");
+  assertVerticalRun(right.slice(0, 5), "compact right 1–5");
+  assertHorizontalRun(north.slice(0, 2), "compact top 1–2");
+  assertHorizontalRun(south.slice(0, 2), "compact bottom 1–2");
   console.log("✓ 5-straight LEFT/RIGHT still holds when that rail fits at preferred size");
 }
 
@@ -235,12 +234,12 @@ function branchFromSpinner(layout, board) {
     assert.equal(right.length, 5, `${name} right count`);
     assert.equal(north.length, 2, `${name} north count`);
     assert.equal(south.length, 2, `${name} south count`);
-    assertMainFirstFold(left, "W", FIRST_FOLD_LEFT, `${name} left`);
-    assertMainFirstFold(right, "E", FIRST_FOLD_RIGHT, `${name} right`);
-    assertVerticalRun([layout.tiles.find((t) => t.tileId === "3-3"), ...north.slice(0, 2)], `${name} top 1–2`);
-    assertVerticalRun([layout.tiles.find((t) => t.tileId === "3-3"), ...south.slice(0, 2)], `${name} bottom 1–2`);
+    assertMainFirstFold(left, "S", "W", `${name} left`);
+    assertMainFirstFold(right, "N", "E", `${name} right`);
+    assertHorizontalRun(north.slice(0, 2), `${name} top 1–2`);
+    assertHorizontalRun(south.slice(0, 2), `${name} bottom 1–2`);
   }
-  console.log("✓ left/right keep locked fold direction; top/bottom 1–2 stay vertical");
+  console.log("✓ left/right keep locked fold direction; top/bottom 1–2 stay horizontal");
 }
 
 {
@@ -254,30 +253,30 @@ function branchFromSpinner(layout, board) {
     assertNoOverlap(boxes, `${name}-6-6-4-4`);
     assertInsideSafe(boxes, vp, `${name}-6-6-4-4`);
     const { left, right, north, south } = branchFromSpinner(layout, packed.board);
-    assertMainFirstFold(left, "W", FIRST_FOLD_LEFT, `${name} left`);
-    assertMainFirstFold(right, "E", FIRST_FOLD_RIGHT, `${name} right`);
-    assertVerticalRun(north.slice(0, 2), `${name} top does not turn before tile 3`);
-    assertVerticalRun(south.slice(0, 2), `${name} bottom does not turn before tile 3`);
-    const leftFold = firstTurnIndex(left, "W");
-    const rightFold = firstTurnIndex(right, "E");
+    assertMainFirstFold(left, "S", "W", `${name} left`);
+    assertMainFirstFold(right, "N", "E", `${name} right`);
+    assertHorizontalRun(north.slice(0, 2), `${name} top does not turn before tile 3`);
+    assertHorizontalRun(south.slice(0, 2), `${name} bottom does not turn before tile 3`);
+    const leftFold = firstTurnIndex(left, "S");
+    const rightFold = firstTurnIndex(right, "N");
     if (leftFold >= 1) {
       const prev = left[leftFold - 1];
       const fold = left[leftFold];
-      assert.ok(fold.y + fold.h / 2 < prev.y + prev.h / 2 - 2, `${name} left fold goes UP`);
+      assert.ok(fold.x + fold.w / 2 < prev.x + prev.w / 2 - 2, `${name} left fold goes WEST`);
     }
     if (rightFold >= 1) {
       const prev = right[rightFold - 1];
       const fold = right[rightFold];
-      assert.ok(fold.y + fold.h / 2 > prev.y + prev.h / 2 + 2, `${name} right fold goes DOWN`);
+      assert.ok(fold.x + fold.w / 2 > prev.x + prev.w / 2 + 2, `${name} right fold goes EAST`);
     }
-    assert.ok(north[2].x + north[2].w / 2 > north[1].x + north[1].w / 2 + 2, `${name} top tile 3 goes RIGHT`);
-    assert.ok(south[2].x + south[2].w / 2 < south[1].x + south[1].w / 2 - 2, `${name} bottom tile 3 goes LEFT`);
+    assert.ok(north[2].y + north[2].h / 2 < north[1].y + north[1].h / 2 - 2, `${name} top tile 3 goes NORTH`);
+    assert.ok(south[2].y + south[2].h / 2 > south[1].y + south[1].h / 2 + 2, `${name} bottom tile 3 goes SOUTH`);
     const tileScales = new Set(
       [...layout.tiles, ...(layout.armTiles || [])].map(() => layout.scale)
     );
     assert.equal(tileScales.size, 1, `${name} uniform scale after 6/6/4/4`);
   }
-  console.log("✓ first fold stays LEFT→UP / RIGHT→DOWN; N/S may turn only after tile 2");
+  console.log("✓ first fold stays LEFT→WEST / RIGHT→EAST; W/E may turn only after tile 2");
 }
 
 {
@@ -314,17 +313,17 @@ function branchFromSpinner(layout, board) {
       );
       assert.equal(tileScales.size, 1, `${name} step ${step}: uniform scale`);
       const branches = branchFromSpinner(layout, packed.board);
-      assertMainFirstFold(branches.left, "W", FIRST_FOLD_LEFT, `${name} step ${step} left`);
-      assertMainFirstFold(branches.right, "E", FIRST_FOLD_RIGHT, `${name} step ${step} right`);
+      assertMainFirstFold(branches.left, "S", "W", `${name} step ${step} left`);
+      assertMainFirstFold(branches.right, "N", "E", `${name} step ${step} right`);
       if (branches.north.length >= 2) {
-        assertVerticalRun(branches.north.slice(0, 2), `${name} step ${step} top 1–2`);
+        assertHorizontalRun(branches.north.slice(0, 2), `${name} step ${step} top 1–2`);
       } else if (branches.north.length) {
-        assertVerticalRun(branches.north, `${name} step ${step} top`);
+        assertHorizontalRun(branches.north, `${name} step ${step} top`);
       }
       if (branches.south.length >= 2) {
-        assertVerticalRun(branches.south.slice(0, 2), `${name} step ${step} bottom 1–2`);
+        assertHorizontalRun(branches.south.slice(0, 2), `${name} step ${step} bottom 1–2`);
       } else if (branches.south.length) {
-        assertVerticalRun(branches.south, `${name} step ${step} bottom`);
+        assertHorizontalRun(branches.south, `${name} step ${step} bottom`);
       }
     }
   }
@@ -345,10 +344,10 @@ function branchFromSpinner(layout, board) {
     assertInsideSafe(boxes, vp, `${name}-stress`);
     assert.ok(layout.scale > 0 && layout.scale <= 1, `${name} stress scale`);
     const { left, right, north, south } = branchFromSpinner(layout, packed.board);
-    assertMainFirstFold(left, "W", FIRST_FOLD_LEFT, `${name} stress left`);
-    assertMainFirstFold(right, "E", FIRST_FOLD_RIGHT, `${name} stress right`);
-    assertVerticalRun(north.slice(0, 2), `${name} stress top 1–2`);
-    assertVerticalRun(south.slice(0, 2), `${name} stress bottom 1–2`);
+    assertMainFirstFold(left, "S", "W", `${name} stress left`);
+    assertMainFirstFold(right, "N", "E", `${name} stress right`);
+    assertHorizontalRun(north.slice(0, 2), `${name} stress top 1–2`);
+    assertHorizontalRun(south.slice(0, 2), `${name} stress bottom 1–2`);
   }
   console.log("✓ desktop/tablet/phone spinner stress layouts remain contained");
 }
@@ -364,17 +363,17 @@ function branchFromSpinner(layout, board) {
     ["phone", phone],
   ]) {
     const { left, right, north, south } = branchFromSpinner(layout, packed.board);
-    assertMainFirstFold(left, "W", FIRST_FOLD_LEFT, `resize ${name} left`);
-    assertMainFirstFold(right, "E", FIRST_FOLD_RIGHT, `resize ${name} right`);
-    assertVerticalRun(north.slice(0, 2), `resize ${name} top`);
-    assertVerticalRun(south.slice(0, 2), `resize ${name} bottom`);
+    assertMainFirstFold(left, "S", "W", `resize ${name} left`);
+    assertMainFirstFold(right, "N", "E", `resize ${name} right`);
+    assertHorizontalRun(north.slice(0, 2), `resize ${name} top`);
+    assertHorizontalRun(south.slice(0, 2), `resize ${name} bottom`);
     assert.equal(
       layout.tiles.length + layout.armTiles.length,
       packed.board.length + packed.north.length + packed.south.length,
       `resize ${name}: no tiles lost`
     );
   }
-  console.log("✓ resizing still preserves LEFT→UP / RIGHT→DOWN and 2-tile N/S locks");
+  console.log("✓ resizing still preserves LEFT→WEST / RIGHT→EAST and 2-tile W/E locks");
 }
 
 console.log("\nAll Fives spinner layout tests passed.");

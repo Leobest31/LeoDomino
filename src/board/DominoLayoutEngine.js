@@ -281,7 +281,7 @@ function forceAttachTile(prev, tile, size, gap, dir, branch) {
     travelDir: travel,
     branch,
     isCorner: false,
-    isBridge: travel === "N" || travel === "S",
+    isBridge: !isMainAxisDir(travel),
   };
 }
 
@@ -496,6 +496,7 @@ const DEFAULT_LAYOUT_POLICY = Object.freeze({
   rulesetId: "",
   american: false,
   horizontalSpinner: false,
+  verticalMainChain: false,
   spinnerId: null,
   runClear: CHAIN_GAP + SNAP_CLEARANCE,
 });
@@ -517,11 +518,46 @@ export function createBoardLayoutPolicy(options, size, gap) {
     rulesetId: String(options?.rulesetId || ""),
     american,
     horizontalSpinner: Boolean(american && spinnerId),
+    verticalMainChain: american,
     spinnerId,
     runClear: american
       ? parallelRunClearance(size, gap)
       : Math.max(0, Number(gap) || 0) + SNAP_CLEARANCE,
   };
+}
+
+function americanVerticalMain() {
+  return Boolean(layoutPolicy().american);
+}
+
+/** Main-rail start/fold dirs. American: N/S through a horizontal spinner. */
+function mainRailDirs() {
+  if (americanVerticalMain()) {
+    return { right: "N", left: "S", foldRight: "E", foldLeft: "W" };
+  }
+  return {
+    right: "E",
+    left: "W",
+    foldRight: FIRST_FOLD_RIGHT,
+    foldLeft: FIRST_FOLD_LEFT,
+  };
+}
+
+/** Spinner-arm start dirs. American: W/E off the horizontal spinner. */
+function spinnerArmStartDirs() {
+  if (americanVerticalMain()) return { top: "W", bottom: "E" };
+  return { top: "N", bottom: "S" };
+}
+
+function spinnerArmFoldDir(startDir) {
+  if (startDir === "N") return FIRST_FOLD_TOP;
+  if (startDir === "S") return FIRST_FOLD_BOTTOM;
+  if (startDir === "W") return "N";
+  return "S";
+}
+
+function isMainAxisDir(dir, verticalMain = americanVerticalMain()) {
+  return verticalMain ? dir === "N" || dir === "S" : dir === "E" || dir === "W";
 }
 
 function asLayoutPolicy(value) {
@@ -984,9 +1020,12 @@ function growArm(
   exitOutward = false
 ) {
   void packSize;
+  const verticalMain = americanVerticalMain();
+  const isMain = (d) => isMainAxisDir(d, verticalMain);
+  const isCross = (d) => !isMain(d);
   let prev = start;
   let dir = startDir;
-  let lastH = startDir === "E" || startDir === "W" ? startDir : "E";
+  let lastMain = isMain(startDir) ? startDir : verticalMain ? "N" : "E";
   let vertRun = 0;
   let exitAfterPivot = false;
   let run = 0;
@@ -1010,7 +1049,7 @@ function growArm(
   for (let i = from; i !== to; i += step) {
     const tile = tiles[i];
     const occupied = [...out.values()];
-    const onVertical = dir === "N" || dir === "S";
+    const onCross = isCross(dir);
     const tileIsDouble = isDouble(tile);
 
     const attempt = (d) =>
@@ -1032,36 +1071,36 @@ function growArm(
       if (!isLegalStep(prev, tile, d, size)) return null;
       const cand = placeAgainst(prev, tile, d, size, gap, dir);
       cand.isCorner = d !== dir;
-      cand.isBridge = d === "N" || d === "S";
+      cand.isBridge = isCross(d);
       return findCollision(cand, occupied, gap, prev.id) ? null : cand;
     };
 
     let wantTurn = exitAfterPivot;
     const mandatoryStraight =
-      !onVertical && !firstFoldDone && run < minFirstRun;
+      !onCross && !firstFoldDone && run < minFirstRun;
     if (!wantTurn) {
       const straight = attempt(dir);
       if (mandatoryStraight) {
         if (!straight && !force) return false;
       } else if (!straight) {
         wantTurn = true;
-      } else if (onVertical && vertRun >= Math.max(1, bridgeTarget)) {
+      } else if (onCross && vertRun >= Math.max(1, bridgeTarget)) {
         const exitDirs = exitOutward
-          ? [lastH, OPP[lastH], foldDir, OPP[foldDir]]
-          : [OPP[lastH], lastH, foldDir, OPP[foldDir]];
+          ? [lastMain, OPP[lastMain], foldDir, OPP[foldDir]]
+          : [OPP[lastMain], lastMain, foldDir, OPP[foldDir]];
         if (exitDirs.some((d) => attempt(d))) {
           wantTurn = true;
         }
-      } else if (!onVertical && !firstFoldDone && leoLayout && run >= minFirstRun) {
+      } else if (!onCross && !firstFoldDone && leoLayout && run >= minFirstRun) {
         wantTurn = true;
-      } else if (!onVertical && firstFoldDone) {
+      } else if (!onCross && firstFoldDone) {
         const nearLimit = run >= laterRun - 1;
         const effectiveMaxRun =
           nearLimit && hasDoubleAhead(tiles, i, step, DOUBLE_LOOKAHEAD)
             ? laterRun + DOUBLE_LOOKAHEAD
             : laterRun;
         if (run >= effectiveMaxRun) {
-          const turnDirs = [foldDir, OPP[foldDir], OPP[lastH], lastH];
+          const turnDirs = [foldDir, OPP[foldDir], OPP[lastMain], lastMain];
           const canTurn = turnDirs.some(
             (d) =>
               attempt(d) ||
@@ -1082,7 +1121,7 @@ function growArm(
       }
     }
 
-    if (wantTurn && onVertical && tileIsDouble && attempt(dir)) {
+    if (wantTurn && onCross && tileIsDouble && attempt(dir)) {
       wantTurn = false;
       exitAfterPivot = true;
     }
@@ -1090,7 +1129,7 @@ function growArm(
     let chosen = null;
     let chosenDir = dir;
     const lockingFirstFold =
-      leoLayout && !firstFoldDone && !onVertical && wantTurn;
+      leoLayout && !firstFoldDone && !onCross && wantTurn;
 
     if (mandatoryStraight) {
       chosen = attempt(dir) || (force ? forcePlace(dir) : null);
@@ -1100,7 +1139,7 @@ function growArm(
       chosen = attemptFirstFold(foldDir) || (force ? forcePlace(foldDir) : null);
       if (!chosen) return false;
       chosenDir = foldDir;
-    } else if (onVertical && vertRun > 0 && vertRun < Math.max(1, bridgeTarget)) {
+    } else if (onCross && vertRun > 0 && vertRun < Math.max(1, bridgeTarget)) {
       chosen =
         attempt(dir) ||
         tryPlace(
@@ -1121,17 +1160,17 @@ function growArm(
     }
 
     if (!chosen && !lockingFirstFold) {
-      // First main-chain tiles after the spinner stay on the E/W rail.
-      // TOP/BOTTOM are spinner-arm directions, never a main-chain fallback.
-      const lockMainAxis = leoLayout && !firstFoldDone && !onVertical;
+      // First main-chain tiles after the spinner stay on the main rail
+      // (E/W Classic, N/S American). Spinner arms are never a main fallback.
+      const lockMainAxis = leoLayout && !firstFoldDone && !onCross;
       const verticalExits = exitOutward
-        ? [lastH, OPP[lastH], foldDir, OPP[foldDir], dir]
-        : [OPP[lastH], lastH, foldDir, OPP[foldDir], dir];
+        ? [lastMain, OPP[lastMain], foldDir, OPP[foldDir], dir]
+        : [OPP[lastMain], lastMain, foldDir, OPP[foldDir], dir];
       const primary = lockMainAxis
         ? [dir]
-        : onVertical
+        : onCross
           ? verticalExits
-          : [foldDir, OPP[foldDir], OPP[lastH], lastH, dir];
+          : [foldDir, OPP[foldDir], OPP[lastMain], lastMain, dir];
       const seen = new Set();
       for (const d of primary) {
         if (seen.has(d)) continue;
@@ -1163,19 +1202,19 @@ function growArm(
 
     if (!chosen && force) {
       const open = [...out.values()];
-      const lockMainAxis = leoLayout && !firstFoldDone && !onVertical;
+      const lockMainAxis = leoLayout && !firstFoldDone && !onCross;
       const order = lockingFirstFold
         ? [foldDir]
         : lockMainAxis
           ? [dir]
           : exitOutward
-            ? [dir, lastH, OPP[lastH], foldDir, OPP[foldDir], "E", "W", "N", "S"]
+            ? [dir, lastMain, OPP[lastMain], foldDir, OPP[foldDir], "E", "W", "N", "S"]
             : [dir, foldDir, OPP[foldDir], OPP[dir], "E", "W", "N", "S"];
       for (const d of order) {
         if (!isLegalStep(prev, tile, d, size)) continue;
         const box = placeAgainst(prev, tile, d, size, gap, dir);
         box.isCorner = d !== dir;
-        box.isBridge = d === "N" || d === "S";
+        box.isBridge = isCross(d);
         if (!findCollision(box, open, gap, prev.id)) {
           chosen = box;
           chosenDir = d;
@@ -1187,17 +1226,17 @@ function growArm(
     if (!chosen) return false;
     if (findCollision(chosen, occupied, gap, prev.id)) return false;
 
-    if (chosenDir === "E" || chosenDir === "W") {
-      lastH = chosenDir;
-      run = chosenDir === dir && !onVertical ? run + 1 : 1;
+    if (isMain(chosenDir)) {
+      lastMain = chosenDir;
+      run = chosenDir === dir && !onCross ? run + 1 : 1;
       vertRun = 0;
       if (exitAfterPivot) exitAfterPivot = false;
     } else {
-      if (!firstFoldDone && (dir === "E" || dir === "W")) {
+      if (!firstFoldDone && isMain(dir)) {
         firstFoldDone = true;
       }
       run = 0;
-      vertRun = chosenDir === dir && onVertical ? vertRun + 1 : 1;
+      vertRun = chosenDir === dir && onCross ? vertRun + 1 : 1;
       if (!tileIsDouble) exitAfterPivot = false;
     }
 
@@ -1208,7 +1247,7 @@ function growArm(
       travelDir: chosenDir,
       branch: publicLayoutBranch(branch) ?? branch,
       isCorner: turned,
-      isBridge: chosenDir === "N" || chosenDir === "S",
+      isBridge: isCross(chosenDir),
     };
     out.set(tile.id, placed);
     prev = placed;
@@ -1318,8 +1357,36 @@ function spinnerLaneOccupants(spinner, northCount, southCount, size, gap) {
   if (!spinner || (northCount <= 0 && southCount <= 0)) return [];
   const short = Math.min(size.w, size.h);
   const long = Math.max(size.w, size.h);
-  const x = spinner.x + (spinner.w - short) / 2;
   const out = [];
+  if (americanVerticalMain()) {
+    const y = spinner.y + (spinner.h - short) / 2;
+    for (let i = 0; i < northCount; i += 1) {
+      out.push({
+        id: `${RESERVE_PREFIX}n-${i}`,
+        x: spinner.x - (i + 1) * (long + gap),
+        y,
+        w: long,
+        h: short,
+        double: false,
+        isBridge: false,
+        branch: BRANCH.SPINNER_TOP,
+      });
+    }
+    for (let i = 0; i < southCount; i += 1) {
+      out.push({
+        id: `${RESERVE_PREFIX}s-${i}`,
+        x: spinner.x + spinner.w + gap + i * (long + gap),
+        y,
+        w: long,
+        h: short,
+        double: false,
+        isBridge: false,
+        branch: BRANCH.SPINNER_BOTTOM,
+      });
+    }
+    return out;
+  }
+  const x = spinner.x + (spinner.w - short) / 2;
   for (let i = 0; i < northCount; i += 1) {
     out.push({
       id: `${RESERVE_PREFIX}n-${i}`,
@@ -1359,8 +1426,8 @@ function growSpinnerArm(
   minStraight = SPINNER_ARM_STRAIGHT,
   armRun = 0
 ) {
-  const branch = startDir === "N" ? BRANCH.SPINNER_TOP : BRANCH.SPINNER_BOTTOM;
-  const foldDir = startDir === "N" ? FIRST_FOLD_TOP : FIRST_FOLD_BOTTOM;
+  const branch = startDir === "N" || startDir === "W" ? BRANCH.SPINNER_TOP : BRANCH.SPINNER_BOTTOM;
+  const foldDir = spinnerArmFoldDir(startDir);
   const awayDir = startDir;
   const wrapRun = Number.isFinite(armRun) && armRun >= 2 ? Math.floor(armRun) : 0;
   const wrapBridge = wrapRun ? 1 : 0;
@@ -1520,14 +1587,15 @@ function attachSpinnerBranches(
   if (!north.length && !south.length) return { ok: true, armIds: [] };
   const spinner = map.get(spinnerId);
   if (!spinner) return { ok: false, armIds: [] };
+  const arms = spinnerArmStartDirs();
   for (const tile of north) map.delete(tile.id);
   for (const tile of south) map.delete(tile.id);
   const northOk =
     !north.length ||
-    growSpinnerArm(map, spinner, north, "N", size, gap, hard, force, minStraight, armRun);
+    growSpinnerArm(map, spinner, north, arms.top, size, gap, hard, force, minStraight, armRun);
   const southOk =
     !south.length ||
-    growSpinnerArm(map, spinner, south, "S", size, gap, hard, force, minStraight, armRun);
+    growSpinnerArm(map, spinner, south, arms.bottom, size, gap, hard, force, minStraight, armRun);
   const armIds = [...north, ...south].map((t) => t.id).filter((id) => map.has(id));
   return {
     ok: Boolean(northOk && southOk && armIds.length === north.length + south.length),
@@ -1568,7 +1636,8 @@ function completeMissingTiles(map, tiles, centerIndex, size, gap, opts = {}) {
   const linear = Boolean(opts.linear);
   const topology = opts.topology || null;
   if (!map.has(opener.id)) {
-    const fp = footprintForTravel(opener, "E", size);
+    const rails = mainRailDirs();
+    const fp = footprintForTravel(opener, rails.right, size);
     map.set(opener.id, {
       id: opener.id,
       x: snap(-fp.w / 2),
@@ -1583,16 +1652,17 @@ function completeMissingTiles(map, tiles, centerIndex, size, gap, opts = {}) {
       branch: linear
         ? topology?.membership?.[opener.id] ?? BRANCH.MAIN_RIGHT
         : SPINNER_NODE,
-      travelDir: "E",
+      travelDir: rails.right,
     });
   }
+  const rails = mainRailDirs();
   const fill = (from, to, step, startDir, branch) => {
     let prev = map.get(tiles[centerIndex].id);
     let dir = startDir;
     let straight = 0;
     const foldDir = branch === "right" || branch === BRANCH.MAIN_RIGHT
-      ? opts.foldRight || FIRST_FOLD_RIGHT
-      : opts.foldLeft || FIRST_FOLD_LEFT;
+      ? opts.foldRight || rails.foldRight
+      : opts.foldLeft || rails.foldLeft;
     for (let i = from; i !== to; i += step) {
       const tile = tiles[i];
       if (map.has(tile.id)) {
@@ -1613,7 +1683,9 @@ function completeMissingTiles(map, tiles, centerIndex, size, gap, opts = {}) {
         )
       );
       const allowed = linear
-        ? ["E", "W"]
+        ? americanVerticalMain()
+          ? ["N", "S"]
+          : ["E", "W"]
         : straight < firstRunCap
           ? [startDir]
           : [foldDir, startDir];
@@ -1637,7 +1709,7 @@ function completeMissingTiles(map, tiles, centerIndex, size, gap, opts = {}) {
         travelDir: chosenDir,
         branch: topology?.membership?.[tile.id] ?? publicLayoutBranch(branch) ?? branch,
         isCorner: chosenDir !== dir,
-        isBridge: chosenDir === "N" || chosenDir === "S",
+        isBridge: !isMainAxisDir(chosenDir),
       };
       map.set(tile.id, placed);
       prev = placed;
@@ -1649,15 +1721,15 @@ function completeMissingTiles(map, tiles, centerIndex, size, gap, opts = {}) {
     centerIndex + 1,
     tiles.length,
     1,
-    "E",
-    linear ? BRANCH.MAIN_RIGHT : BRANCH.MAIN_RIGHT
+    rails.right,
+    BRANCH.MAIN_RIGHT
   );
   fill(
     centerIndex - 1,
     -1,
     -1,
-    "W",
-    linear ? BRANCH.MAIN_LEFT : BRANCH.MAIN_LEFT
+    rails.left,
+    BRANCH.MAIN_LEFT
   );
   applyTopologyBranches(map, topology);
   if (!linear) {
@@ -1715,7 +1787,8 @@ function applyTopologyBranches(map, topology) {
 }
 
 /**
- * Pre-spinner pack: board[0] … board[n] as one E–W rail.
+ * Pre-spinner pack: board[0] … board[n] as one rail.
+ * Classic/Haitian stay E–W. American grows N (vertical main chain).
  * A non-double is never given spinner/double orientation just because it
  * is the visual center of the felt. Branch comes from topology, not from
  * travel/rotation.
@@ -1724,7 +1797,8 @@ function placeLinearMainChain(tiles, size, gap, topology = null) {
   const map = new Map();
   if (!tiles.length) return map;
   const first = tiles[0];
-  const fp = footprintForTravel(first, "E", size);
+  const dir = americanVerticalMain() ? "N" : "E";
+  const fp = footprintForTravel(first, dir, size);
   const firstBranch = topology?.membership?.[first.id] ?? BRANCH.MAIN_RIGHT;
   let prev = {
     id: first.id,
@@ -1732,24 +1806,24 @@ function placeLinearMainChain(tiles, size, gap, topology = null) {
     y: snap(-fp.h / 2),
     w: snap(fp.w),
     h: snap(fp.h),
-    orientation: isDouble(first) ? "vertical" : "horizontal",
-    rotation: isDouble(first) ? 90 : 0,
+    orientation: fp.orientation,
+    rotation: fp.rotation,
     double: isDouble(first),
     valueLeft: Number(first.left),
     valueRight: Number(first.right),
     branch: firstBranch,
-    travelDir: "E",
+    travelDir: dir,
   };
   map.set(first.id, prev);
   for (let i = 1; i < tiles.length; i += 1) {
     const tile = tiles[i];
-    const box = placeAgainst(prev, tile, "E", size, gap, "E");
+    const box = placeAgainst(prev, tile, dir, size, gap, dir);
     prev = {
       ...box,
-      travelDir: "E",
+      travelDir: dir,
       branch: topology?.membership?.[tile.id] ?? BRANCH.MAIN_RIGHT,
-      orientation: isDouble(tile) ? "vertical" : "horizontal",
-      rotation: isDouble(tile) ? 90 : 0,
+      orientation: box.orientation,
+      rotation: box.rotation,
       isCorner: false,
       isBridge: false,
     };
@@ -1779,7 +1853,8 @@ function placeGraph(
   exitOutward = false
 ) {
   const opener = tiles[centerIndex];
-  const fp = footprintForTravel(opener, "E", size);
+  const rails = mainRailDirs();
+  const fp = footprintForTravel(opener, rails.right, size);
   const origin = {
     id: opener.id,
     x: snap(-fp.w / 2),
@@ -1792,8 +1867,10 @@ function placeGraph(
     valueLeft: Number(opener.left),
     valueRight: Number(opener.right),
     branch: spinnerLayout ? SPINNER_NODE : BRANCH.MAIN_RIGHT,
-    travelDir: "E",
+    travelDir: rails.right,
   };
+  const foldR = americanVerticalMain() ? rails.foldRight : foldRight;
+  const foldL = americanVerticalMain() ? rails.foldLeft : foldLeft;
   // Opener itself must sit inside the hard playable table.
   if (!fitsSoft(origin, hard)) {
     return { map: new Map(), ok: false };
@@ -1812,8 +1889,8 @@ function placeGraph(
         tiles.length,
         1,
         origin,
-        "E",
-        foldRight,
+        rails.right,
+        foldR,
         size,
         gap,
         soft,
@@ -1835,8 +1912,8 @@ function placeGraph(
         -1,
         -1,
         origin,
-        "W",
-        foldLeft,
+        rails.left,
+        foldL,
         size,
         gap,
         soft,
@@ -2067,9 +2144,9 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     });
   assertBoardTopology(topology);
 
-  // Spinner layout is enabled only by the first-double id from game state.
-  // A non-double opener, a centered tile, or a double that is not spinnerId
-  // must never activate TOP/BOTTOM or vertical main-chain packing.
+  // Spinner arms are enabled only by the first-double id from game state.
+  // American still packs the main chain vertically before that spinner exists.
+  // Classic / Haitian stay E–W until a spinnerId is present.
   let centerIndex =
     options.centerIndex != null
       ? options.centerIndex
@@ -2134,7 +2211,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       tiles,
       size,
       gap,
-      "E",
+      americanVerticalMain() ? "N" : "E",
       (tile) => topology?.membership?.[tile.id]
     );
     applyTopologyBranches(map, topology);
@@ -2188,12 +2265,22 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
   const safeW = Math.max(1, safeEarly.maxX - safeEarly.minX);
   const safeH = Math.max(1, safeEarly.maxY - safeEarly.minY);
   const laterRunDefault = packRunLimit(usableW, size.h, gap, RUN_CEILING);
-  const firstRunFloor = packFirstRunLimit(safeW, size.h, size.w, gap);
+  const firstRunFloor = packFirstRunLimit(
+    americanVerticalMain() ? safeH : safeW,
+    size.h,
+    size.w,
+    gap
+  );
   const leftLen = Math.max(0, centerIndex);
   const rightLen = Math.max(0, tiles.length - centerIndex - 1);
   const maxArm = Math.max(leftLen, rightLen);
   const playedCount = tiles.length + northTiles.length + southTiles.length;
-  const armStraight = packSpinnerArmLimit(safeH, size.h, size.w, gap);
+  const armStraight = packSpinnerArmLimit(
+    americanVerticalMain() ? safeW : safeH,
+    size.h,
+    size.w,
+    gap
+  );
   const extraOccupied = spinnerLaneOccupants(
     originProbe,
     Math.min(northCount, armStraight),
@@ -2249,7 +2336,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       tiles,
       size,
       gap,
-      "E",
+      americanVerticalMain() ? "N" : "E",
       (tile) => topology?.membership?.[tile.id]
     );
     const expectedArms = northTiles.length + southTiles.length;
@@ -2265,7 +2352,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
         northTiles,
         size,
         gap,
-        "N",
+        spinnerArmStartDirs().top,
         (tile) => topology?.membership?.[tile.id],
         map.get(layoutSpinnerId)
       );
@@ -2274,7 +2361,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
         southTiles,
         size,
         gap,
-        "S",
+        spinnerArmStartDirs().bottom,
         (tile) => topology?.membership?.[tile.id],
         map.get(layoutSpinnerId)
       );
@@ -2630,7 +2717,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       tiles,
       size,
       gap,
-      "E",
+      americanVerticalMain() ? "N" : "E",
       (tile) => topology?.membership?.[tile.id]
     );
     fillMissingPlayedTiles(
@@ -2638,7 +2725,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       northTiles,
       size,
       gap,
-      "N",
+      spinnerArmStartDirs().top,
       (tile) => topology?.membership?.[tile.id],
       map.get(layoutSpinnerId)
     );
@@ -2647,7 +2734,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       southTiles,
       size,
       gap,
-      "S",
+      spinnerArmStartDirs().bottom,
       (tile) => topology?.membership?.[tile.id],
       map.get(layoutSpinnerId)
     );
@@ -2906,11 +2993,21 @@ export function measureMinRowClearance(placements) {
     for (let j = i + 1; j < placements.length; j += 1) {
       const a = placements[i];
       const b = placements[j];
-      if (!(a.w >= a.h - 0.5 && b.w >= b.h - 0.5)) continue;
-      const xOverlap = a.x < b.x + b.w - 1 && a.x + a.w > b.x + 1;
-      if (!xOverlap) continue;
-      const clear = a.y >= b.y ? a.y - (b.y + b.h) : b.y - (a.y + a.h);
-      if (clear >= 0) minClear = Math.min(minClear, clear);
+      const bothH = a.w >= a.h - 0.5 && b.w >= b.h - 0.5;
+      const bothV = a.h > a.w + 0.5 && b.h > b.w + 0.5;
+      if (bothH) {
+        const xOverlap = a.x < b.x + b.w - 1 && a.x + a.w > b.x + 1;
+        if (xOverlap) {
+          const clear = a.y >= b.y ? a.y - (b.y + b.h) : b.y - (a.y + a.h);
+          if (clear >= 0) minClear = Math.min(minClear, clear);
+        }
+      } else if (bothV) {
+        const yOverlap = a.y < b.y + b.h - 1 && a.y + a.h > b.y + 1;
+        if (yOverlap) {
+          const clear = a.x >= b.x ? a.x - (b.x + b.w) : b.x - (a.x + a.w);
+          if (clear >= 0) minClear = Math.min(minClear, clear);
+        }
+      }
     }
   }
   return minClear === Infinity ? null : minClear;

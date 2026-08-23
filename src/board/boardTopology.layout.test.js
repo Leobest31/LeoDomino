@@ -73,13 +73,7 @@ function assertHorizontalChain(layout, board, label) {
     const double = Number(tile.left) === Number(tile.right);
     if (!double) {
       assert.equal(p.orientation, "horizontal", `${label}: ${tile.id} orientation`);
-      assert.ok(p.w > p.h + 0.5, `${label}: ${tile.id} stacked vertically ${p.w}x${p.h}`);
-      assert.ok(
-        p.branch === BRANCH.MAIN_LEFT || p.branch === BRANCH.MAIN_RIGHT,
-        `${label}: ${tile.id} branch ${p.branch}`
-      );
-      assert.notEqual(p.branch, BRANCH.SPINNER_TOP, `${label}: ${tile.id} became TOP`);
-      assert.notEqual(p.branch, BRANCH.SPINNER_BOTTOM, `${label}: ${tile.id} became BOTTOM`);
+      assert.ok(p.w > p.h + 0.5, `${label}: ${tile.id} stacked ${p.w}x${p.h}`);
     }
     ys.push(centerOf(p).y);
   }
@@ -90,10 +84,39 @@ function assertHorizontalChain(layout, board, label) {
       `${label}: tile ${board[i].id} left the horizontal Y axis (${ys[i]} vs ${mid})`
     );
   }
+}
+
+function assertVerticalChain(layout, board, label) {
+  assert.equal(layout.armTiles.length, 0, `${label}: invented TOP/BOTTOM`);
+  const map = byId(layout);
+  const xs = [];
+  for (const tile of board) {
+    const p = map[tile.id];
+    assert.ok(p, `${label}: missing ${tile.id}`);
+    const double = Number(tile.left) === Number(tile.right);
+    if (!double) {
+      assert.equal(p.orientation, "vertical", `${label}: ${tile.id} orientation`);
+      assert.ok(p.h > p.w + 0.5, `${label}: ${tile.id} stacked ${p.w}x${p.h}`);
+      assert.ok(
+        p.branch === BRANCH.MAIN_LEFT || p.branch === BRANCH.MAIN_RIGHT,
+        `${label}: ${tile.id} branch ${p.branch}`
+      );
+      assert.notEqual(p.branch, BRANCH.SPINNER_TOP, `${label}: ${tile.id} became TOP`);
+      assert.notEqual(p.branch, BRANCH.SPINNER_BOTTOM, `${label}: ${tile.id} became BOTTOM`);
+    }
+    xs.push(centerOf(p).x);
+  }
+  const mid = xs[0];
+  for (let i = 0; i < xs.length; i += 1) {
+    assert.ok(
+      Math.abs(xs[i] - mid) < 3,
+      `${label}: tile ${board[i].id} left the vertical X axis (${xs[i]} vs ${mid})`
+    );
+  }
   for (let i = 0; i < board.length - 1; i += 1) {
     const a = map[board[i].id];
     const b = map[board[i + 1].id];
-    assert.ok(centerOf(b).x > centerOf(a).x + 8, `${label}: ${board[i].id} / ${board[i + 1].id} stacked on x`);
+    assert.ok(centerOf(b).y < centerOf(a).y - 8, `${label}: ${board[i].id} / ${board[i + 1].id} stacked on y`);
   }
 }
 
@@ -107,7 +130,7 @@ function assertHorizontalChain(layout, board, label) {
   match = applyPlace(match, 0, "2-5", END.RIGHT);
   match = applyPlace(match, 0, "5-6", END.RIGHT);
   const layout = layoutFromMatch(match);
-  assertHorizontalChain(layout, match.board, "A-two-non-doubles");
+  assertVerticalChain(layout, match.board, "A-two-non-doubles");
 
   const displays = buildBoardDisplays(match.board, layout.tiles.map((t) => ({
     id: t.tileId,
@@ -120,9 +143,9 @@ function assertHorizontalChain(layout, board, label) {
     travelDir: t.travelDir,
   })));
   for (const entry of displays) {
-    assert.equal(entry.display.orientation, "horizontal", `A paint ${entry.tile.id}`);
+    assert.equal(entry.display.orientation, "vertical", `A paint ${entry.tile.id}`);
   }
-  console.log("✓ A. two non-doubles stay on one horizontal main line");
+  console.log("✓ A. two non-doubles stay on one vertical main line");
 }
 
 {
@@ -137,8 +160,8 @@ function assertHorizontalChain(layout, board, label) {
   match = applyPlace(match, 0, "1-2", BRANCH.MAIN_LEFT);
   match = applyPlace(match, 0, "0-1", BRANCH.MAIN_LEFT);
   const layout = layoutFromMatch(match);
-  assertHorizontalChain(layout, match.board, "B-four-non-doubles");
-  console.log("✓ B. four non-doubles stay on one horizontal main line");
+  assertVerticalChain(layout, match.board, "B-four-non-doubles");
+  console.log("✓ B. four non-doubles stay on one vertical main line");
 }
 
 {
@@ -156,10 +179,10 @@ function assertHorizontalChain(layout, board, label) {
   assert.ok(map["2-2"].w > map["2-2"].h, "C spinner is visually horizontal");
   assert.equal(map["3-6"].branch, BRANCH.MAIN_RIGHT);
   assert.equal(map["2-3"].branch, BRANCH.MAIN_RIGHT);
-  assert.equal(map["3-6"].orientation, "horizontal");
-  assert.equal(map["2-3"].orientation, "horizontal");
-  assert.ok(centerOf(map["3-6"]).x > centerOf(map["2-2"]).x);
-  assert.ok(Math.abs(centerOf(map["3-6"]).y - centerOf(map["2-2"]).y) <= 6);
+  assert.equal(map["3-6"].orientation, "vertical");
+  assert.equal(map["2-3"].orientation, "vertical");
+  assert.ok(centerOf(map["3-6"]).y < centerOf(map["2-2"]).y);
+  assert.ok(Math.abs(centerOf(map["3-6"]).x - centerOf(map["2-2"]).x) <= 6);
   assert.equal(layout.armTiles.length, 0, "C TOP/BOTTOM empty until explicitly played");
   console.log("✓ C. first double re-anchors; previous tiles stay MAIN_RIGHT, not TOP/BOTTOM");
 }
@@ -189,15 +212,15 @@ function assertHorizontalChain(layout, board, label) {
     assert.ok(map[id].w > map[id].h, `${id} horizontal spinner`);
     assert.equal(map[`L${pip}`].branch, BRANCH.MAIN_LEFT);
     assert.equal(map[`R${pip}`].branch, BRANCH.MAIN_RIGHT);
-    assert.equal(map[`L${pip}`].orientation, "horizontal");
-    assert.equal(map[`R${pip}`].orientation, "horizontal");
-    assert.ok(centerOf(map[`L${pip}`]).x < centerOf(map[id]).x, `${id} left is west`);
-    assert.ok(centerOf(map[`R${pip}`]).x > centerOf(map[id]).x, `${id} right is east`);
-    assert.ok(Math.abs(centerOf(map[`L${pip}`]).y - centerOf(map[id]).y) <= 6);
-    assert.ok(Math.abs(centerOf(map[`R${pip}`]).y - centerOf(map[id]).y) <= 6);
+    assert.equal(map[`L${pip}`].orientation, "vertical");
+    assert.equal(map[`R${pip}`].orientation, "vertical");
+    assert.ok(centerOf(map[`L${pip}`]).y > centerOf(map[id]).y, `${id} left is south`);
+    assert.ok(centerOf(map[`R${pip}`]).y < centerOf(map[id]).y, `${id} right is north`);
+    assert.ok(Math.abs(centerOf(map[`L${pip}`]).x - centerOf(map[id]).x) <= 6);
+    assert.ok(Math.abs(centerOf(map[`R${pip}`]).x - centerOf(map[id]).x) <= 6);
     assert.equal(layout.armTiles.length, 0, `${id} no invented arms`);
   }
-  console.log("✓ D–G. 1-1 / 3-3 / 5-5 / 6-6 MAIN_LEFT/RIGHT stay horizontal");
+  console.log("✓ D–G. 1-1 / 3-3 / 5-5 / 6-6 MAIN_LEFT/RIGHT stay vertical");
 }
 
 {

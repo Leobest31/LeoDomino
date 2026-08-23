@@ -232,6 +232,50 @@ function section(title) {
     null,
     "spinner hub N/S do not inherit main-chain travelDir"
   );
+  assert.equal(
+    resolveDestinationOutward(END.NORTH, "N", { spinnerHub: true, american: true }),
+    "W",
+    "American spinner NORTH is the west/left short face"
+  );
+  assert.equal(
+    resolveDestinationOutward(END.SOUTH, "S", { spinnerHub: true, american: true }),
+    "E",
+    "American spinner SOUTH is the east/right short face"
+  );
+  assert.equal(
+    resolveDestinationOutward(END.LEFT, "N", { spinnerHub: true, american: true }),
+    "S",
+    "American spinner LEFT is the south long face"
+  );
+  assert.equal(
+    resolveDestinationOutward(END.RIGHT, "N", { spinnerHub: true, american: true }),
+    "N",
+    "American spinner RIGHT is the north long face"
+  );
+  const americanHub = rect(400, 200, 136, 40);
+  const americanTargets = [
+    { end: END.LEFT, rect: americanHub, outward: "S" },
+    { end: END.RIGHT, rect: americanHub, outward: "N" },
+    { end: END.NORTH, rect: americanHub, outward: "W" },
+    { end: END.SOUTH, rect: americanHub, outward: "E" },
+  ];
+  const cx = (americanHub.left + americanHub.right) / 2;
+  const cy = (americanHub.top + americanHub.bottom) / 2;
+  assert.ok(
+    pickTargetDestination(cx, cy, americanTargets) === END.LEFT ||
+      pickTargetDestination(cx, cy, americanTargets) === END.RIGHT,
+    "American spinner body is a main-chain play"
+  );
+  assert.equal(
+    pickTargetDestination(americanHub.left - 8, cy, americanTargets),
+    END.NORTH,
+    "tap left of the horizontal spinner is NORTH (left branch)"
+  );
+  assert.equal(
+    pickTargetDestination(americanHub.right + 8, cy, americanTargets),
+    END.SOUTH,
+    "tap right of the horizontal spinner is SOUTH (right branch)"
+  );
   section("folded LEFT endpoint keeps logical id; hit tests the outward face");
 }
 

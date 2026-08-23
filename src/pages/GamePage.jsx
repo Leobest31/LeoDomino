@@ -39,6 +39,7 @@ import {
   resolveDestinationOutward,
   DESTINATION_TAP_SLOP_PX,
 } from "../game/destinationTarget.js";
+import { usesAmericanBoardLayout } from "../board/index.js";
 import { MOTION, wait } from "../utils/motion.js";
 import {
   hudScoresDuringHold,
@@ -63,6 +64,7 @@ function seatDisplayName(t) {
 
 function collectDestinationTargets(legalEnds, layout) {
   if (!legalEnds?.length) return [];
+  const american = usesAmericanBoardLayout(layout.rulesetId);
   const targets = [];
   for (const end of legalEnds) {
     const tileId = destinationTileId(end, layout);
@@ -74,7 +76,7 @@ function collectDestinationTargets(legalEnds, layout) {
     targets.push({
       end,
       rect: el.getBoundingClientRect(),
-      outward: resolveDestinationOutward(end, travelDir, { spinnerHub }),
+      outward: resolveDestinationOutward(end, travelDir, { spinnerHub, american }),
     });
   }
   return targets;
@@ -291,6 +293,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
           spinnerId: snap.spinnerId,
           spinnerNorth: snap.spinnerNorth,
           spinnerSouth: snap.spinnerSouth,
+          rulesetId: snap.rulesetId,
         })
       );
       const tileId = current.tileId;
@@ -378,6 +381,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
             spinnerId: snap.spinnerId,
             spinnerNorth: snap.spinnerNorth,
             spinnerSouth: snap.spinnerSouth,
+            rulesetId: snap.rulesetId,
           })
         )
       );
@@ -607,6 +611,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
           spinnerId: snap.spinnerId,
           spinnerNorth: snap.spinnerNorth,
           spinnerSouth: snap.spinnerSouth,
+          rulesetId: snap.rulesetId,
         })
       )
     );

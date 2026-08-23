@@ -14,7 +14,7 @@ import {
   LOCKED_BOARD_TILE_LONG_PX,
 } from "./layoutEngine.js";
 import { END } from "../game/constants.js";
-import { playTile } from "../game/index.js";
+import { playTile, listLegalMoves } from "../game/index.js";
 import { generateSet, indexTiles } from "../game/tiles.js";
 import { createBoard } from "../game/board.js";
 import { PHASE } from "../game/rules/constants.js";
@@ -169,9 +169,11 @@ function assertParallelClearance(boxes, layout, label) {
   assert.ok(spin.w > spin.h + 0.5, `spinner ${spin.w}×${spin.h} must stay horizontal`);
   const left = layout.tiles.find((t) => t.tileId === "L1");
   const right = layout.tiles.find((t) => t.tileId === "R1");
-  assert.equal(left.orientation, "horizontal");
-  assert.equal(right.orientation, "horizontal");
-  section("American spinner stays horizontal as the branch hub");
+  assert.equal(left.orientation, "vertical");
+  assert.equal(right.orientation, "vertical");
+  assert.ok(left.y + left.h <= spin.y + 1 || left.y >= spin.y + spin.h - 1);
+  assert.ok(right.y + right.h <= spin.y + 1 || right.y >= spin.y + spin.h - 1);
+  section("American spinner stays horizontal; main chain is vertical");
 }
 
 {
@@ -203,10 +205,10 @@ function assertParallelClearance(boxes, layout, label) {
   assert.ok(spin.w > spin.h + 0.5);
   const n1 = boxes.find((b) => b.id === "N1");
   const s1 = boxes.find((b) => b.id === "S1");
-  assert.ok(n1.y + n1.h <= spin.y + 1, "north branch is above the horizontal spinner");
-  assert.ok(s1.y >= spin.y + spin.h - 1, "south branch is below the horizontal spinner");
+  assert.ok(n1.x + n1.w <= spin.x + 1, "north/spinner TOP branch is left of the horizontal spinner");
+  assert.ok(s1.x >= spin.x + spin.w - 1, "south/spinner BOTTOM branch is right of the horizontal spinner");
   assertNoOverlap(boxes, "four-way");
-  section("branches route around a fixed horizontal spinner");
+  section("spinner branches attach to the left and right of the horizontal spinner");
 }
 
 for (const stage of PORTRAIT_STAGES) {
@@ -227,7 +229,11 @@ for (const stage of PORTRAIT_STAGES) {
   assert.ok(layout.scale > 0.2 && layout.scale <= 1, `${stage.name} scale`);
   assert.ok(!layout.camera?.overflow, `${stage.name}: stay on felt`);
   const ys = [...new Set(boxes.filter((b) => b.w >= b.h - 0.5).map((b) => Math.round(b.y)))];
-  assert.ok(ys.length >= 2, `${stage.name}: uses table height with more than one row`);
+  const xs = [...new Set(boxes.filter((b) => b.h >= b.w - 0.5).map((b) => Math.round(b.x)))];
+  assert.ok(
+    ys.length >= 2 || xs.length >= 2,
+    `${stage.name}: uses table space with more than one parallel run`
+  );
 }
 section("portrait stages keep parallel-row clearance without device CSS");
 
@@ -309,13 +315,13 @@ section("portrait stages keep parallel-row clearance without device CSS");
   assert.ok(spin.w > spin.h + 0.5);
   assert.ok(extra.h > extra.w + 0.5, "later double is a vertical chain tile, not a hub");
   assert.equal(extra.orientation, "vertical");
-  assert.ok(west.x + west.w <= spin.x + 1, "west branch attaches to the original spinner");
-  assert.ok(east.x >= spin.x + spin.w - 1, "east branch attaches to the original spinner");
-  assert.ok(n1.y + n1.h <= spin.y + 1, "north branch attaches to the original spinner");
-  assert.ok(s1.y >= spin.y + spin.h - 1, "south branch attaches to the original spinner");
-  const spinCx = spin.x + spin.w / 2;
-  assert.ok(Math.abs(n1.x + n1.w / 2 - spinCx) < spin.w, "north stays on the spinner hub");
-  assert.ok(Math.abs(s1.x + s1.w / 2 - spinCx) < spin.w, "south stays on the spinner hub");
+  assert.ok(west.y + west.h <= spin.y + 1 || west.y >= spin.y + spin.h - 1, "MAIN_LEFT stays on the vertical main chain");
+  assert.ok(east.y + east.h <= spin.y + 1 || east.y >= spin.y + spin.h - 1, "MAIN_RIGHT stays on the vertical main chain");
+  assert.ok(n1.x + n1.w <= spin.x + 1, "north branch attaches to the left of the spinner");
+  assert.ok(s1.x >= spin.x + spin.w - 1, "south branch attaches to the right of the spinner");
+  const spinCy = spin.y + spin.h / 2;
+  assert.ok(Math.abs(n1.y + n1.h / 2 - spinCy) < spin.h * 2, "left branch stays on the spinner hub");
+  assert.ok(Math.abs(s1.y + s1.h / 2 - spinCy) < spin.h * 2, "right branch stays on the spinner hub");
   assertNoOverlap(boxes, "later-double-hub");
   section("later doubles do not steal the American spinner hub");
 }
@@ -346,8 +352,8 @@ section("portrait stages keep parallel-row clearance without device CSS");
   const right = boxes.find((b) => b.id === "R1");
   assert.equal(left.branch, "MAIN_LEFT");
   assert.equal(right.branch, "MAIN_RIGHT");
-  assert.ok(left.x + left.w <= spin.x + 2);
-  assert.ok(right.x >= spin.x + spin.w - 2);
+  assert.ok(left.y + left.h <= spin.y + 2 || left.y >= spin.y + spin.h - 2);
+  assert.ok(right.y + right.h <= spin.y + 2 || right.y >= spin.y + spin.h - 2);
   section("long American chains keep the original spinner topology");
 }
 
@@ -398,6 +404,66 @@ section("portrait stages keep parallel-row clearance without device CSS");
   assert.equal(spin.orientation, "horizontal");
   assert.ok(later.h > later.w + 0.5, "played later double stays a chain tile");
   section("engine spinner identity matches the laid hub");
+}
+
+{
+  const spinner = dbl("5-5", 5);
+  const board = [spinner];
+  let state = {
+    seed: 2,
+    byId: indexTiles(generateSet()),
+    players: [
+      { id: "you", hand: ["4-5", "5-6", "2-5", "1-5"] },
+      { id: "leobest", hand: ["0-1", "0-2"] },
+    ],
+    reserve: [],
+    board,
+    spinnerId: "5-5",
+    spinnerNorth: [],
+    spinnerSouth: [],
+    phase: PHASE.PLAYING,
+    currentPlayer: 0,
+    scores: [0, 0],
+    round: 1,
+    targetScore: 150,
+    rulesetId: "american",
+    mustPlayTileId: null,
+    consecutivePasses: 0,
+    roundStarterIndex: 0,
+    roundResult: null,
+    matchWinner: null,
+    statusKey: null,
+    statusVars: null,
+  };
+  const moves = listLegalMoves(state, 0);
+  const endsFor45 = [...new Set(moves.filter((m) => m.tileId === "4-5").map((m) => m.end))];
+  assert.ok(endsFor45.includes(END.LEFT), "4-5 can continue MAIN_LEFT");
+  assert.ok(endsFor45.includes(END.RIGHT), "4-5 can continue MAIN_RIGHT");
+  assert.ok(endsFor45.includes(END.NORTH), "4-5 can attach to spinner left branch");
+  assert.ok(endsFor45.includes(END.SOUTH), "4-5 can attach to spinner right branch");
+
+  const leftPlay = playTile({ ...state, currentPlayer: 0 }, "4-5", END.NORTH);
+  const rightPlay = playTile({ ...state, currentPlayer: 0 }, "4-5", END.SOUTH);
+  assert.equal(leftPlay.spinnerNorth.at(-1)?.id, "4-5");
+  assert.equal(rightPlay.spinnerSouth.at(-1)?.id, "4-5");
+
+  const leftLayout = calculateBoardLayout(leftPlay.board, { width: 900, height: 620 }, americanOptions({
+    spinnerId: "5-5",
+    spinnerNorth: leftPlay.spinnerNorth,
+    spinnerSouth: leftPlay.spinnerSouth,
+  }));
+  const rightLayout = calculateBoardLayout(rightPlay.board, { width: 900, height: 620 }, americanOptions({
+    spinnerId: "5-5",
+    spinnerNorth: rightPlay.spinnerNorth,
+    spinnerSouth: rightPlay.spinnerSouth,
+  }));
+  const leftSpin = [...leftLayout.tiles, ...leftLayout.armTiles].find((t) => t.tileId === "5-5");
+  const leftArm = [...leftLayout.tiles, ...leftLayout.armTiles].find((t) => t.tileId === "4-5");
+  const rightSpin = [...rightLayout.tiles, ...rightLayout.armTiles].find((t) => t.tileId === "5-5");
+  const rightArm = [...rightLayout.tiles, ...rightLayout.armTiles].find((t) => t.tileId === "4-5");
+  assert.ok(leftArm.x + leftArm.w <= leftSpin.x + 1, "legal NORTH play sits on the spinner's left");
+  assert.ok(rightArm.x >= rightSpin.x + rightSpin.w - 1, "legal SOUTH play sits on the spinner's right");
+  section("legal play can choose the spinner's left or right branch");
 }
 
 console.log("\nAmerican chain layout tests passed.");
