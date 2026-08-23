@@ -6,6 +6,7 @@ import LanguageSwitcher from "../components/LanguageSwitcher";
 import {
   IconEye,
   IconEyeOff,
+  IconGlobe,
   IconLock,
   IconMail,
   IconShield,
@@ -15,11 +16,7 @@ import {
 import { AUTH_ERROR, DEFAULT_AVATAR_ID, PASSWORD_MIN_LENGTH, useAuth } from "../auth";
 import { PLAYER_AVATARS } from "../auth/avatars.media.js";
 import CountryPicker from "../components/CountryPicker";
-import {
-  authEarthNight,
-  homeDominos,
-  homeLeagueLion,
-} from "../assets";
+import { authEarthNight, authLeoEmblem } from "../assets";
 import { LEGAL_URLS } from "../legal/urls.js";
 import "./AuthPage.css";
 
@@ -83,6 +80,7 @@ function AuthPage() {
     setFieldError({});
     setFormError("");
     setReveal({ password: false, confirmPassword: false });
+    document.querySelector("[data-auth='true']")?.scrollTo(0, 0);
   }, [authView]);
 
   const title = isCreate ? t("auth.createTitle") : t("auth.loginTitle");
@@ -163,18 +161,22 @@ function AuthPage() {
       <div className="auth__shell">
         <div className="auth__frame">
           <div className="auth__atmosphere" aria-hidden="true">
-            <div className="auth__glow" />
-            <img className="auth__side-lion" src={homeLeagueLion} alt="" draggable={false} />
-            <img className="auth__side-dominos" src={homeDominos} alt="" draggable={false} />
+            <div className="auth__space" />
+            <div className="auth__stars" />
+            <div className="auth__stars auth__stars--far" />
+            <div className="auth__nebula auth__nebula--left" />
+            <div className="auth__nebula auth__nebula--right" />
+            <div className="auth__horizon" />
             <img className="auth__earth" src={authEarthNight} alt="" draggable={false} />
           </div>
           <div className="auth__stack">
             <div className="auth__brand">
-              <div className="auth__crest">
-                <BrandLogo size="md" title={t("common.brand")} />
-              </div>
-              <p className="auth__wordmark">{t("auth.wordmark")}</p>
-              <p className="auth__tagline">{t("auth.brandTagline")}</p>
+              <img
+                className="auth__emblem"
+                src={authLeoEmblem}
+                alt={t("common.brand")}
+                draggable={false}
+              />
             </div>
             <main className="auth__card" aria-label={isCreate ? t("auth.ariaCreate") : t("auth.ariaLogin")}>
               <h1 className="auth__title">{title}</h1>
@@ -185,7 +187,12 @@ function AuthPage() {
                 <span className="auth__mark-line" />
               </div>
               <div className="auth__locale">
-                <LanguageSwitcher />
+                <div className="auth__locale-control">
+                  <span className="auth__locale-icon" aria-hidden="true">
+                    <IconGlobe className="auth__glyph" />
+                  </span>
+                  <LanguageSwitcher />
+                </div>
               </div>
               <form className="auth__form" onSubmit={submit} noValidate>
                 {fields.map((field) => {

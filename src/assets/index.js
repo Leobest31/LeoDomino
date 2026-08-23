@@ -30,6 +30,7 @@ export { default as homeIconUser } from "./home/icon-user.svg";
 export { default as homeIconGlobe } from "./home/icon-globe.svg";
 export { default as homeEarthGlobe } from "./home/earth-globe.png";
 export { default as authEarthNight } from "./auth/auth-earth-night.png";
+export { default as authLeoEmblem } from "./auth/auth-leo-emblem.png";
 export { default as avatarMarcus } from "./avatars/avatar-marcus.png";
 export { default as avatarRafael } from "./avatars/avatar-rafael.png";
 export { default as avatarAndre } from "./avatars/avatar-andre.png";
