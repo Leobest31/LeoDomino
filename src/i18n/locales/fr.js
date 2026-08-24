@@ -19,6 +19,9 @@ export default {
     back: "Retour",
     mainMenu: "Menu principal",
     ok: "OK",
+    crashTitle: "Une erreur s’est produite",
+    crashBody: "LeoDomino a rencontré un problème inattendu. Vous pouvez recharger et continuer à jouer.",
+    crashReload: "Recharger",
   },
   home: {
     headline: "Un jeu précis sur une table classique.",

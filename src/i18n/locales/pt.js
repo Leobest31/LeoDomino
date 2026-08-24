@@ -19,6 +19,9 @@ export default {
     back: "Voltar",
     mainMenu: "Menu principal",
     ok: "OK",
+    crashTitle: "Algo correu mal",
+    crashBody: "O LeoDomino encontrou um erro inesperado. Pode recarregar e continuar a jogar.",
+    crashReload: "Recarregar",
   },
   home: {
     headline: "Jogo preciso numa mesa clássica.",

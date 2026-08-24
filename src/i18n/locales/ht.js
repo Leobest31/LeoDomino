@@ -22,6 +22,9 @@ export default {
     back: "Retounen",
     mainMenu: "Meni prensipal",
     ok: "OK",
+    crashTitle: "Yon erè rive",
+    crashBody: "LeoDomino rankontre yon pwoblèm. Ou ka rechaje pou kontinye jwe.",
+    crashReload: "Rechaje",
   },
   home: {
     headline: "Jwe presi sou yon tab klasik.",

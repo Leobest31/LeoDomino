@@ -11,6 +11,7 @@ import {
   gameStyleFlagEmoji,
   listV1GameStyles,
 } from "../data/gameStyles.js";
+import { addSafeBreadcrumb } from "../monitoring";
 import {
   acceptMatchRequest,
   canAcceptMatchRequest,
@@ -111,6 +112,17 @@ function FindMatchPage({ onBack, onMainMenu }) {
   const [notice, setNotice] = useState("");
   const ownStatusRef = useRef(null);
   const matchedRef = useRef(null);
+  const enteredOnlineRef = useRef(false);
+
+  const markEnteredOnline = (matchId) => {
+    if (enteredOnlineRef.current) return;
+    enteredOnlineRef.current = true;
+    addSafeBreadcrumb("entered online match", {
+      screen: "findMatch",
+      mode: "online",
+      matchId,
+    });
+  };
 
   const tap = (fn) => {
     unlock();
@@ -137,6 +149,7 @@ function FindMatchPage({ onBack, onMainMenu }) {
           const match = await getMatchWithPlayers(nextOwn.matchId);
           matchedRef.current = match;
           setMatched(match);
+          markEnteredOnline(match?.id || nextOwn.matchId);
         } catch {
           const fallback = {
             id: nextOwn.matchId,
@@ -146,6 +159,7 @@ function FindMatchPage({ onBack, onMainMenu }) {
           };
           matchedRef.current = fallback;
           setMatched(fallback);
+          markEnteredOnline(fallback.id);
         }
       }
       ownStatusRef.current = nextOwn?.status ?? null;
@@ -183,8 +197,18 @@ function FindMatchPage({ onBack, onMainMenu }) {
     return () => stop();
   }, [onlineReady, refresh]);
 
+  useEffect(() => {
+    addSafeBreadcrumb("entered Find Match", { screen: "findMatch", mode: "online" });
+  }, []);
+
   const handleSelect = (styleId) => {
-    tap(() => setSelectedId(styleId));
+    tap(() => {
+      setSelectedId(styleId);
+      addSafeBreadcrumb(
+        styleId === "haitian" ? "selected Haitian ruleset" : `selected ${styleId} ruleset`,
+        { screen: "findMatch", ruleset: styleId, mode: "online" }
+      );
+    });
   };
 
   const handleCreate = () => {
@@ -197,6 +221,11 @@ function FindMatchPage({ onBack, onMainMenu }) {
         setOwn(withSessionIdentity(created, session));
         ownStatusRef.current = "open";
         setNotice("");
+        addSafeBreadcrumb("created match request", {
+          screen: "findMatch",
+          mode: "online",
+          ruleset: selectedId,
+        });
         await refresh();
       } catch (error) {
         setErrorKey(errorMessageKey(error));
@@ -220,6 +249,12 @@ function FindMatchPage({ onBack, onMainMenu }) {
         matchedRef.current = match;
         setMatched(match);
         setState("matched");
+        addSafeBreadcrumb("accepted request", {
+          screen: "findMatch",
+          mode: "online",
+          matchId: match?.id,
+        });
+        markEnteredOnline(match?.id);
       } catch (error) {
         const key = errorMessageKey(error);
         await refresh();

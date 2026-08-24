@@ -1,6 +1,14 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { buildReleaseId } from "./src/monitoring/release.js";
+
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+const sentryOrg = process.env.SENTRY_ORG;
+const sentryProject = process.env.SENTRY_PROJECT;
+const sentryUpload = Boolean(sentryAuthToken && sentryOrg && sentryProject);
+const releaseName = buildReleaseId(process.env.VITE_BUILD_NUMBER);
 
 /** Map clean legal URLs to static HTML for Vite dev/preview (host rewrites cover production). */
 function legalPrettyPathsPlugin() {
@@ -101,11 +109,25 @@ export default defineConfig({
         enabled: false,
       },
     }),
+    ...(sentryUpload
+      ? [
+          sentryVitePlugin({
+            org: sentryOrg,
+            project: sentryProject,
+            authToken: sentryAuthToken,
+            telemetry: false,
+            release: { name: releaseName },
+            sourcemaps: {
+              filesToDeleteAfterUpload: ["./dist/**/*.map"],
+            },
+          }),
+        ]
+      : []),
   ],
   build: {
     target: "es2020",
     cssCodeSplit: true,
-    sourcemap: false,
+    sourcemap: sentryUpload ? "hidden" : false,
     minify: true,
     reportCompressedSize: true,
     chunkSizeWarningLimit: 600,

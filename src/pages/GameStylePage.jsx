@@ -20,6 +20,7 @@ import {
   normalizeRulesetId,
 } from "../data/gameStyles.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
+import { addSafeBreadcrumb } from "../monitoring";
 import "./GameStylePage.css";
 
 const GAME_STYLES = listV1GameStyles();
@@ -58,12 +59,23 @@ function GameStylePage({ onBack, onMainMenu, onPlay }) {
   };
 
   const handleSelect = (styleId) => {
-    tap(() => persistStyle(styleId));
+    tap(() => {
+      persistStyle(styleId);
+      addSafeBreadcrumb(
+        styleId === "haitian" ? "selected Haitian ruleset" : `selected ${styleId} ruleset`,
+        { screen: "gameStyle", ruleset: styleId, mode: "LeoBest" }
+      );
+    });
   };
 
   const handlePlay = () => {
     tap(() => {
       const rulesetId = persistStyle(selectedId);
+      addSafeBreadcrumb("started LeoBest match", {
+        screen: "gameStyle",
+        ruleset: selectedId,
+        mode: "LeoBest",
+      });
       onPlay?.({
         playerCount: V1_PLAYER_COUNT,
         difficulty: normalizeDifficulty(

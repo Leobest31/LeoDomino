@@ -1,0 +1,38 @@
+.crash-fallback {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #08110e;
+  color: #f4efe4;
+}
+
+.crash-fallback__panel {
+  width: min(28rem, 100%);
+  padding: 28px 24px;
+  border-radius: 18px;
+  background: #12211c;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+.crash-fallback__title {
+  margin: 0 0 12px;
+  font-size: 1.35rem;
+}
+
+.crash-fallback__body {
+  margin: 0 0 20px;
+  line-height: 1.45;
+  color: #d7cec0;
+}
+
+.crash-fallback__reload {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 22px;
+  background: #c4a35a;
+  color: #16110a;
+  font-weight: 700;
+}

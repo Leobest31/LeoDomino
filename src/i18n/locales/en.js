@@ -19,6 +19,9 @@ export default {
     back: "Back",
     mainMenu: "Main Menu",
     ok: "OK",
+    crashTitle: "Something went wrong",
+    crashBody: "LeoDomino hit an unexpected error. You can reload and keep playing.",
+    crashReload: "Reload",
   },
   home: {
     headline: "Precision play on a classic table.",

@@ -31,6 +31,7 @@ import { V1_PLAYER_COUNT } from "../game/v1Product.js";
 import { forfeitFingerprint } from "../game/matchForfeit.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import { MOTION } from "../utils/motion.js";
+import { addSafeBreadcrumb } from "../monitoring";
 import {
   clearMatchSave,
   loadMatch,
@@ -259,6 +260,7 @@ export function useMatch(options = {}) {
   }, []);
 
   const commitPlay = useCallback((tileId, end = null) => {
+    addSafeBreadcrumb("attempted play", { screen: "game", mode: "LeoBest", actionName: "play" });
     const current = stateRef.current;
     const legalMoves = getAvailableActions(current).legalMoves;
     const chosen = resolvePlayChoice(legalMoves, tileId, end);
@@ -291,6 +293,7 @@ export function useMatch(options = {}) {
   }, []);
 
   const commitDraw = useCallback((tileId = null) => {
+    addSafeBreadcrumb("attempted draw", { screen: "game", mode: "LeoBest", actionName: "draw" });
     const current = stateRef.current;
     if (!getAvailableActions(current).canDraw) return null;
     const drawnId =
@@ -350,6 +353,7 @@ export function useMatch(options = {}) {
 
   const pass = useCallback(() => {
     if (!isHumanTurn || !actions.canPass) return;
+    addSafeBreadcrumb("attempted pass", { screen: "game", mode: "LeoBest", actionName: "pass" });
     try {
       const next = passTurn(stateRef.current);
       stateRef.current = next;

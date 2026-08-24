@@ -12,6 +12,7 @@ import { AudioProvider } from "./audio";
 import { AuthProvider } from "./auth";
 import { PrefsProvider } from "./hooks/PrefsProvider.jsx";
 import { applyTheme, applyTileSkin, loadPrefs } from "./persistence/index.js";
+import { MonitoringErrorBoundary, initMonitoring } from "./monitoring";
 import "./styles/global.css";
 import App from "./App.jsx";
 
@@ -19,16 +20,23 @@ const prefs = loadPrefs();
 applyTheme(prefs.theme);
 applyTileSkin(prefs.tileSkin);
 
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <I18nProvider>
-      <PrefsProvider>
-        <AudioProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </AudioProvider>
-      </PrefsProvider>
-    </I18nProvider>
-  </StrictMode>
-);
+async function boot() {
+  await initMonitoring();
+  createRoot(document.getElementById("root")).render(
+    <StrictMode>
+      <I18nProvider>
+        <MonitoringErrorBoundary>
+          <PrefsProvider>
+            <AudioProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </AudioProvider>
+          </PrefsProvider>
+        </MonitoringErrorBoundary>
+      </I18nProvider>
+    </StrictMode>
+  );
+}
+
+void boot();
