@@ -4,10 +4,11 @@ import SplashPage from "./pages/SplashPage";
 import HomePage from "./pages/HomePage";
 import AuthPage from "./pages/AuthPage";
 import GameStylePage from "./pages/GameStylePage";
+import FindMatchPage from "./pages/FindMatchPage";
 import GamePage from "./pages/GamePage";
 import "./App.css";
 
-/** @typedef {"intro" | "home" | "gameStyle" | "game"} AppPhase */
+/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "game"} AppPhase */
 
 /**
  * Startup: brand intro → Login (or Home if signed in) → Game Style → table.
@@ -29,7 +30,7 @@ function App() {
   useEffect(() => {
     if (!authReady || phase === "intro" || signedIn) return undefined;
     if (!authView) openLogin();
-    if (phase === "game" || phase === "gameStyle") {
+    if (phase === "game" || phase === "gameStyle" || phase === "findMatch") {
       setMatchOptions(null);
       setPhase("home");
     }
@@ -71,7 +72,7 @@ function App() {
   };
 
   const bootShell =
-    phase === "intro" || phase === "home" || phase === "gameStyle";
+    phase === "intro" || phase === "home" || phase === "gameStyle" || phase === "findMatch";
   const showAuth = Boolean(authView) || (phase !== "intro" && authReady && !signedIn);
 
   return (
@@ -88,7 +89,15 @@ function App() {
         <HomePage
           key={session?.playerId ?? "home"}
           onPlayVsLeoBest={() => setPhase("gameStyle")}
+          onFindMatch={() => setPhase("findMatch")}
           onResume={handleResume}
+        />
+      ) : null}
+
+      {phase === "findMatch" && signedIn ? (
+        <FindMatchPage
+          onBack={() => setPhase("home")}
+          onMainMenu={() => setPhase("home")}
         />
       ) : null}
 

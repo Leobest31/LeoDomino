@@ -41,6 +41,7 @@ const liveImports = [
   "src/pages/HomePage.jsx",
   "src/pages/AuthPage.jsx",
   "src/pages/GamePage.jsx",
+  "src/pages/FindMatchPage.jsx",
   "src/hooks/useMatch.js",
 ];
 for (const rel of liveImports) {
@@ -59,8 +60,13 @@ const home = read("src/pages/HomePage.jsx");
 assert.match(home, /handlePlayOnline/, "Find Match handler still exists");
 assert.match(
   home.slice(home.indexOf("const handlePlayOnline"), home.indexOf("const goToStore")),
+  /onFindMatch/,
+  "Find Match opens the matchmaking screen"
+);
+assert.doesNotMatch(
+  home.slice(home.indexOf("const handlePlayOnline"), home.indexOf("const goToStore")),
   /showComingSoon\(\)/,
-  "Find Match is still Coming Soon"
+  "Find Match is no longer Coming Soon"
 );
 
 assert.equal(typeof import.meta.env, "undefined");

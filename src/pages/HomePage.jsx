@@ -69,7 +69,7 @@ const HOME_PREVIEW = Object.freeze({
  * Premium Home dashboard — Figma visual shell, existing Home only.
  * PLAY VS LEOBEST is the only live gameplay path.
  */
-function HomePage({ onPlayVsLeoBest, onResume }) {
+function HomePage({ onPlayVsLeoBest, onResume, onFindMatch }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
   const { session, openLogin } = useAuth();
@@ -148,11 +148,10 @@ function HomePage({ onPlayVsLeoBest, onResume }) {
   };
 
   /**
-   * Temporary Coming Soon for this visual integration.
-   * Before V1 publish this becomes: Create Account / Sign In → Find Match → online 1v1.
+   * Find Match: choose Classic / Haitian / American, then create or join a public request.
    */
   const handlePlayOnline = () => {
-    showComingSoon();
+    tap(() => onFindMatch?.());
   };
 
   const goToStore = () => {

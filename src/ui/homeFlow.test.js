@@ -18,7 +18,7 @@ const home = read("pages/HomePage.jsx");
 const style = read("pages/GameStylePage.jsx");
 const page = read("pages/GamePage.jsx");
 
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "game"/, "App phases are Home-first");
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "game"/, "App phases are Home-first");
 assert.doesNotMatch(app, /GameSetupPage/, "obsolete Setup is not the live hub");
 assert.match(app, /setPhase\("home"\)/, "splash and Main Menu return to Home");
 assert.match(app, /onPlayVsLeoBest=\{\(\) => setPhase\("gameStyle"\)\}/, "Play vs LeoBest opens Game Style");
@@ -49,7 +49,9 @@ assert.match(home, /data-home-nav-item="play"/, "PLAY routes to Game Style");
 assert.match(home, /data-home-nav-item="league"/, "League is a bottom-nav destination");
 assert.match(home, /data-home-nav-item="store"/, "Store is a bottom-nav destination");
 assert.match(home, /data-home-nav-item="menu"/, "Menu is a bottom-nav destination");
-assert.match(home, /handlePlayOnline/, "Play Online has a dedicated future-activation handler");
+assert.match(home, /handlePlayOnline/, "Play Online has a dedicated Find Match handler");
+assert.match(app, /onFindMatch=\{\(\) => setPhase\("findMatch"\)\}/, "Find Match opens matchmaking");
+assert.match(app, /<FindMatchPage/, "Find Match page is mounted");
 assert.match(home, /ProfilePanel/, "Home opens player profile from the avatar");
 assert.match(home, /openProfile/, "signed-in avatar opens Profile");
 assert.match(home, /openLogin/, "signed-out profile opens Login");
@@ -79,7 +81,7 @@ assert.match(app, /phase === "game" && signedIn/, "the table is gated on a signe
   assert.match(provider, /setAuthView\("login"\)/, "logout returns immediately to Login");
   assert.match(config, /FIRST_LAUNCH_LOCALE = "en"/, "first-ever launch defaults to English");
 }
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "game"/, "App phases stay Home-first");
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "game"/, "App phases stay Home-first");
 assert.match(home, /id="online"/, "Find Match card exists");
 assert.match(home, /id="friend"/, "Play with a Friend card exists");
 assert.match(home, /id="private"/, "Private Table is visible as a future shell");
