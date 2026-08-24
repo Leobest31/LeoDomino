@@ -49,6 +49,11 @@ assert.doesNotMatch(page, /supabaseClient|@supabase\/supabase-js/, "page does no
 assert.doesNotMatch(page, /track\(|channel\("presence"|Presence/, "no Presence");
 assert.doesNotMatch(page, /chat|sendMessage/, "no live chat");
 assert.doesNotMatch(page, /setPhase\("game"\)|onPlay\?/, "does not start live table play");
+assert.doesNotMatch(
+  page,
+  /enterOnlineMatch|getGameView|submitGameAction|game_sessions|game_secrets/,
+  "does not wire live table play"
+);
 assert.doesNotMatch(page, /insert\(\{[^}]*creator_id/, "does not write creator_id");
 assert.doesNotMatch(page, /from\("match_requests"\)/, "no direct table writes in the page");
 

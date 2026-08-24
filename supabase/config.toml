@@ -1,0 +1,6 @@
+# LeoDomino Supabase config — Edge Functions import the shared JS engine from src/.
+# Do not copy Classic / Haitian / American rules into this folder.
+
+[functions.online-game]
+verify_jwt = true
+entrypoint = "./functions/online-game/index.js"
