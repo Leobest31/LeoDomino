@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "../i18n";
 import { useAudio } from "../audio";
 import { AUTH_ERROR, DEFAULT_AVATAR_ID, useAuth } from "../auth";
@@ -8,10 +8,11 @@ import CountryPicker from "./CountryPicker";
 import PlayerAvatar from "./PlayerAvatar";
 import { IconClose } from "./Icon";
 import { isReferralSuccessNotice } from "../online/referrals.js";
+import { getMyGlobalRating, subscribeGlobalRatingRefresh } from "../online/globalRp.js";
 import "./ProfilePanel.css";
 
 function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
-  const { t, locale } = useI18n();
+  const { t, locale, formatNumber } = useI18n();
   const { play } = useAudio();
   const { session, updateProfile, busy } = useAuth();
   const [username, setUsername] = useState("");
@@ -19,6 +20,8 @@ function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
   const [countryCode, setCountryCode] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [rating, setRating] = useState(null);
+  const [ratingStatus, setRatingStatus] = useState("idle");
 
   useEffect(() => {
     if (!open || !session) return;
@@ -28,6 +31,32 @@ function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
     setError("");
     setSaved(false);
   }, [open, session]);
+
+  const loadRating = useCallback(async () => {
+    if (!open || !session?.playerId) {
+      setRating(null);
+      setRatingStatus("idle");
+      return;
+    }
+    setRating(null);
+    setRatingStatus("loading");
+    try {
+      const next = await getMyGlobalRating();
+      setRating(next);
+      setRatingStatus("ready");
+    } catch {
+      setRating(null);
+      setRatingStatus("unavailable");
+    }
+  }, [open, session?.playerId]);
+
+  useEffect(() => {
+    void loadRating();
+    if (!open || !session?.playerId) return undefined;
+    return subscribeGlobalRatingRefresh(() => {
+      void loadRating();
+    });
+  }, [loadRating, open, session?.playerId]);
 
   if (!open || !session) return null;
 
@@ -84,6 +113,51 @@ function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
             </button>
           ) : null}
         </div>
+        <section
+          className="profile-panel__global-rp"
+          data-global-rp="true"
+          data-global-rp-status={ratingStatus}
+          aria-label={t("profile.globalRanking")}
+          aria-busy={ratingStatus === "loading" ? "true" : undefined}
+        >
+          <h3>{t("profile.globalRanking")}</h3>
+          {ratingStatus === "unavailable" ? (
+            <p className="profile-panel__global-rp-unavailable" data-global-rp-unavailable="true">
+              {t("profile.ratingUnavailable")}
+            </p>
+          ) : ratingStatus === "ready" && rating ? (
+            <dl className="profile-panel__global-rp-stats">
+              <div>
+                <dt>{t("profile.globalRank")}</dt>
+                <dd data-global-rp-rank="true">{t("profile.rankValue", { n: formatNumber(rating.globalRank) })}</dd>
+              </div>
+              <div>
+                <dt>{t("profile.rp")}</dt>
+                <dd data-global-rp-value="true">{t("profile.rpAmount", { n: formatNumber(rating.rp) })}</dd>
+              </div>
+              <div>
+                <dt>{t("profile.matchesPlayed")}</dt>
+                <dd data-global-rp-matches="true">{formatNumber(rating.matchesPlayed)}</dd>
+              </div>
+              <div>
+                <dt>{t("profile.wins")}</dt>
+                <dd data-global-rp-wins="true">{formatNumber(rating.wins)}</dd>
+              </div>
+              <div>
+                <dt>{t("profile.losses")}</dt>
+                <dd data-global-rp-losses="true">{formatNumber(rating.losses)}</dd>
+              </div>
+              <div>
+                <dt>{t("profile.winRate")}</dt>
+                <dd data-global-rp-winrate="true">
+                  {formatNumber(rating.winRate, { style: "percent", maximumFractionDigits: 0 })}
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="profile-panel__global-rp-loading" data-global-rp-loading="true" />
+          )}
+        </section>
         {referral ? (
           <section className="profile-panel__referral" data-referral="true" aria-label={t("referral.title")}>
             <h3>{t("referral.title")}</h3>

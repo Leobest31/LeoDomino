@@ -13,6 +13,12 @@ import MatchOverModal from "../components/MatchOverModal";
 import AbandonMatchDialog from "../components/AbandonMatchDialog";
 import { isForfeitView } from "../online/gameAuthority.js";
 import {
+  fetchSettledMatchRpResult,
+  isOnlineMatchAborted,
+  matchRpDisplayFromResult,
+  notifyGlobalRatingRefresh,
+} from "../online/globalRp.js";
+import {
   applyGameplayLayoutVars,
   gameplayDensityClass,
   measureSafeGameplayBox,
@@ -185,6 +191,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   const [pendingPlay, setPendingPlay] = useState(null);
   const [abandonIntent, setAbandonIntent] = useState(null);
   const [leaving, setLeaving] = useState(false);
+  const [matchRp, setMatchRp] = useState(null);
   const leavingRef = useRef(false);
   const dragRef = useRef(null);
   const skipClickRef = useRef(false);
@@ -202,6 +209,36 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   const awaitingInteraction = isViewerTurn(view) && !hasCoherentInteraction(view);
   const matchOver = view?.phase === PHASE.MATCH_OVER || view?.status === "match_over";
   const roundOver = view?.phase === PHASE.ROUND_OVER || view?.status === "round_over";
+  const matchAborted = isOnlineMatchAborted(view);
+
+  useEffect(() => {
+    if (!matchOver || !matchId) {
+      setMatchRp(null);
+      return undefined;
+    }
+    if (matchAborted) {
+      setMatchRp({ kind: "none" });
+      return undefined;
+    }
+    let cancelled = false;
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    setMatchRp(null);
+    void (async () => {
+      try {
+        const result = await fetchSettledMatchRpResult(matchId, { signal: controller?.signal });
+        if (cancelled) return;
+        const display = matchRpDisplayFromResult(result);
+        setMatchRp(display);
+        if (display.kind === "rated") notifyGlobalRatingRefresh();
+      } catch {
+        if (!cancelled) setMatchRp({ kind: "none" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+      controller?.abort();
+    };
+  }, [matchOver, matchId, matchAborted]);
   const roundIdentity = roundIdentityFromView(view);
   const tableEpoch = tableEpochFromView(view);
   const boardTiles = useMemo(() => {
@@ -832,6 +869,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         winnerName={winnerName}
         scores={scores}
         roundsPlayed={view.round}
+        globalRp={matchRp}
         message={
           isForfeitView(view)
             ? humanWonMatch

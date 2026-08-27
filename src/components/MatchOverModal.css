@@ -143,6 +143,51 @@
   color: rgba(242, 237, 229, 0.88);
 }
 
+.match-over__rp {
+  margin: 0.85rem auto 0;
+  width: min(100%, 18rem);
+  padding: 0.65rem 0.75rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  background: rgba(8, 12, 10, 0.45);
+}
+
+.match-over__rp-label,
+.match-over__rp-unchanged {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.match-over__rp-delta {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-brand);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #3de08c;
+}
+
+.match-over--defeat .match-over__rp-delta {
+  color: #f3e2a0;
+}
+
+.match-over__rp-range {
+  margin: 0.12rem 0 0;
+  font-variant-numeric: tabular-nums;
+  color: #f6edd4;
+}
+
+.match-over__rp--unrated .match-over__rp-unchanged {
+  margin-top: 0.28rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 0.88rem;
+  color: #d7c48a;
+}
+
 .match-over__stats {
   display: grid;
   gap: 0.7rem;

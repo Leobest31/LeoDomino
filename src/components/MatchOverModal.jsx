@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef } from "react";
 import { useI18n } from "../i18n";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion.js";
 import { formatMatchDuration } from "../utils/formatMatchDuration.js";
+import { signedDeltaLabel } from "../online/globalRp.js";
 import "./MatchOverModal.css";
 
 /**
@@ -17,6 +18,7 @@ function MatchOverModal({
   durationSeconds = 0,
   primaryActionLabel = null,
   message = null,
+  globalRp = null,
   onNewMatch,
   onStatistics,
   onMainMenu,
@@ -124,6 +126,30 @@ function MatchOverModal({
           <p className="match-over__message" data-match-over-message="true">
             {message}
           </p>
+        ) : null}
+
+        {globalRp?.kind === "rated" ? (
+          <div className="match-over__rp" data-match-rp="rated">
+            <p className="match-over__rp-label">{t("matchOver.globalRp")}</p>
+            <p className="match-over__rp-delta" data-match-rp-delta="true">
+              {t("matchOver.rpDelta", {
+                delta: signedDeltaLabel(globalRp.delta, formatNumber),
+              })}
+            </p>
+            <p className="match-over__rp-range" data-match-rp-range="true">
+              {t("matchOver.rpRange", {
+                old: formatNumber(globalRp.oldRp),
+                new: formatNumber(globalRp.newRp),
+              })}
+            </p>
+          </div>
+        ) : globalRp?.kind === "unrated" ? (
+          <div className="match-over__rp match-over__rp--unrated" data-match-rp="unrated">
+            <p className="match-over__rp-label">{t("matchOver.unratedFriend")}</p>
+            <p className="match-over__rp-unchanged" data-match-rp-unchanged="true">
+              {t("matchOver.rpUnchanged")}
+            </p>
+          </div>
         ) : null}
 
         <dl className="match-over__stats">
