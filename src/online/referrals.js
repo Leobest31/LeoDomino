@@ -53,7 +53,8 @@ export function getAppOrigin({ env, location } = {}) {
   const viteEnv = env || (typeof import.meta !== "undefined" ? import.meta.env : {});
   const configured = parseHttpOrigin(viteEnv?.[PUBLIC_APP_URL_ENV] || readViteEnv(PUBLIC_APP_URL_ENV));
   if (configured) return configured;
-  return parseHttpOrigin(location?.origin || "");
+  const loc = location ?? (typeof globalThis !== "undefined" ? globalThis.location : undefined);
+  return parseHttpOrigin(loc?.origin || loc?.href || "");
 }
 
 export function buildReferralLink(code, options = {}) {
@@ -233,8 +234,29 @@ export function isReferralSuccessNotice(key) {
     key === "referral.linkCopied" ||
     key === "referral.shared" ||
     key === "referral.applied" ||
-    key === "referral.preparing"
+    key === "referral.preparing" ||
+    key === "referral.cancelled"
   );
+}
+
+/**
+ * After ensureMyReferralCode succeeds, drop a previous load error.
+ * Attribution notices (applied/self/…) still replace the status line.
+ */
+export function noticeAfterReferralCodeLoad(ok, pendingNotice = "") {
+  return ok ? String(pendingNotice || "") : "referral.loadError";
+}
+
+/**
+ * Invite Friends status is never a code-load error when a valid code is already in hand.
+ */
+export function noticeForInviteFriendsOutcome({ code, url, result }) {
+  if (!code) return "referral.loadError";
+  if (!url) return "referral.shareFailed";
+  if (result === "copied") return "referral.linkCopied";
+  if (result === "shared") return "referral.shared";
+  if (result === "cancelled") return "referral.cancelled";
+  return "referral.shareFailed";
 }
 
 export async function ensureMyReferralCode(client) {
@@ -342,10 +364,34 @@ export async function copyText(text, clip = globalThis.navigator?.clipboard) {
   return copyWithExecCommand(value);
 }
 
-export async function shareReferralInvite({ title, text, url, share = globalThis.navigator?.share?.bind(globalThis.navigator) }) {
-  if (typeof share === "function") {
+function resolveShareFn(share) {
+  if (share !== undefined) return share;
+  const native = globalThis.navigator?.share;
+  return typeof native === "function" ? native.bind(globalThis.navigator) : undefined;
+}
+
+function sharePayloadAllowed(payload, canShare) {
+  const native = canShare !== undefined ? canShare : globalThis.navigator?.canShare?.bind(globalThis.navigator);
+  if (typeof native !== "function") return true;
+  try {
+    return native(payload) !== false;
+  } catch {
+    return false;
+  }
+}
+
+export async function shareReferralInvite({
+  title,
+  text,
+  url,
+  share,
+  canShare,
+} = {}) {
+  const payload = { title, text, url };
+  const shareFn = resolveShareFn(share);
+  if (typeof shareFn === "function" && sharePayloadAllowed(payload, canShare)) {
     try {
-      await share({ title, text, url });
+      await shareFn(payload);
       return "shared";
     } catch (error) {
       if (error?.name === "AbortError") return "cancelled";

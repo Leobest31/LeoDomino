@@ -79,6 +79,27 @@ assert.equal(parseReferralCodeFromHref("https://play.leodomino.com/"), "");
   assert.equal(origin, "");
 }
 
+{
+  const previous = globalThis.location;
+  Object.defineProperty(globalThis, "location", {
+    configurable: true,
+    value: { origin: "https://device.example", href: "https://device.example/" },
+  });
+  try {
+    assert.equal(getAppOrigin({ env: { VITE_PUBLIC_APP_URL: "" } }), "https://device.example");
+    assert.equal(
+      buildReferralLink("ABCD2345", { env: { VITE_PUBLIC_APP_URL: "" } }),
+      "https://device.example/invite?ref=ABCD2345"
+    );
+  } finally {
+    if (previous === undefined) {
+      delete globalThis.location;
+    } else {
+      Object.defineProperty(globalThis, "location", { configurable: true, value: previous });
+    }
+  }
+}
+
 function memoryWin(href = "https://play.leodomino.com/invite?ref=abcd2345") {
   const store = new Map();
   return {
@@ -248,6 +269,21 @@ function memoryWin(href = "https://play.leodomino.com/invite?ref=abcd2345") {
     },
   });
   assert.equal(result, "cancelled");
+}
+
+{
+  let attempted = false;
+  const result = await shareReferralInvite({
+    title: "LeoDomino",
+    text: "Play LeoDomino with me!",
+    url: "https://play.leodomino.com/invite?ref=ABCD2345",
+    share: async () => {
+      attempted = true;
+    },
+    canShare: () => false,
+  });
+  assert.equal(attempted, false);
+  assert.ok(result === "copied" || result === "failed");
 }
 
 {

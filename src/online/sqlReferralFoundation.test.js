@@ -9,7 +9,9 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const migrationRel = "supabase/migrations/20260827180000_referral_foundation.sql";
+const generateFixRel = "supabase/migrations/20260827210000_fix_referral_code_generation.sql";
 const sql = readFileSync(join(root, migrationRel), "utf8");
+const generateFixSql = readFileSync(join(root, generateFixRel), "utf8");
 
 function sliceFn(name) {
   const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}`);
@@ -98,6 +100,24 @@ assert.doesNotMatch(sql, /u\.email[^_]|u\.phone[^_]/, "does not return auth cont
   assert.match(ensure, /caller uuid := auth\.uid\(\)/);
   assert.match(ensure, /_generate_referral_code/);
   assert.doesNotMatch(ensure, /p_code/);
+}
+
+{
+  const start = generateFixSql.indexOf("CREATE OR REPLACE FUNCTION public._generate_referral_code()");
+  assert.ok(start >= 0, "fix migration replaces _generate_referral_code");
+  const generate = generateFixSql.slice(start);
+  assert.match(generate, /SET search_path = public, extensions/, "generator does not use the caller session search_path");
+  assert.match(generate, /extensions\.gen_random_bytes\(1\)/, "pgcrypto is schema-qualified");
+  assert.doesNotMatch(generate, /(?<!extensions\.)gen_random_bytes/, "no unqualified gen_random_bytes");
+  assert.match(generate, /ABCDEFGHJKLMNPQRSTUVWXYZ23456789/, "alphabet unchanged");
+  assert.match(generate, /FOR i IN 1\.\.8 LOOP/, "8-character codes unchanged");
+  assert.match(
+    generateFixSql,
+    /REVOKE ALL ON FUNCTION public\._generate_referral_code\(\) FROM PUBLIC, anon, authenticated/
+  );
+  assert.doesNotMatch(generateFixSql, /GRANT EXECUTE ON FUNCTION public\._generate_referral_code/);
+  assert.doesNotMatch(generateFixSql, /ALTER TABLE|DROP POLICY|CREATE POLICY|GRANT SELECT|GRANT INSERT/);
+  assert.doesNotMatch(generateFixSql, /INSERT INTO public\.player_referral_codes/);
 }
 
 {

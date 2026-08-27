@@ -125,6 +125,7 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
 
   useEffect(() => {
     if (referral.noticeKey) setNotice(t(referral.noticeKey));
+    else if (referral.noticeNonce > 0) setNotice("");
   }, [referral.noticeKey, referral.noticeNonce, t]);
 
   const tap = (fn) => {

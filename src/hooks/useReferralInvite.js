@@ -8,6 +8,9 @@ import {
   consumeReferralNotice,
   copyText,
   ensureMyReferralCode,
+  normalizeReferralCode,
+  noticeAfterReferralCodeLoad,
+  noticeForInviteFriendsOutcome,
   shareReferralInvite,
 } from "../online/referrals.js";
 
@@ -24,8 +27,7 @@ export function useReferralInvite({ enabled = true } = {}) {
   const codeRef = useRef("");
 
   const showNotice = useCallback((key) => {
-    if (!key) return;
-    setNoticeKey(key);
+    setNoticeKey(key || "");
     setNoticeNonce((n) => n + 1);
   }, []);
 
@@ -40,8 +42,7 @@ export function useReferralInvite({ enabled = true } = {}) {
       codeRef.current = next;
       setCode(next);
       await applyPendingReferralAttribution({ ownCode: next });
-      const notice = consumeReferralNotice();
-      if (notice) showNotice(notice);
+      showNotice(noticeAfterReferralCodeLoad(true, consumeReferralNotice()));
       return next;
     } catch (error) {
       reportError(error, {
@@ -49,7 +50,7 @@ export function useReferralInvite({ enabled = true } = {}) {
         actionName: "ensure_my_referral_code",
         code: error?.code || "GENERIC",
       });
-      showNotice("referral.loadError");
+      showNotice(noticeAfterReferralCodeLoad(false));
       return "";
     }
   }, [enabled, showNotice]);
@@ -100,9 +101,14 @@ export function useReferralInvite({ enabled = true } = {}) {
         showNotice("referral.preparing");
         ready = await fetchCode();
       }
-      const url = buildReferralLink(ready);
+      ready = normalizeReferralCode(ready) || normalizeReferralCode(codeRef.current) || normalizeReferralCode(code);
+      const url = ready ? buildReferralLink(ready) : "";
+      if (!ready) {
+        showNotice(noticeForInviteFriendsOutcome({ code: "", url: "", result: "failed" }));
+        return "failed";
+      }
       if (!url) {
-        showNotice("referral.loadError");
+        showNotice(noticeForInviteFriendsOutcome({ code: ready, url: "", result: "failed" }));
         return "failed";
       }
       let result = "failed";
@@ -120,10 +126,7 @@ export function useReferralInvite({ enabled = true } = {}) {
         });
         result = "failed";
       }
-      if (result === "copied") showNotice("referral.linkCopied");
-      else if (result === "shared") showNotice("referral.shared");
-      else if (result === "cancelled") showNotice("referral.cancelled");
-      else if (result === "failed") showNotice("referral.shareFailed");
+      showNotice(noticeForInviteFriendsOutcome({ code: ready, url, result }));
       return result;
     } finally {
       inviteLockRef.current = false;
