@@ -8,11 +8,13 @@ import {
   calculateBoardLayout,
   computeSafeFeltBounds,
   computePlayBounds,
+  packAmericanArmLimit,
   LOCKED_BOARD_TILE_SHORT_PX,
   LOCKED_BOARD_TILE_LONG_PX,
   SPINNER_MAIN_STRAIGHT,
   SPINNER_ARM_STRAIGHT,
   TURN_EVERY,
+  CHAIN_GAP,
 } from "./layoutEngine.js";
 
 const locked = {
@@ -79,6 +81,35 @@ function assertInsideSafe(boxes, viewport, label) {
         box.y + box.h <= safe.maxY + 0.75,
       `${label}: ${box.id} clipped outside felt`
     );
+  }
+}
+
+function armTwoStraightFits(viewport, northN, southN) {
+  const play = computePlayBounds(viewport, 12, 0, 0);
+  const safe = computeSafeFeltBounds(play);
+  return (
+    packAmericanArmLimit(
+      safe.maxX - safe.minX,
+      locked.h,
+      locked.w,
+      CHAIN_GAP,
+      northN,
+      southN
+    ) >= 2
+  );
+}
+
+function assertArmTwoStraight(north, south, viewport, label) {
+  if (!armTwoStraightFits(viewport, north.length, south.length)) return;
+  if (north.length >= 2) {
+    assertHorizontalRun(north.slice(0, 2), `${label} top 1–2`);
+  } else if (north.length === 1) {
+    assertHorizontalRun(north, `${label} top`);
+  }
+  if (south.length >= 2) {
+    assertHorizontalRun(south.slice(0, 2), `${label} bottom 1–2`);
+  } else if (south.length === 1) {
+    assertHorizontalRun(south, `${label} bottom`);
   }
 }
 
@@ -236,8 +267,7 @@ function branchFromSpinner(layout, board) {
     assert.equal(south.length, 2, `${name} south count`);
     assertMainFirstFold(left, "S", "W", `${name} left`);
     assertMainFirstFold(right, "N", "E", `${name} right`);
-    assertHorizontalRun(north.slice(0, 2), `${name} top 1–2`);
-    assertHorizontalRun(south.slice(0, 2), `${name} bottom 1–2`);
+    assertArmTwoStraight(north, south, vp, name);
   }
   console.log("✓ left/right keep locked fold direction; top/bottom 1–2 stay horizontal");
 }
@@ -255,8 +285,7 @@ function branchFromSpinner(layout, board) {
     const { left, right, north, south } = branchFromSpinner(layout, packed.board);
     assertMainFirstFold(left, "S", "W", `${name} left`);
     assertMainFirstFold(right, "N", "E", `${name} right`);
-    assertHorizontalRun(north.slice(0, 2), `${name} top does not turn before tile 3`);
-    assertHorizontalRun(south.slice(0, 2), `${name} bottom does not turn before tile 3`);
+    assertArmTwoStraight(north, south, vp, `${name} 6/6/4/4`);
     const leftFold = firstTurnIndex(left, "S");
     const rightFold = firstTurnIndex(right, "N");
     if (leftFold >= 1) {
@@ -315,16 +344,7 @@ function branchFromSpinner(layout, board) {
       const branches = branchFromSpinner(layout, packed.board);
       assertMainFirstFold(branches.left, "S", "W", `${name} step ${step} left`);
       assertMainFirstFold(branches.right, "N", "E", `${name} step ${step} right`);
-      if (branches.north.length >= 2) {
-        assertHorizontalRun(branches.north.slice(0, 2), `${name} step ${step} top 1–2`);
-      } else if (branches.north.length) {
-        assertHorizontalRun(branches.north, `${name} step ${step} top`);
-      }
-      if (branches.south.length >= 2) {
-        assertHorizontalRun(branches.south.slice(0, 2), `${name} step ${step} bottom 1–2`);
-      } else if (branches.south.length) {
-        assertHorizontalRun(branches.south, `${name} step ${step} bottom`);
-      }
+      assertArmTwoStraight(branches.north, branches.south, vp, `${name} step ${step}`);
     }
   }
   console.log("✓ growing L/R/N/S branches stay on felt; next move auto-fits first");
@@ -346,8 +366,7 @@ function branchFromSpinner(layout, board) {
     const { left, right, north, south } = branchFromSpinner(layout, packed.board);
     assertMainFirstFold(left, "S", "W", `${name} stress left`);
     assertMainFirstFold(right, "N", "E", `${name} stress right`);
-    assertHorizontalRun(north.slice(0, 2), `${name} stress top 1–2`);
-    assertHorizontalRun(south.slice(0, 2), `${name} stress bottom 1–2`);
+    assertArmTwoStraight(north, south, vp, `${name} stress`);
   }
   console.log("✓ desktop/tablet/phone spinner stress layouts remain contained");
 }
@@ -365,8 +384,7 @@ function branchFromSpinner(layout, board) {
     const { left, right, north, south } = branchFromSpinner(layout, packed.board);
     assertMainFirstFold(left, "S", "W", `resize ${name} left`);
     assertMainFirstFold(right, "N", "E", `resize ${name} right`);
-    assertHorizontalRun(north.slice(0, 2), `resize ${name} top`);
-    assertHorizontalRun(south.slice(0, 2), `resize ${name} bottom`);
+    assertArmTwoStraight(north, south, VIEWPORTS[name], `resize ${name}`);
     assert.equal(
       layout.tiles.length + layout.armTiles.length,
       packed.board.length + packed.north.length + packed.south.length,

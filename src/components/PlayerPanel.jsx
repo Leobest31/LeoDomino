@@ -62,7 +62,7 @@ function PlayerPanel({
       </div>
       )}
 
-      <div className="player-panel__tray">
+      <div className="player-panel__tray" data-hand-scroll>
         <ul className="player-panel__hand" ref={handRef} data-hand-root="player">
           {tiles.map((tile, index) => {
             const entering = enteringIds?.has(tile.id);

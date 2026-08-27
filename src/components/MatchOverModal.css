@@ -134,6 +134,15 @@
   background-clip: text;
 }
 
+.match-over__message {
+  margin: 0.45rem 0 0;
+  max-width: 22rem;
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: rgba(242, 237, 229, 0.88);
+}
+
 .match-over__stats {
   display: grid;
   gap: 0.7rem;

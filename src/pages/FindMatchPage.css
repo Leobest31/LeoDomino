@@ -245,6 +245,13 @@
   border-color: rgba(232, 197, 71, 0.42);
 }
 
+.find-match__card .friend-btn,
+.find-match__panel--ready .friend-btn,
+.find-match__card .friend-btn__pair,
+.find-match__panel--ready .friend-btn__pair {
+  justify-self: start;
+}
+
 .find-match__who {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

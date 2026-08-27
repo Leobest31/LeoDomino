@@ -10,9 +10,17 @@ import {
   measureMinRowClearance,
   parallelRunClearance,
   usesAmericanBoardLayout,
+  packAmericanArmLimit,
+  packFirstRunLimit,
+  computePlayBounds,
+  computeSafeFeltBounds,
+  computeChainBounds,
+  MARGIN,
   LOCKED_BOARD_TILE_SHORT_PX,
   LOCKED_BOARD_TILE_LONG_PX,
+  resolveBoardTileBase,
 } from "./layoutEngine.js";
+import { resolveGameplayLayout } from "../ui/gameplayLayout.js";
 import { END } from "../game/constants.js";
 import { playTile, listLegalMoves } from "../game/index.js";
 import { generateSet, indexTiles } from "../game/tiles.js";
@@ -464,6 +472,275 @@ section("portrait stages keep parallel-row clearance without device CSS");
   assert.ok(leftArm.x + leftArm.w <= leftSpin.x + 1, "legal NORTH play sits on the spinner's left");
   assert.ok(rightArm.x >= rightSpin.x + rightSpin.w - 1, "legal SOUTH play sits on the spinner's right");
   section("legal play can choose the spinner's left or right branch");
+}
+
+function fourWayBoard(leftCount, rightCount, northCount, southCount) {
+  const { board, spinnerId } = snakeBoard(leftCount, rightCount, 3);
+  const north = [];
+  let nPip = 3;
+  for (let i = 1; i <= northCount; i += 1) {
+    const next = (nPip + 3) % 7;
+    north.push(tile(`N${i}`, nPip, next));
+    nPip = next;
+  }
+  const south = [];
+  let sPip = 3;
+  for (let i = 1; i <= southCount; i += 1) {
+    const next = (sPip + 4) % 7;
+    south.push(tile(`S${i}`, sPip, next));
+    sPip = next;
+  }
+  return { board, spinnerId, north, south };
+}
+
+const PHONE_PORTRAITS = Object.freeze([
+  { name: "360", width: 360, height: 800 },
+  { name: "384", width: 384, height: 832 },
+  { name: "390", width: 390, height: 844 },
+  { name: "402", width: 402, height: 874 },
+  { name: "430", width: 430, height: 932 },
+]);
+
+function portraitStage(vp, rulesetId = "american") {
+  const L = resolveGameplayLayout(
+    { width: vp.width, height: vp.height },
+    { playerCount: 2, rulesetId }
+  );
+  const stage = {
+    width: Math.round(L.feltWidth),
+    height: Math.round(L.feltHeight),
+  };
+  const size = resolveBoardTileBase(stage, { w: L.playedShort, h: L.playedLong });
+  return { L, stage, size };
+}
+
+function layoutAmerican(pack, stage, size, extra = {}) {
+  return calculateBoardLayout(pack.board, stage, americanOptions({
+    tileWidth: size.w,
+    tileHeight: size.h,
+    spinnerId: pack.spinnerId,
+    spinnerNorth: pack.north || [],
+    spinnerSouth: pack.south || [],
+    ...extra,
+  }));
+}
+
+function measureFelt(layout, stage) {
+  const boxes = boxesOf(layout);
+  const play = computePlayBounds(stage, MARGIN, 0, 0, 0);
+  const safe = computeSafeFeltBounds(play);
+  const aabb = computeChainBounds(
+    boxes.map((t) => ({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h }))
+  );
+  const safeW = safe.maxX - safe.minX;
+  const safeH = safe.maxY - safe.minY;
+  return {
+    boxes,
+    safe,
+    aabb,
+    safeW,
+    safeH,
+    slackFracW: (safeW - aabb.width) / safeW,
+    slackFracH: (safeH - aabb.height) / safeH,
+    short: renderedShort(boxes),
+  };
+}
+
+function assertInsideSafe(boxes, safe, label) {
+  for (const b of boxes) {
+    assert.ok(b.x >= safe.minX - 0.75, `${label} ${b.id} left`);
+    assert.ok(b.y >= safe.minY - 0.75, `${label} ${b.id} top`);
+    assert.ok(b.x + b.w <= safe.maxX + 0.75, `${label} ${b.id} right`);
+    assert.ok(b.y + b.h <= safe.maxY + 0.75, `${label} ${b.id} bottom`);
+  }
+}
+
+function verticalLaneCount(boxes) {
+  const cols = new Set(
+    boxes
+      .filter((b) => b.h >= b.w - 0.5)
+      .map((b) => Math.round((b.x + b.w / 2) / 12) * 12)
+  );
+  return cols.size;
+}
+
+{
+  assert.equal(packAmericanArmLimit(900, 112, 59, 2), 2);
+  assert.equal(packAmericanArmLimit(300, 112, 59, 2), 1);
+  assert.equal(packAmericanArmLimit(332, 119, 63, 2, 3, 3), 1);
+  assert.equal(packAmericanArmLimit(972, 223, 119, 2, 2, 2), 2);
+  section("American spinner arms fold after 1 tile when 2-straight cannot fit width");
+}
+
+for (const phone of PHONE_PORTRAITS) {
+  const { stage, size } = portraitStage(phone);
+  const firstFloor = packFirstRunLimit(stage.height - 2 * MARGIN - 24, size.h, size.w, CHAIN_GAP);
+  assert.ok(firstFloor <= 3, `${phone.name}: portrait first-run floor is wrap-early (${firstFloor})`);
+
+  const shortPack = snakeBoard(2, 2);
+  const shortLayout = layoutAmerican(shortPack, stage, size);
+  const shortBoxes = boxesOf(shortLayout);
+  const spin = shortBoxes.find((b) => b.id === shortPack.spinnerId);
+  assert.equal(spin.orientation, "horizontal", `${phone.name} short: spinner horizontal`);
+  assert.ok(spin.w > spin.h + 0.5);
+  assert.ok(shortLayout.scale >= 0.99, `${phone.name} short chain keeps preferred scale, got ${shortLayout.scale}`);
+  assertNoOverlap(shortBoxes, `${phone.name} short`);
+  assert.ok(!shortLayout.camera?.overflow);
+
+  const medPack = snakeBoard(4, 6);
+  const medLayout = layoutAmerican(medPack, stage, size);
+  const medM = measureFelt(medLayout, stage);
+  assertNoOverlap(medM.boxes, `${phone.name} medium`);
+  assertConnectedFaceGap(medM.boxes, medPack.board, medLayout, `${phone.name} medium`);
+  assertInsideSafe(medM.boxes, medM.safe, `${phone.name} medium`);
+  assert.ok(!medLayout.camera?.overflow, `${phone.name} medium overflow`);
+  assert.ok(
+    medM.short + 0.05 >= size.w * 0.72,
+    `${phone.name} medium short ${medM.short.toFixed(1)} collapsed vs preferred ${size.w.toFixed(1)}`
+  );
+
+  const longPack = snakeBoard(8, 16);
+  const longLayout = layoutAmerican(longPack, stage, size);
+  const longM = measureFelt(longLayout, stage);
+  assertNoOverlap(longM.boxes, `${phone.name} long`);
+  assertConnectedFaceGap(longM.boxes, longPack.board, longLayout, `${phone.name} long`);
+  assertInsideSafe(longM.boxes, longM.safe, `${phone.name} long`);
+  assert.ok(!longLayout.camera?.overflow);
+  assertParallelClearance(longM.boxes, longLayout, `${phone.name} long`);
+  assert.ok(
+    verticalLaneCount(longM.boxes) >= 2,
+    `${phone.name} long chain must occupy more than one vertical lane`
+  );
+  assert.ok(
+    longM.short + 0.05 >= 31,
+    `${phone.name} long-chain short ${longM.short.toFixed(1)} must stay readable`
+  );
+  if (longLayout.scale < 0.97) {
+    assert.ok(
+      longM.slackFracW < 0.16 || longM.slackFracH < 0.12,
+      `${phone.name} long: shrunk while leaving unused felt ` +
+        `${(longM.slackFracW * 100).toFixed(0)}% × ${(longM.slackFracH * 100).toFixed(0)}%`
+    );
+  }
+
+  const fullPack = snakeBoard(14, 13);
+  const fullLayout = layoutAmerican(fullPack, stage, size);
+  const fullM = measureFelt(fullLayout, stage);
+  assert.equal(fullM.boxes.length, 28, `${phone.name} 28-tile count`);
+  assertNoOverlap(fullM.boxes, `${phone.name} 28`);
+  assertInsideSafe(fullM.boxes, fullM.safe, `${phone.name} 28`);
+  assert.ok(!fullLayout.camera?.overflow);
+  assert.ok(
+    fullM.short + 0.05 >= 33,
+    `${phone.name} 28-tile short ${fullM.short.toFixed(1)} must not collapse`
+  );
+  if (fullLayout.scale < 0.97) {
+    assert.ok(
+      fullM.slackFracW < 0.16 || fullM.slackFracH < 0.12,
+      `${phone.name} 28: unused felt ${(fullM.slackFracW * 100).toFixed(0)}% × ${(fullM.slackFracH * 100).toFixed(0)}%`
+    );
+  }
+
+  const topPack = snakeBoard(0, 8);
+  const topLayout = layoutAmerican(topPack, stage, size);
+  const topDirs = topLayout.tiles.map((t) => t.travelDir).join("");
+  assert.ok(
+    /E|W/.test(topDirs),
+    `${phone.name} north-heavy chain must turn before the top bound, got ${topDirs}`
+  );
+  assert.ok(!topLayout.camera?.overflow);
+
+  const botPack = snakeBoard(8, 0);
+  const botLayout = layoutAmerican(botPack, stage, size);
+  const botDirs = botLayout.tiles.map((t) => t.travelDir).join("");
+  assert.ok(
+    /E|W/.test(botDirs),
+    `${phone.name} south-heavy chain must turn before the bottom bound, got ${botDirs}`
+  );
+  assert.ok(!botLayout.camera?.overflow);
+
+  const branchPack = fourWayBoard(4, 4, 3, 3);
+  const branchLayout = layoutAmerican(branchPack, stage, size);
+  const branchBoxes = boxesOf(branchLayout);
+  const branchSpin = branchBoxes.find((b) => b.id === branchPack.spinnerId);
+  assert.equal(branchSpin.orientation, "horizontal", `${phone.name} branched spinner`);
+  const n1 = branchBoxes.find((b) => b.id === "N1");
+  const s1 = branchBoxes.find((b) => b.id === "S1");
+  assert.ok(n1.x + n1.w <= branchSpin.x + 1, `${phone.name} NORTH sits left of spinner`);
+  assert.ok(s1.x >= branchSpin.x + branchSpin.w - 1, `${phone.name} SOUTH sits right of spinner`);
+  assertNoOverlap(branchBoxes, `${phone.name} branches`);
+  assertInsideSafe(branchBoxes, measureFelt(branchLayout, stage).safe, `${phone.name} branches`);
+  const branchM = measureFelt(branchLayout, stage);
+  assert.ok(
+    branchLayout.scale > 0.62,
+    `${phone.name} branched scale ${branchLayout.scale.toFixed(3)} must beat the old 0.45 height-bound column`
+  );
+  assert.ok(
+    branchM.short + 0.05 >= 38,
+    `${phone.name} branched short ${branchM.short.toFixed(1)} must beat the old ~29 CSS`
+  );
+}
+section("portrait 360–430: wrap-first American lanes keep readable scale");
+
+{
+  const { stage, size } = portraitStage({ name: "390", width: 390, height: 844 });
+  const classic = calculateBoardLayout(snakeBoard(4, 6).board, stage, {
+    tileWidth: size.w,
+    tileHeight: size.h,
+    hudRight: 0,
+    spinnerId: "5-5",
+    rulesetId: "legacy",
+  });
+  const haitian = calculateBoardLayout(snakeBoard(4, 6).board, stage, {
+    tileWidth: size.w,
+    tileHeight: size.h,
+    hudRight: 0,
+    spinnerId: "5-5",
+    rulesetId: "haitian",
+  });
+  const classicSpin = classic.tiles.find((t) => t.tileId === "5-5");
+  const haitianSpin = haitian.tiles.find((t) => t.tileId === "5-5");
+  assert.ok(classicSpin.h > classicSpin.w + 0.5, "Classic spinner stays vertical");
+  assert.ok(haitianSpin.h > haitianSpin.w + 0.5, "Haitian spinner stays vertical");
+  const classicDirs = classic.tiles.map((t) => t.travelDir).join("");
+  assert.ok(
+    classicDirs.includes("E") || classicDirs.includes("W"),
+    `Classic main chain stays E/W, got ${classicDirs}`
+  );
+  assert.ok(!classic.camera?.overflow);
+  assert.ok(!haitian.camera?.overflow);
+  section("Classic and Haitian geometry is unchanged by the American wrap path");
+}
+
+{
+  const vp = { width: 1280, height: 720 };
+  const classicWide = calculateBoardLayout(snakeBoard(5, 5).board, vp, {
+    tileWidth: TILE.w,
+    tileHeight: TILE.h,
+    hudRight: 0,
+    spinnerId: "5-5",
+    rulesetId: "legacy",
+  });
+  const play = computePlayBounds(vp, MARGIN, 0, 0);
+  const safe = computeSafeFeltBounds(play);
+  const firstRun = packFirstRunLimit(
+    safe.maxX - safe.minX,
+    TILE.h,
+    TILE.w,
+    CHAIN_GAP
+  );
+  const right = classicWide.tiles.filter((t) => String(t.tileId).startsWith("R"));
+  const foldAt = Math.min(firstRun, 5, right.length);
+  for (let i = 0; i < foldAt; i += 1) {
+    assert.equal(
+      right[i].travelDir,
+      "E",
+      `Classic right[${i}] stays E while 5-straight fits (floor ${firstRun}), got ${right.map((t) => t.travelDir).join("")}`
+    );
+  }
+  const spin = classicWide.tiles.find((t) => t.tileId === "5-5");
+  assert.ok(spin.h > spin.w + 0.5);
+  section("Classic 5-straight ceiling still holds when the felt can fit it");
 }
 
 console.log("\nAmerican chain layout tests passed.");

@@ -23,7 +23,7 @@ const css = read("pages/FindMatchPage.css");
 const en = read("i18n/locales/en.js");
 const ht = read("i18n/locales/ht.js");
 
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "game"/);
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "game"/);
 assert.match(app, /<FindMatchPage/);
 assert.match(app, /onFindMatch=\{\(\) => setPhase\("findMatch"\)\}/);
 assert.match(app, /phase === "findMatch"/);
@@ -45,14 +45,25 @@ assert.match(page, /cancelMatchRequest/, "cancel uses the RPC adapter");
 assert.match(page, /subscribeMatchRequests/, "subscribes to match_requests");
 assert.match(page, /loadFindMatchBoard/, "loads open + own requests");
 
+{
+  const home = read("pages/HomePage.jsx");
+  assert.match(home, /useFindMatchAvailability/, "Home reads live Find Match availability");
+  assert.match(home, /data-find-match-available/, "Home Find Match button has an availability light");
+  assert.doesNotMatch(home, /acceptMatchRequest/, "Home does not accept requests");
+}
+
 assert.doesNotMatch(page, /supabaseClient|@supabase\/supabase-js/, "page does not import the client");
 assert.doesNotMatch(page, /track\(|channel\("presence"|Presence/, "no Presence");
 assert.doesNotMatch(page, /chat|sendMessage/, "no live chat");
-assert.doesNotMatch(page, /setPhase\("game"\)|onPlay\?/, "does not start live table play");
+assert.match(page, /onEnterMatch/, "Match ready can enter the accepted match");
+assert.match(page, /matchId: matched\.id/, "uses the accepted match id");
+assert.match(page, /data-find-match-friend=\{matched\.opponent\.playerId\}/, "Add Friend uses opponent profile id");
+assert.match(page, /matched\.opponent\.playerId !== playerId/, "cannot add self from Find Match");
+assert.match(page, /useFriendsBoard\(\{ watchOnline: false \}\)/, "Find Match does not listen to friend presence");
 assert.doesNotMatch(
   page,
   /enterOnlineMatch|getGameView|submitGameAction|game_sessions|game_secrets/,
-  "does not wire live table play"
+  "Find Match delegates live table entry to App"
 );
 assert.doesNotMatch(page, /insert\(\{[^}]*creator_id/, "does not write creator_id");
 assert.doesNotMatch(page, /from\("match_requests"\)/, "no direct table writes in the page");
@@ -73,9 +84,12 @@ assert.doesNotMatch(page, /from\("match_requests"\)/, "no direct table writes in
   assert.match(acceptBlock, /acceptMatchRequest\(/);
   assert.doesNotMatch(acceptBlock, /rulesetId|selectedId|styleId/);
   assert.match(acceptBlock, /canAcceptMatchRequest/);
+  assert.match(acceptBlock, /isStaleMatchAcceptError/);
   assert.match(acceptBlock, /const key = errorMessageKey\(error\)/);
   assert.match(acceptBlock, /await refresh\(\)/);
   assert.match(acceptBlock, /setErrorKey\(key\)/);
+  assert.match(acceptBlock, /setMatched\(null\)/);
+  assert.doesNotMatch(acceptBlock, /onEnterMatch/);
 }
 
 assert.match(page, /canAcceptMatchRequest\(request, playerId\)/);
@@ -93,6 +107,7 @@ assert.match(page, /findMatch\.matchReady/);
 assert.match(page, /findMatch\.statusOpen/);
 assert.match(page, /findMatch\.cannotAcceptOwn/);
 assert.match(page, /findMatch\.styleLocked/);
+assert.match(page, /findMatch\.enterTable/);
 
 assert.match(css, /max-width:\s*26\.5rem|width:\s*min\(100%,\s*26\.5rem\)/);
 assert.match(css, /env\(safe-area-inset-bottom/);
@@ -100,7 +115,10 @@ assert.match(css, /100svh|100dvh|flex:\s*1/);
 
 assert.match(en, /findMatch:\s*\{/);
 assert.match(ht, /findMatch:\s*\{/);
-assert.match(en, /cannotAcceptOwn:/);
+assert.match(page, /findMatch\.playerUnavailable/);
+assert.match(page, /findMatch\.alreadyInMatch/);
+assert.match(en, /playerUnavailable:/);
+assert.match(ht, /playerUnavailable:/);
 assert.match(en, /styleLocked:/);
 
 const styles = listV1GameStyles();

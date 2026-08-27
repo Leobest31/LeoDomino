@@ -13,6 +13,7 @@ import { AuthProvider } from "./auth";
 import { PrefsProvider } from "./hooks/PrefsProvider.jsx";
 import { applyTheme, applyTileSkin, loadPrefs } from "./persistence/index.js";
 import { MonitoringErrorBoundary, initMonitoring } from "./monitoring";
+import { capturePendingReferralFromWindow } from "./online/referrals.js";
 import "./styles/global.css";
 import App from "./App.jsx";
 
@@ -21,6 +22,7 @@ applyTheme(prefs.theme);
 applyTileSkin(prefs.tileSkin);
 
 async function boot() {
+  capturePendingReferralFromWindow();
   await initMonitoring();
   createRoot(document.getElementById("root")).render(
     <StrictMode>

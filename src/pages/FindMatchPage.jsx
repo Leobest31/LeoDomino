@@ -19,9 +19,12 @@ import {
   createMatchRequest,
   getMatchWithPlayers,
   isOwnMatchRequest,
+  isStaleMatchAcceptError,
   loadFindMatchBoard,
   subscribeMatchRequests,
 } from "../online/matchmaking.js";
+import { useFriendsBoard } from "../hooks/useFriends.js";
+import FriendButton from "../components/FriendButton";
 import "./FindMatchPage.css";
 
 const GAME_STYLES = listV1GameStyles();
@@ -32,8 +35,12 @@ function errorMessageKey(error) {
       return "findMatch.invalidStyle";
     case "SELF_ACCEPT":
       return "findMatch.cannotAcceptOwn";
+    case "PLAYER_BUSY":
+    case "REQUEST_UNAVAILABLE":
+    case "REQUEST_ALREADY_ACCEPTED":
     case "NOT_OPEN":
-      return "findMatch.notOpen";
+    case "NOT_FOUND":
+      return "findMatch.playerUnavailable";
     case "EXPIRED":
       return "findMatch.expired";
     case "ALREADY_OPEN":
@@ -94,12 +101,13 @@ function Identity({ person, label, you }) {
   );
 }
 
-function FindMatchPage({ onBack, onMainMenu }) {
+function FindMatchPage({ onBack, onMainMenu, onEnterMatch }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
   const { session } = useAuth();
   const playerId = session?.playerId ?? "";
   const onlineReady = isCloudAuth();
+  const friends = useFriendsBoard({ watchOnline: false });
 
   const [selectedId, setSelectedId] = useState(DEFAULT_GAME_STYLE_ID);
   const [open, setOpen] = useState([]);
@@ -228,7 +236,9 @@ function FindMatchPage({ onBack, onMainMenu }) {
         });
         await refresh();
       } catch (error) {
-        setErrorKey(errorMessageKey(error));
+        setErrorKey(
+          error?.code === "PLAYER_BUSY" ? "findMatch.alreadyInMatch" : errorMessageKey(error)
+        );
       } finally {
         setBusy("");
       }
@@ -257,6 +267,11 @@ function FindMatchPage({ onBack, onMainMenu }) {
         markEnteredOnline(match?.id);
       } catch (error) {
         const key = errorMessageKey(error);
+        if (isStaleMatchAcceptError(error)) {
+          setOpen((prev) => prev.filter((row) => row.id !== request.id));
+          setMatched(null);
+          matchedRef.current = null;
+        }
         await refresh();
         setErrorKey(key);
       } finally {
@@ -284,6 +299,24 @@ function FindMatchPage({ onBack, onMainMenu }) {
         setBusy("");
         setBusyId("");
       }
+    });
+  };
+
+  const handleEnterTable = () => {
+    if (!matched?.id || busy) return;
+    tap(() => {
+      addSafeBreadcrumb("enter live table", {
+        screen: "findMatch",
+        mode: "online",
+        matchId: matched.id,
+        ruleset: matched.rulesetId,
+      });
+      onEnterMatch?.({
+        matchId: matched.id,
+        rulesetId: matched.rulesetId,
+        host: matched.host || own?.creator,
+        opponent: matched.opponent,
+      });
     });
   };
 
@@ -342,7 +375,27 @@ function FindMatchPage({ onBack, onMainMenu }) {
               label={t("findMatch.opponent")}
               you={matched.opponent?.playerId === playerId}
             />
-            <button type="button" className="find-match__primary" onClick={handleBack}>
+            {matched.opponent?.playerId && matched.opponent.playerId !== playerId ? (
+              <div data-find-match-friend={matched.opponent.playerId}>
+                <FriendButton
+                  relation={friends.relationFor(matched.opponent.playerId)}
+                  busy={Boolean(friends.busy)}
+                  onAdd={() => friends.sendTo(matched.opponent.playerId)}
+                  onAccept={() => friends.accept(friends.incomingRequestId(matched.opponent.playerId))}
+                  onDecline={() => friends.decline(friends.incomingRequestId(matched.opponent.playerId))}
+                  onCancel={() => friends.cancel(friends.outgoingRequestId(matched.opponent.playerId))}
+                />
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="find-match__primary"
+              data-find-match-enter="true"
+              onClick={handleEnterTable}
+            >
+              {t("findMatch.enterTable")}
+            </button>
+            <button type="button" className="find-match__ghost" onClick={handleBack}>
               {t("findMatch.backHome")}
             </button>
           </section>
@@ -434,6 +487,19 @@ function FindMatchPage({ onBack, onMainMenu }) {
                           data-find-match-ruleset={request.rulesetId}
                         >
                           <Identity person={request.creator} you={mine} />
+                          {!mine ? (
+                            <div data-find-match-friend={request.creatorId}>
+                              <FriendButton
+                                compact
+                                relation={friends.relationFor(request.creatorId)}
+                                busy={Boolean(friends.busy)}
+                                onAdd={() => friends.sendTo(request.creatorId)}
+                                onAccept={() => friends.accept(friends.incomingRequestId(request.creatorId))}
+                                onDecline={() => friends.decline(friends.incomingRequestId(request.creatorId))}
+                                onCancel={() => friends.cancel(friends.outgoingRequestId(request.creatorId))}
+                              />
+                            </div>
+                          ) : null}
                           <div className="find-match__card-meta">
                             <span className="find-match__pill">{t(styleNameKey(request.styleId))}</span>
                             <span className="find-match__pill find-match__pill--open">

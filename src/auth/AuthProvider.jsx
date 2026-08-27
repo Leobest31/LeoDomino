@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthContext } from "./AuthContext.js";
 import { AuthError, authService } from "./service.js";
+import { applyPendingReferralAttribution } from "../online/referrals.js";
 
 /**
  * Cloud session (Supabase when configured) + auth screen intent.
@@ -36,6 +37,12 @@ export function AuthProvider({ children }) {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!authReady || !session?.playerId) return undefined;
+    void applyPendingReferralAttribution();
+    return undefined;
+  }, [authReady, session?.playerId]);
 
   const openLogin = useCallback(() => setAuthView("login"), []);
   const openCreate = useCallback(() => setAuthView("create"), []);

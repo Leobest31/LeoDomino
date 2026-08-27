@@ -117,7 +117,7 @@ mustInclude(/CREATE OR REPLACE FUNCTION public\.backfill_profiles_from_auth\(\)/
 const home = readFileSync(join(root, "src/pages/HomePage.jsx"), "utf8");
 const styles = readFileSync(join(root, "src/pages/GameStylePage.jsx"), "utf8");
 const matchHook = readFileSync(join(root, "src/hooks/useMatch.js"), "utf8");
-assert.doesNotMatch(home, /match_requests|accept_match_request/, "Home UI unchanged");
+assert.doesNotMatch(home, /match_requests|accept_match_request/, "Home does not call match_requests or accept RPC");
 assert.doesNotMatch(styles, /match_requests|accept_match_request/, "GameStylePage unchanged");
 assert.doesNotMatch(matchHook, /match_requests|accept_match_request/, "useMatch unchanged");
 

@@ -40,6 +40,8 @@ import {
   normalizeDifficulty,
 } from "../game/ai/difficulties.js";
 import { useAuth } from "../auth";
+import { useFindMatchAvailability } from "../hooks/useFindMatchAvailability.js";
+import { useReferralInvite } from "../hooks/useReferralInvite.js";
 import { loadMatch } from "../persistence/index.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
 import "./HomePage.css";
@@ -69,10 +71,12 @@ const HOME_PREVIEW = Object.freeze({
  * Premium Home dashboard — Figma visual shell, existing Home only.
  * PLAY VS LEOBEST is the only live gameplay path.
  */
-function HomePage({ onPlayVsLeoBest, onResume, onFindMatch }) {
+function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
   const { session, openLogin } = useAuth();
+  const findMatchAvailability = useFindMatchAvailability();
+  const referral = useReferralInvite({ enabled: Boolean(session) });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notice, setNotice] = useState("");
@@ -118,6 +122,10 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch }) {
     const timer = window.setTimeout(() => setNotice(""), 2200);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    if (referral.noticeKey) setNotice(t(referral.noticeKey));
+  }, [referral.noticeKey, referral.noticeNonce, t]);
 
   const tap = (fn) => {
     unlock();
@@ -348,6 +356,9 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch }) {
             subtitle={t("home.playOnlineSub")}
             action={t("home.findMatch")}
             onPress={handlePlayOnline}
+            availability={findMatchAvailability}
+            availableLabel={t("home.findMatchAvailable")}
+            unavailableLabel={t("home.findMatchUnavailable")}
           />
           <ModeCard
             id="friend"
@@ -368,6 +379,16 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch }) {
             onPress={showComingSoon}
           />
         </section>
+
+        <button
+          type="button"
+          className="home__invite-friends"
+          data-home-cta="inviteFriends"
+          aria-busy={referral.busy ? "true" : undefined}
+          onClick={() => tap(() => void referral.inviteFriends())}
+        >
+          {t("referral.inviteFriends")}
+        </button>
 
         <article className="home__card home__card--promo" id="tournaments" data-home-card="tournaments">
           <div className="home__tourney">
@@ -486,12 +507,34 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch }) {
         difficulty={difficulty}
         onDifficultyChange={handleDifficultyChange}
       />
-      <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfilePanel
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        referral={referral}
+        onOpenFriends={() => {
+          setProfileOpen(false);
+          onFriends?.();
+        }}
+      />
     </main>
   );
 }
 
-function ModeCard({ id, icon, title, subtitle, action, onPress, tone = "emerald" }) {
+function ModeCard({
+  id,
+  icon,
+  title,
+  subtitle,
+  action,
+  onPress,
+  tone = "emerald",
+  availability,
+  availableLabel,
+  unavailableLabel,
+}) {
+  const live = Boolean(availability);
+  const available = Boolean(availability?.available);
+  const liveLabel = live ? (available ? availableLabel : unavailableLabel) : "";
   return (
     <button
       type="button"
@@ -499,13 +542,23 @@ function ModeCard({ id, icon, title, subtitle, action, onPress, tone = "emerald"
       id={id}
       data-home-card={id}
       onClick={onPress}
+      aria-label={live ? `${title}. ${action}. ${liveLabel}` : undefined}
     >
       <span className="home-mode__title">{title}</span>
       <span className="home-mode__icon" aria-hidden="true">
         {icon}
       </span>
       <span className="home-mode__sub">{subtitle}</span>
-      <span className={`home-mode__cta home-mode__cta--${tone} home__cta--chevron`}>{action}</span>
+      <span className={`home-mode__cta home-mode__cta--${tone} home__cta--chevron${live ? " home-mode__cta--live" : ""}`}>
+        {live ? (
+          <span
+            className={`home-mode__live ${available ? "home-mode__live--on" : "home-mode__live--off"}`}
+            data-find-match-available={available ? "true" : "false"}
+            aria-hidden="true"
+          />
+        ) : null}
+        {action}
+      </span>
     </button>
   );
 }

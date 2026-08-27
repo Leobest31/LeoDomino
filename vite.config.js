@@ -48,6 +48,9 @@ export default defineConfig({
     // Temporary Quick Tunnel testing: Cloudflare Host header is *.trycloudflare.com.
     allowedHosts: [".trycloudflare.com"],
   },
+  preview: {
+    allowedHosts: [".trycloudflare.com"],
+  },
   plugins: [
     legalPrettyPathsPlugin(),
     react(),

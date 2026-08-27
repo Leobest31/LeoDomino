@@ -20,12 +20,15 @@
  *   5. Keep the preferred tile size when the real chain fits. Translate the
  *      complete AABB into the exclusive playable felt (HUD and Player 1
  *      dock are outside this rectangle) before any uniform auto-fit scale.
- *      Later horizontal runs fold to the felt width so unused vertical
- *      felt is used before shrinking. Parallel runs keep a tile-short
- *      alley on American / All Fives so neighboring rows never crowd.
- *      The American spinner hub stays horizontal; Classic/Haitian doubles
- *      stay vertical. The spinner may leave the geometric felt mid so
- *      unused space above a south branch is used.
+ *      Later Classic/Haitian horizontal runs fold to the felt width so
+ *      unused vertical felt is used before shrinking. American later
+ *      vertical lanes fold from the felt height, with 1-tile E/W
+ *      connectors, so unused left/right felt is used before shrinking.
+ *      Parallel runs keep a tile-short alley on American / All Fives
+ *      so neighboring rows never crowd. The American spinner hub stays
+ *      horizontal; Classic/Haitian doubles stay vertical. The spinner
+ *      may leave the geometric felt mid so unused space above a south
+ *      branch is used.
  *
  * Preferred first turns when they fit at preferred size:
  *   LEFT  up to 5 straight west  → next tile turns UP
@@ -343,12 +346,12 @@ function takeScreenTile(byId, tile, neighbor, fallback, size, scale, topology) {
   };
 }
 
-function isBetterPacking(candidate, best, laterRunDefault) {
+function isBetterPacking(candidate, best, laterRunDefault, preferWrap = false) {
   if (!best) return true;
   const scaleDelta = candidate.scale - best.scale;
   if (scaleDelta > PACK_SCALE_TIE) return true;
   if (scaleDelta < -PACK_SCALE_TIE) return false;
-  if (candidate.laterRun === best.laterRun) {
+  if (!preferWrap && candidate.laterRun === best.laterRun) {
     return candidate.firstRun > best.firstRun;
   }
   if (candidate.waste < best.waste - 0.02) return true;
@@ -357,7 +360,14 @@ function isBetterPacking(candidate, best, laterRunDefault) {
   const bestEven = Math.abs(best.slackFracW - best.slackFracH);
   if (candEven < bestEven - 0.02) return true;
   if (bestEven < candEven - 0.02) return false;
-  if (candidate.firstRun !== best.firstRun) return candidate.firstRun > best.firstRun;
+  if (candidate.firstRun !== best.firstRun) {
+    return preferWrap
+      ? candidate.firstRun < best.firstRun
+      : candidate.firstRun > best.firstRun;
+  }
+  if (preferWrap && candidate.laterRun !== best.laterRun) {
+    return candidate.laterRun < best.laterRun;
+  }
   const candRunDist = Math.abs(candidate.laterRun - laterRunDefault);
   const bestRunDist = Math.abs(best.laterRun - laterRunDefault);
   if (candRunDist !== bestRunDist) return candRunDist < bestRunDist;
@@ -406,6 +416,33 @@ export function packSpinnerArmLimit(
   if (h >= SPINNER_ARM_SHORT_FELT_H) return SPINNER_ARM_STRAIGHT;
   const col2 = 5 * long + 4 * g;
   if (col2 <= h + 0.5) return SPINNER_ARM_STRAIGHT;
+  return 1;
+}
+
+/**
+ * American L/R spinner arms are horizontal longs. Two-straight on both
+ * sides is five longs (2 + spinner + 2) and must fold after 1 tile when
+ * that rail cannot fit the usable felt width at preferred size.
+ */
+export function packAmericanArmLimit(
+  safeWidth,
+  tileLong,
+  tileShort,
+  gap = CHAIN_GAP,
+  northCount = SPINNER_ARM_STRAIGHT,
+  southCount = SPINNER_ARM_STRAIGHT
+) {
+  const long = Math.max(Number(tileLong) || 1, Number(tileShort) || 1);
+  const g = Math.max(0, Number(gap) || 0);
+  const w = Math.max(1, Number(safeWidth) || 0);
+  const left = Math.min(SPINNER_ARM_STRAIGHT, Math.max(0, Number(northCount) || 0));
+  const right = Math.min(SPINNER_ARM_STRAIGHT, Math.max(0, Number(southCount) || 0));
+  const longer = Math.max(left, right);
+  // One 2-straight arm + the horizontal spinner is three longs. Fold after
+  // 1 tile when even that rail cannot fit; both-arms occupancy is handled
+  // by the packing search / extraOccupied.
+  const oneArm2 = (longer + 1) * long + longer * g;
+  if (oneArm2 <= w + 0.5) return SPINNER_ARM_STRAIGHT;
   return 1;
 }
 
@@ -988,7 +1025,9 @@ function tryPlace(prev, tile, dir, fromDir, size, gap, soft, occupied, hard = nu
  * (up to LEO_MAIN_STRAIGHT, or fewer when that rail cannot fit the felt at
  * preferred size), then the next tile MUST take foldDir (never the opposite).
  * Before any double exists the chain stays linear (no fake spinner folds).
- * Later runs after the mandatory first fold use a felt-aware run length.
+ * Later runs after the mandatory first fold use a felt-aware run length
+ * (Classic: later E/W rails from felt width; American: later N/S lanes
+ * from felt height, with a 1-tile E/W connector between columns).
  * Long height-bound chains may search past RUN_CEILING when that raises
  * the uniform fit scale.
  */
@@ -2264,23 +2303,39 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
   const safeEarly = computeSafeFeltBounds(playEarly);
   const safeW = Math.max(1, safeEarly.maxX - safeEarly.minX);
   const safeH = Math.max(1, safeEarly.maxY - safeEarly.minY);
-  const laterRunDefault = packRunLimit(usableW, size.h, gap, RUN_CEILING);
+  const americanPack = americanVerticalMain();
+  // Classic later rails are horizontal → limit by felt width.
+  // American later rails are vertical lanes → limit by felt height.
+  const laterRunDefault = packRunLimit(
+    americanPack ? safeH : usableW,
+    size.h,
+    gap,
+    RUN_CEILING
+  );
   const firstRunFloor = packFirstRunLimit(
-    americanVerticalMain() ? safeH : safeW,
+    americanPack ? safeH : safeW,
     size.h,
     size.w,
     gap
   );
+  // Search up to the 5-straight ceiling. American wrapping wins on scale
+  // ties (preferWrap) and by later-run/bridge defaults, not by hiding 5.
+  // firstRun=1-only fails because the E/W fold hits the horizontal spinner.
+  const firstRunCeiling = LEO_MAIN_STRAIGHT;
   const leftLen = Math.max(0, centerIndex);
   const rightLen = Math.max(0, tiles.length - centerIndex - 1);
   const maxArm = Math.max(leftLen, rightLen);
   const playedCount = tiles.length + northTiles.length + southTiles.length;
-  const armStraight = packSpinnerArmLimit(
-    americanVerticalMain() ? safeW : safeH,
-    size.h,
-    size.w,
-    gap
-  );
+  const armStraight = americanPack
+    ? packAmericanArmLimit(
+        safeW,
+        size.h,
+        size.w,
+        gap,
+        northTiles.length,
+        southTiles.length
+      )
+    : packSpinnerArmLimit(safeH, size.h, size.w, gap);
   const extraOccupied = spinnerLaneOccupants(
     originProbe,
     Math.min(northCount, armStraight),
@@ -2433,6 +2488,8 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     return next;
   };
 
+  // American column connectors are 1 tile (a 2-long E/W jog is ~2× tile
+  // long and width-caps portrait packing). Classic keeps the 1-or-2 search.
   const bridgeOptions = [...new Set([1, BRIDGE_LEN])];
 
   const tryPack = (force, firstRun, bridgeLen, laterRunLen) =>
@@ -2503,16 +2560,22 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     if (packingHasOverlap(picked)) return target;
     const candidate = scorePicked(picked, firstRun, laterRunLen);
     candidate.bridgeLen = bridgeLen;
-    if (!target || isBetterPacking(candidate, target, laterRunDefault)) return candidate;
+    if (!target || isBetterPacking(candidate, target, laterRunDefault, americanPack)) {
+      return candidate;
+    }
     return target;
   };
 
-  const searchPackings = (laterRuns, minFirstRun = firstRunFloor, maxFirstRun = LEO_MAIN_STRAIGHT) => {
+  const searchPackings = (
+    laterRuns,
+    minFirstRun = firstRunFloor,
+    maxFirstRun = firstRunCeiling
+  ) => {
     let found = null;
     const firstMin = Math.max(1, Number(minFirstRun) || 1);
     const firstMax = Math.max(
       firstMin,
-      Math.min(Math.max(1, maxArm), Math.floor(Number(maxFirstRun) || LEO_MAIN_STRAIGHT))
+      Math.min(Math.max(1, maxArm), Math.floor(Number(maxFirstRun) || firstRunCeiling))
     );
     for (const laterRunLen of laterRuns) {
       for (let firstRun = firstMax; firstRun >= firstMin; firstRun -= 1) {
@@ -2546,13 +2609,15 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     const laterMax = packLaterRunSearchLimit(laterRunDefault, maxArm);
     const laterRuns = [];
     for (let r = 2; r <= laterMax; r += 1) laterRuns.push(r);
-    const firstMax = packLaterRunSearchLimit(LEO_MAIN_STRAIGHT, maxArm);
-    const minFirst = playedCount >= 18 ? 1 : Math.max(1, firstRunFloor);
+    const firstMax = americanPack
+      ? firstRunCeiling
+      : packLaterRunSearchLimit(LEO_MAIN_STRAIGHT, maxArm);
+    const minFirst = playedCount >= 18 || americanPack ? 1 : Math.max(1, firstRunFloor);
     const searched = searchPackings(laterRuns, minFirst, firstMax);
     if (
       searched &&
       (searched.scale > best.scale ||
-        isBetterPacking(searched, best, laterRunDefault))
+        isBetterPacking(searched, best, laterRunDefault, americanPack))
     ) {
       best = searched;
     }
@@ -2616,7 +2681,12 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
     const laterMax = Math.min(8, packLaterRunSearchLimit(laterRunDefault, maxArm));
     const laterRuns = [];
     for (let r = 2; r <= laterMax; r += 1) laterRuns.push(r);
-    const firstMax = Math.min(8, packLaterRunSearchLimit(LEO_MAIN_STRAIGHT, maxArm));
+    const firstMax = Math.min(
+      8,
+      americanPack
+        ? firstRunCeiling
+        : packLaterRunSearchLimit(LEO_MAIN_STRAIGHT, maxArm)
+    );
     const foldSpecs = [
       { right: "S", left: "S", outward: true },
       { right: "N", left: "N", outward: true },
@@ -2629,7 +2699,7 @@ export function calculateBoardLayout(boardGraph, viewportDimensions, options = {
       if (
         searched &&
         (searched.scale > best.scale ||
-          isBetterPacking(searched, best, laterRunDefault))
+          isBetterPacking(searched, best, laterRunDefault, americanPack))
       ) {
         best = searched;
       }

@@ -192,7 +192,8 @@ export async function handleGetGameView({ userId, matchId, store }) {
   return viewFromSecret(secret, matchId, session.version, seat);
 }
 
-async function applyAndCommit({ userId, matchId, expectedVersion, action, store, allowedTypes }) {
+async function applyAndCommit({ userId, matchId, expectedVersion, action, store, allowedTypes, trace }) {
+  const edgeStarted = Date.now();
   requireUser(userId);
   if (!matchId) throw new GameplayError("MATCH_REQUIRED", "match_id required");
   if (!Number.isInteger(expectedVersion) || expectedVersion < 0) {
@@ -214,6 +215,7 @@ async function applyAndCommit({ userId, matchId, expectedVersion, action, store,
     throw new GameplayError("UNKNOWN_ACTION", "Unsupported action type");
   }
   const applied = applyOnlineAction(secret.engineState, { seat, action });
+  const validatedAt = Date.now();
   const nextVersion = expectedVersion + 1;
   const publicRow = projectPublicSession(applied.state, { version: nextVersion });
   await store.commitTransition({
@@ -229,10 +231,20 @@ async function applyAndCommit({ userId, matchId, expectedVersion, action, store,
     },
     matchStatus: matchStatusForEngine(applied.state),
   });
-  return projectGameView(applied.state, { matchId, version: nextVersion, viewerSeat: seat });
+  const committedAt = Date.now();
+  const view = projectGameView(applied.state, { matchId, version: nextVersion, viewerSeat: seat });
+  if (trace) {
+    view._timings = {
+      edgeReceivedToValidatedMs: validatedAt - edgeStarted,
+      edgeValidatedToCommitMs: committedAt - validatedAt,
+      edgeCommitToReturnMs: Date.now() - committedAt,
+      edgeTotalMs: Date.now() - edgeStarted,
+    };
+  }
+  return view;
 }
 
-export async function handleSubmitGameAction({ userId, matchId, expectedVersion, action, store }) {
+export async function handleSubmitGameAction({ userId, matchId, expectedVersion, action, store, trace }) {
   return applyAndCommit({
     userId,
     matchId,
@@ -240,10 +252,11 @@ export async function handleSubmitGameAction({ userId, matchId, expectedVersion,
     action,
     store,
     allowedTypes: PLAY_DRAW_PASS,
+    trace,
   });
 }
 
-export async function handleAdvanceOnlineRound({ userId, matchId, expectedVersion, store }) {
+export async function handleAdvanceOnlineRound({ userId, matchId, expectedVersion, store, trace }) {
   return applyAndCommit({
     userId,
     matchId,
@@ -251,6 +264,7 @@ export async function handleAdvanceOnlineRound({ userId, matchId, expectedVersio
     action: { type: ONLINE_ACTION_ADVANCE_ROUND },
     store,
     allowedTypes: new Set([ONLINE_ACTION_ADVANCE_ROUND]),
+    trace,
   });
 }
 
@@ -262,10 +276,10 @@ export async function handleOnlineGameRequest(op, payload, ctx) {
     return handleGetGameView({ ...ctx, ...payload });
   }
   if (op === "submit_game_action") {
-    return handleSubmitGameAction({ ...ctx, ...payload });
+    return handleSubmitGameAction({ ...ctx, ...payload, trace: Boolean(payload?.trace) });
   }
   if (op === "advance_online_round") {
-    return handleAdvanceOnlineRound({ ...ctx, ...payload });
+    return handleAdvanceOnlineRound({ ...ctx, ...payload, trace: Boolean(payload?.trace) });
   }
   throw new GameplayError("UNKNOWN_OP", "Unknown gameplay operation");
 }

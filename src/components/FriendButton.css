@@ -1,0 +1,59 @@
+.friend-btn__pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.friend-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.7rem;
+  padding: 0 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  background: transparent;
+  color: #f3e2a4;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.friend-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.friend-btn--add {
+  border-color: rgba(61, 224, 140, 0.55);
+  background: linear-gradient(180deg, #3de08c 0%, #00b85c 58%, #006b38 100%);
+  color: #04140c;
+}
+
+.friend-btn--accept {
+  border-color: rgba(61, 224, 140, 0.55);
+  background: linear-gradient(180deg, #3de08c 0%, #00b85c 58%, #006b38 100%);
+  color: #04140c;
+}
+
+.friend-btn--ghost {
+  border-color: rgba(169, 183, 195, 0.35);
+  color: rgba(232, 236, 240, 0.88);
+}
+
+.friend-btn--state {
+  border-color: rgba(201, 162, 39, 0.35);
+  color: #f3e2a4;
+  cursor: default;
+}
+
+.friend-btn--compact {
+  min-height: 1.4rem;
+  padding: 0 0.45rem;
+  font-size: 0.64rem;
+}

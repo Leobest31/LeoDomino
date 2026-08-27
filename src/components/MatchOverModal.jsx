@@ -15,6 +15,8 @@ function MatchOverModal({
   scores = [],
   roundsPlayed = 1,
   durationSeconds = 0,
+  primaryActionLabel = null,
+  message = null,
   onNewMatch,
   onStatistics,
   onMainMenu,
@@ -118,6 +120,12 @@ function MatchOverModal({
           {t("matchOver.title")}
         </h2>
 
+        {message ? (
+          <p className="match-over__message" data-match-over-message="true">
+            {message}
+          </p>
+        ) : null}
+
         <dl className="match-over__stats">
           <div className="match-over__stat">
             <dt>{t("matchOver.winner")}</dt>
@@ -144,7 +152,7 @@ function MatchOverModal({
             className="match-over__btn match-over__btn--primary"
             onClick={onNewMatch}
           >
-            {t("matchOver.newMatch")}
+            {primaryActionLabel || t("matchOver.newMatch")}
           </button>
           {typeof onStatistics === "function" ? (
             <button

@@ -6,10 +6,19 @@ import assert from "node:assert/strict";
 import {
   FIND_MATCH_STYLE_IDS,
   MATCH_REQUEST_SELECT,
+  MATCH_REQUEST_SELECT_LEGACY,
   MatchmakingError,
   acceptMatchRequest,
   canAcceptMatchRequest,
+  canAcceptFriendInvite,
   cancelMatchRequest,
+  abortOnlineMatch,
+  cleanupStaleOccupiedMatches,
+  forfeitOnlineMatch,
+  MATCH_PRESENCE_HEARTBEAT_MS,
+  STALE_MATCH_GRACE_MS,
+  touchMyMatchPresence,
+  getOwnLatestRequest,
   isMatchRequestExpired,
   createMatchRequest,
   isOwnMatchRequest,
@@ -20,6 +29,8 @@ import {
   subscribeMatchRequests,
   throwFromPostgrest,
   toFindMatchRulesetId,
+  isStaleMatchAcceptError,
+  friendInviteErrorKey,
 } from "./matchmaking.js";
 
 function thenable(result, capture = {}) {
@@ -35,6 +46,11 @@ function thenable(result, capture = {}) {
     eq(column, value) {
       capture.eq = capture.eq || [];
       capture.eq.push([column, value]);
+      return builder;
+    },
+    neq(column, value) {
+      capture.neq = capture.neq || [];
+      capture.neq.push([column, value]);
       return builder;
     },
     gt(column, value) {
@@ -104,6 +120,14 @@ const CREATOR_ROW = {
   assert.equal(isOwnMatchRequest(mapped, "player-a"), true);
   assert.equal(canAcceptMatchRequest(mapped, "player-a"), false);
   assert.equal(canAcceptMatchRequest(mapped, "player-b"), true);
+  const friendInvite = normalizeMatchRequest({
+    ...CREATOR_ROW,
+    visibility: "friend",
+    invitee_id: "player-b",
+  });
+  assert.equal(canAcceptMatchRequest(friendInvite, "player-b"), false);
+  assert.equal(canAcceptFriendInvite(friendInvite, "player-b"), true);
+  assert.equal(canAcceptFriendInvite(friendInvite, "player-a"), false);
 }
 
 {
@@ -117,7 +141,7 @@ const CREATOR_ROW = {
   const created = await createMatchRequest("haitian", client);
   assert.deepEqual(capture.insert, { ruleset_id: "haitian" });
   assert.equal(Object.keys(capture.insert).join(), "ruleset_id");
-  assert.equal(capture.select, MATCH_REQUEST_SELECT);
+  assert.equal(capture.select, MATCH_REQUEST_SELECT_LEGACY);
   assert.equal(created.styleId, "haitian");
   assert.equal(created.creator.displayName, "Marie");
 }
@@ -143,11 +167,31 @@ const CREATOR_ROW = {
     },
   };
   const open = await listOpenMatchRequests(client);
+  assert.equal(capture.select, MATCH_REQUEST_SELECT);
   assert.deepEqual(capture.eq, [["status", "open"]]);
+  assert.deepEqual(capture.neq, [["visibility", "friend"]]);
   assert.equal(capture.gt[0], "expires_at");
   assert.equal(typeof capture.gt[1], "string");
   assert.equal(open[0].styleId, "haitian");
   assert.equal(open[0].rulesetId, "haitian");
+}
+
+{
+  const friendRow = {
+    ...CREATOR_ROW,
+    id: "req-friend",
+    visibility: "friend",
+    invitee_id: "player-b",
+  };
+  const client = {
+    from() {
+      return thenable({ data: [friendRow, CREATOR_ROW], error: null }, {});
+    },
+  };
+  const open = await listOpenMatchRequests(client);
+  assert.equal(open.length, 1);
+  assert.equal(open[0].id, "req-1");
+  assert.equal(open[0].visibility, "public");
 }
 
 {
@@ -201,10 +245,8 @@ const CREATOR_ROW = {
     },
   };
   const board = await loadFindMatchBoard("player-a", client);
-  assert.equal(board.open.length, 1);
-  assert.equal(board.open[0].id, "req-1");
-  assert.equal(canAcceptMatchRequest(board.open[0], "player-b"), false);
-  assert.equal(isOwnMatchRequest(board.open[0], "player-a"), true);
+  assert.equal(board.open.length, 0);
+  assert.equal(board.own, null);
 }
 
 {
@@ -334,10 +376,89 @@ const CREATOR_ROW = {
 }
 
 {
+  let aborted = null;
+  const client = {
+    async rpc(name, args) {
+      aborted = { name, args };
+      return { error: null };
+    },
+  };
+  await abortOnlineMatch("match-1", client);
+  assert.equal(aborted.name, "forfeit_online_match");
+  assert.deepEqual(aborted.args, { p_match_id: "match-1" });
+}
+
+{
+  let forfeited = null;
+  const client = {
+    async rpc(name, args) {
+      forfeited = { name, args };
+      return { data: { ok: true, idempotent: true }, error: null };
+    },
+  };
+  const result = await forfeitOnlineMatch("match-1", client);
+  assert.equal(forfeited.name, "forfeit_online_match");
+  assert.equal(result.ok, true);
+}
+
+{
+  await assert.rejects(
+    () =>
+      forfeitOnlineMatch("match-1", {
+        async rpc() {
+          return {
+            error: {
+              code: "PGRST202",
+              message:
+                "Could not find the function public.forfeit_online_match(p_match_id) in the schema cache",
+            },
+          };
+        },
+      }),
+    (err) => err instanceof MatchmakingError && err.code === "FORFEIT_FAILED"
+  );
+}
+
+{
+  const client = {
+    from() {
+      return thenable({
+        data: { ...CREATOR_ROW, expires_at: "2020-01-01T00:00:00.000Z" },
+        error: null,
+      });
+    },
+  };
+  const own = await getOwnLatestRequest("player-a", client);
+  assert.equal(own, null);
+}
+
+{
   assert.throws(
     () => throwFromPostgrest({ message: "match request expired" }),
     (err) => err.code === "EXPIRED"
   );
+  assert.throws(
+    () => throwFromPostgrest({ message: "PLAYER_BUSY" }),
+    (err) => err.code === "PLAYER_BUSY"
+  );
+  assert.throws(
+    () => throwFromPostgrest({ code: "P0001", message: "PLAYER_BUSY" }),
+    (err) => err.code === "PLAYER_BUSY"
+  );
+  assert.throws(
+    () => throwFromPostgrest({ message: "REQUEST_UNAVAILABLE" }),
+    (err) => err.code === "REQUEST_UNAVAILABLE"
+  );
+  assert.throws(
+    () => throwFromPostgrest({ message: "not friends" }),
+    (err) => err.code === "NOT_FRIENDS"
+  );
+  assert.throws(
+    () => throwFromPostgrest({ message: "cannot invite yourself" }),
+    (err) => err.code === "SELF_INVITE"
+  );
+  assert.equal(friendInviteErrorKey(new MatchmakingError("PLAYER_BUSY")), "findMatch.alreadyInMatch");
+  assert.equal(isStaleMatchAcceptError(new MatchmakingError("NOT_FRIENDS")), true);
 }
 
 {
@@ -369,6 +490,57 @@ const CREATOR_ROW = {
   stop();
   assert.equal(events.length, 1);
   assert.equal(removed[0], channel);
+}
+
+{
+  assert.equal(STALE_MATCH_GRACE_MS, 5 * 60 * 1000);
+  assert.equal(MATCH_PRESENCE_HEARTBEAT_MS, 20 * 1000);
+}
+
+{
+  let called = null;
+  const client = {
+    async rpc(name, args) {
+      called = { name, args };
+      return { data: { ok: true, touched: true, cleaned: 0 }, error: null };
+    },
+  };
+  const result = await touchMyMatchPresence("match-1", client);
+  assert.equal(called.name, "touch_my_match_presence");
+  assert.deepEqual(called.args, { p_match_id: "match-1" });
+  assert.equal(result.ok, true);
+}
+
+{
+  const client = {
+    async rpc() {
+      return { data: null, error: { message: "function not found" } };
+    },
+  };
+  const result = await touchMyMatchPresence("match-1", client);
+  assert.equal(result.ok, false);
+}
+
+{
+  let called = null;
+  const client = {
+    async rpc(name) {
+      called = name;
+      return { data: 2, error: null };
+    },
+  };
+  const cleaned = await cleanupStaleOccupiedMatches(client);
+  assert.equal(called, "cleanup_stale_occupied_matches");
+  assert.equal(cleaned, 2);
+}
+
+{
+  const client = {
+    async rpc() {
+      return { data: null, error: { message: "function not found" } };
+    },
+  };
+  assert.equal(await cleanupStaleOccupiedMatches(client), 0);
 }
 
 console.log("  ✓ Find Match matchmaking adapter");

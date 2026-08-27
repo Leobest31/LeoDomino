@@ -1,6 +1,6 @@
 /**
  * Browser client for the live-gameplay Edge Function.
- * Pages must not import this yet — table UI is a later checkpoint.
+ * OnlineGamePage / useOnlineMatch consume this. GamePage (LeoBest) must not.
  */
 import { getSupabaseClient } from "./supabaseClient.js";
 
@@ -24,8 +24,14 @@ function throwFromFunctions(error, fallback) {
 }
 
 async function invoke(op, payload, client) {
+  const body = { op, ...payload };
+  try {
+    if (import.meta.env?.DEV) body.trace = true;
+  } catch {
+    /* node tests have no Vite DEV flag */
+  }
   const { data, error } = await clientOf(client).functions.invoke("online-game", {
-    body: { op, ...payload },
+    body,
   });
   if (error) throwFromFunctions(error, "GAMEPLAY_FAILED");
   if (data?.error) {
@@ -49,7 +55,7 @@ export function submitGameAction(matchId, expectedVersion, action, client) {
 /**
  * Minimum next-round contract after phase === roundOver.
  * Classic/Haitian deal the next round. American finishes a pending match
- * winner or deals the next round. No UI calls this yet.
+ * winner or deals the next round.
  */
 export function advanceOnlineRound(matchId, expectedVersion, client) {
   return invoke("advance_online_round", { matchId, expectedVersion }, client);

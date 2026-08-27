@@ -187,7 +187,8 @@
 .game-page[data-orientation="portrait"] .game-page__dock .bottom-bar__center {
   justify-content: center;
   align-items: center;
-  overflow: visible;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .game-page[data-orientation="portrait"] .game-page__dock .player-panel {
@@ -195,12 +196,17 @@
   height: auto;
   max-height: none;
   padding: 0;
+  min-width: 0;
 }
 
 .game-page[data-orientation="portrait"] .game-page__dock .player-panel__tray {
   overflow-x: auto;
-  overflow-y: visible;
-  padding: 0;
+  overflow-y: hidden;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 6px 0 0;
+  margin-top: -6px;
   border: none;
   background: none;
   box-shadow: none;
@@ -344,6 +350,12 @@
 .game-page__hud-id--end {
   align-items: flex-end;
   text-align: right;
+}
+
+.game-page__hud-id .friend-btn,
+.game-page__hud-id .friend-btn__pair {
+  margin-top: 0.06rem;
+  max-width: 100%;
 }
 
 .game-page__hud-name {

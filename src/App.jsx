@@ -1,18 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./auth";
 import SplashPage from "./pages/SplashPage";
 import HomePage from "./pages/HomePage";
 import AuthPage from "./pages/AuthPage";
 import GameStylePage from "./pages/GameStylePage";
 import FindMatchPage from "./pages/FindMatchPage";
+import FriendsPage from "./pages/FriendsPage";
 import GamePage from "./pages/GamePage";
+import OnlineGamePage from "./pages/OnlineGamePage";
+import {
+  cleanupStaleOccupiedMatches,
+  getMatchWithPlayers,
+  sendFriendMatchInvite,
+  friendInviteErrorKey,
+} from "./online/matchmaking.js";
+import { capturePendingReferralFromWindow } from "./online/referrals.js";
+import { ONLINE_MODE, lockedRulesetId, readOnlineSession, clearOnlineSession } from "./online/onlineTable.js";
+import { useOwnFriendsPresence } from "./hooks/useFriends.js";
 import "./App.css";
 
-/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "game"} AppPhase */
+/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "friends" | "game"} AppPhase */
 
 /**
  * Startup: brand intro → Login (or Home if signed in) → Game Style → table.
  * PLAY VS LEOBEST opens Game Style. PLAY on that screen starts the 1v1 match.
+ * Find Match Match-ready enters the live online table.
  * Main Menu returns to Home when signed in.
  */
 function App() {
@@ -22,6 +34,15 @@ function App() {
   const [splashExiting, setSplashExiting] = useState(false);
   const [gameKey, setGameKey] = useState(0);
   const [matchOptions, setMatchOptions] = useState(null);
+  const [friendInvitee, setFriendInvitee] = useState(null);
+  const [friendsNoticeKey, setFriendsNoticeKey] = useState("");
+  const recoveredOnlineRef = useRef(false);
+  const friendInviteBusyRef = useRef(false);
+  useOwnFriendsPresence();
+
+  useEffect(() => {
+    capturePendingReferralFromWindow();
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.boot = phase;
@@ -30,12 +51,55 @@ function App() {
   useEffect(() => {
     if (!authReady || phase === "intro" || signedIn) return undefined;
     if (!authView) openLogin();
-    if (phase === "game" || phase === "gameStyle" || phase === "findMatch") {
+    if (phase === "game" || phase === "gameStyle" || phase === "findMatch" || phase === "friends") {
       setMatchOptions(null);
       setPhase("home");
     }
     return undefined;
   }, [authReady, signedIn, phase, authView, openLogin]);
+
+  useEffect(() => {
+    if (!authReady || !signedIn || phase !== "home") return undefined;
+    cleanupStaleOccupiedMatches().catch(() => 0);
+    return undefined;
+  }, [authReady, signedIn, phase]);
+
+  useEffect(() => {
+    if (!authReady || !signedIn || phase !== "home") return undefined;
+    if (recoveredOnlineRef.current) return undefined;
+    const saved = readOnlineSession();
+    if (!saved?.matchId) {
+      recoveredOnlineRef.current = true;
+      return undefined;
+    }
+    recoveredOnlineRef.current = true;
+    let cancelled = false;
+    cleanupStaleOccupiedMatches()
+      .catch(() => 0)
+      .then(() => getMatchWithPlayers(saved.matchId))
+      .then((match) => {
+        if (cancelled || !match?.id) return;
+        if (match.status === "aborted" || match.status === "finished") {
+          clearOnlineSession();
+          return;
+        }
+        setMatchOptions({
+          mode: ONLINE_MODE,
+          matchId: match.id,
+          rulesetId: lockedRulesetId(match.rulesetId),
+          host: match.host,
+          opponent: match.opponent,
+        });
+        setGameKey((key) => key + 1);
+        setPhase("game");
+      })
+      .catch(() => {
+        /* stay on Home if the stored match cannot be resolved */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, signedIn, phase]);
 
   const handleSplashFinished = () => {
     setSplashExiting(true);
@@ -48,6 +112,24 @@ function App() {
   };
 
   const handlePlay = (config) => {
+    if (friendInvitee?.playerId) {
+      if (friendInviteBusyRef.current) return;
+      friendInviteBusyRef.current = true;
+      const inviteeId = friendInvitee.playerId;
+      void sendFriendMatchInvite(inviteeId, config.rulesetId)
+        .then(() => {
+          setFriendsNoticeKey("friends.inviteSent");
+        })
+        .catch((error) => {
+          setFriendsNoticeKey(friendInviteErrorKey(error));
+        })
+        .finally(() => {
+          friendInviteBusyRef.current = false;
+          setFriendInvitee(null);
+          setPhase("friends");
+        });
+      return;
+    }
     setMatchOptions({
       skipResume: true,
       playerCount: config.playerCount,
@@ -65,6 +147,20 @@ function App() {
     setPhase("game");
   };
 
+  const handleEnterOnlineMatch = (match) => {
+    const matchId = match?.matchId || match?.id;
+    if (!matchId) return;
+    setMatchOptions({
+      mode: ONLINE_MODE,
+      matchId,
+      rulesetId: lockedRulesetId(match.rulesetId),
+      host: match.host,
+      opponent: match.opponent,
+    });
+    setGameKey((key) => key + 1);
+    setPhase("game");
+  };
+
   const handleMainMenu = () => {
     setMatchOptions(null);
     setGameKey((key) => key + 1);
@@ -72,8 +168,13 @@ function App() {
   };
 
   const bootShell =
-    phase === "intro" || phase === "home" || phase === "gameStyle" || phase === "findMatch";
+    phase === "intro" ||
+    phase === "home" ||
+    phase === "gameStyle" ||
+    phase === "findMatch" ||
+    phase === "friends";
   const showAuth = Boolean(authView) || (phase !== "intro" && authReady && !signedIn);
+  const onlineTable = matchOptions?.mode === ONLINE_MODE;
 
   return (
     <div className={`app app--game${bootShell ? " app--booting" : ""}`}>
@@ -90,6 +191,7 @@ function App() {
           key={session?.playerId ?? "home"}
           onPlayVsLeoBest={() => setPhase("gameStyle")}
           onFindMatch={() => setPhase("findMatch")}
+          onFriends={() => setPhase("friends")}
           onResume={handleResume}
         />
       ) : null}
@@ -98,18 +200,53 @@ function App() {
         <FindMatchPage
           onBack={() => setPhase("home")}
           onMainMenu={() => setPhase("home")}
+          onEnterMatch={handleEnterOnlineMatch}
+        />
+      ) : null}
+
+      {phase === "friends" && signedIn ? (
+        <FriendsPage
+          onBack={() => setPhase("home")}
+          onMainMenu={() => setPhase("home")}
+          noticeKey={friendsNoticeKey}
+          onNoticeConsumed={() => setFriendsNoticeKey("")}
+          onPlayWithFriend={(person) => {
+            if (!person?.playerId) return;
+            setFriendsNoticeKey("");
+            setFriendInvitee(person);
+            setPhase("gameStyle");
+          }}
+          onEnterMatch={handleEnterOnlineMatch}
         />
       ) : null}
 
       {phase === "gameStyle" && signedIn ? (
         <GameStylePage
-          onBack={() => setPhase("home")}
-          onMainMenu={() => setPhase("home")}
+          onBack={() => {
+            if (friendInvitee) {
+              setFriendInvitee(null);
+              setPhase("friends");
+              return;
+            }
+            setPhase("home");
+          }}
+          onMainMenu={() => {
+            setFriendInvitee(null);
+            setPhase("home");
+          }}
           onPlay={handlePlay}
         />
       ) : null}
 
-      {phase === "game" && signedIn ? (
+      {phase === "game" && signedIn && onlineTable ? (
+        <OnlineGamePage
+          key={gameKey}
+          matchOptions={matchOptions}
+          onMainMenu={handleMainMenu}
+        />
+      ) : null}
+
+      {phase === "game" && signedIn && !onlineTable ? (
         <GamePage
           key={gameKey}
           matchOptions={matchOptions}

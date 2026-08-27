@@ -42,6 +42,10 @@ import {
 import { usesAmericanBoardLayout } from "../board/index.js";
 import { MOTION, wait } from "../utils/motion.js";
 import {
+  shouldDeferHandDrag,
+  watchHandScrollOrDrag,
+} from "../ui/handTilePointer.js";
+import {
   hudScoresDuringHold,
   shouldShowPlayScorePopup,
 } from "../game/rules/allFivesSpinner.js";
@@ -578,43 +582,53 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     const ends = legalEndsForTile(actions.legalMoves, tileId);
     if (!ends.length) return;
 
-    const rect = event.currentTarget.getBoundingClientRect();
     const tile = humanHand.find((entry) => entry.id === tileId);
     if (!tile) return;
 
-    event.preventDefault();
-    try {
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    } catch {
-      // Ignore capture failures on some browsers.
-    }
+    const startDrag = (pointerEvent) => {
+      const target = pointerEvent.currentTarget;
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      pointerEvent.preventDefault?.();
+      try {
+        target.setPointerCapture?.(pointerEvent.pointerId);
+      } catch {
+        // Ignore capture failures on some browsers.
+      }
 
-    hideTile(tileId);
-    setDrag({
-      tileId,
-      left: tile.left,
-      right: tile.right,
-      x: event.clientX,
-      y: event.clientY,
-      originX: event.clientX,
-      originY: event.clientY,
-      w: rect.width,
-      h: rect.height,
-    });
-    const snap = stateRef.current;
-    setHotEnd(
-      pickTargetDestination(
-        event.clientX,
-        event.clientY,
-        collectDestinationTargets(ends, {
-          board: snap.board,
-          spinnerId: snap.spinnerId,
-          spinnerNorth: snap.spinnerNorth,
-          spinnerSouth: snap.spinnerSouth,
-          rulesetId: snap.rulesetId,
-        })
-      )
-    );
+      hideTile(tileId);
+      setDrag({
+        tileId,
+        left: tile.left,
+        right: tile.right,
+        x: pointerEvent.clientX,
+        y: pointerEvent.clientY,
+        originX: pointerEvent.originX ?? pointerEvent.clientX,
+        originY: pointerEvent.originY ?? pointerEvent.clientY,
+        w: rect.width,
+        h: rect.height,
+      });
+      const snap = stateRef.current;
+      setHotEnd(
+        pickTargetDestination(
+          pointerEvent.clientX,
+          pointerEvent.clientY,
+          collectDestinationTargets(ends, {
+            board: snap.board,
+            spinnerId: snap.spinnerId,
+            spinnerNorth: snap.spinnerNorth,
+            spinnerSouth: snap.spinnerSouth,
+            rulesetId: snap.rulesetId,
+          })
+        )
+      );
+    };
+
+    if (shouldDeferHandDrag(event)) {
+      watchHandScrollOrDrag(event, { onDrag: startDrag });
+      return;
+    }
+    startDrag(event);
   };
 
   const handleReservePick = useCallback(

@@ -7,9 +7,10 @@ import { countryFlag, countryName } from "../auth/countries.js";
 import CountryPicker from "./CountryPicker";
 import PlayerAvatar from "./PlayerAvatar";
 import { IconClose } from "./Icon";
+import { isReferralSuccessNotice } from "../online/referrals.js";
 import "./ProfilePanel.css";
 
-function ProfilePanel({ open, onClose }) {
+function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
   const { t, locale } = useI18n();
   const { play } = useAudio();
   const { session, updateProfile, busy } = useAuth();
@@ -69,7 +70,64 @@ function ProfilePanel({ open, onClose }) {
               t("auth.countryPlaceholder")
             )}
           </p>
+          {onOpenFriends ? (
+            <button
+              type="button"
+              className="profile-panel__friends"
+              data-profile-friends="true"
+              onClick={() => {
+                play("button");
+                onOpenFriends();
+              }}
+            >
+              {t("friends.title")}
+            </button>
+          ) : null}
         </div>
+        {referral ? (
+          <section className="profile-panel__referral" data-referral="true" aria-label={t("referral.title")}>
+            <h3>{t("referral.title")}</h3>
+            <p className="profile-panel__referral-label">{t("referral.yourCode")}</p>
+            <p className="profile-panel__referral-code" data-referral-code="true">
+              {referral.code || "————"}
+            </p>
+            <div className="profile-panel__referral-actions">
+              <button
+                type="button"
+                className="profile-panel__referral-copy"
+                data-referral-copy="true"
+                disabled={!referral.code || referral.busy}
+                onClick={() => {
+                  play("button");
+                  void referral.copyCode();
+                }}
+              >
+                {t("referral.copy")}
+              </button>
+              <button
+                type="button"
+                className="profile-panel__friends"
+                data-referral-invite="true"
+                disabled={referral.busy}
+                onClick={() => {
+                  play("button");
+                  void referral.inviteFriends();
+                }}
+              >
+                {t("referral.inviteFriends")}
+              </button>
+            </div>
+            {referral.noticeKey ? (
+              <p
+                className={`profile-panel__referral-status${isReferralSuccessNotice(referral.noticeKey) ? "" : " is-error"}`}
+                role="status"
+                data-referral-notice="true"
+              >
+                {t(referral.noticeKey)}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
         <form className="profile-panel__form" onSubmit={save}>
           <label className="profile-panel__field">
             <span>{t("auth.username")}</span>

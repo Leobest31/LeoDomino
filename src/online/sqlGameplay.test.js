@@ -72,7 +72,7 @@ const home = readFileSync(join(root, "src/pages/HomePage.jsx"), "utf8");
 const findMatch = readFileSync(join(root, "src/pages/FindMatchPage.jsx"), "utf8");
 const matchHook = readFileSync(join(root, "src/hooks/useMatch.js"), "utf8");
 assert.doesNotMatch(home, /game_sessions|get_game_view|enter_online_match/, "Home unwired");
-assert.doesNotMatch(findMatch, /game_sessions|get_game_view|enter_online_match/, "Find Match unwired");
+assert.doesNotMatch(findMatch, /game_sessions|get_game_view|enter_online_match/, "Find Match page stays a lobby");
 assert.doesNotMatch(matchHook, /game_sessions|get_game_view/, "useMatch still offline");
 
 console.log("  ✓ live 1v1 gameplay SQL foundation contract");

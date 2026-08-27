@@ -2,6 +2,8 @@
   position: fixed;
   inset: 0;
   z-index: 140;
+  pointer-events: auto;
+  touch-action: manipulation;
   display: grid;
   place-items: center;
   padding:
@@ -53,6 +55,13 @@
   line-height: 1.4;
 }
 
+.abandon-dialog__error {
+  margin: -0.45rem 0 0.9rem;
+  color: #ffb4b4;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .abandon-dialog__actions {
   display: grid;
   gap: 0.45rem;
@@ -61,6 +70,8 @@
 .abandon-dialog__leave,
 .abandon-dialog__cancel {
   appearance: none;
+  position: relative;
+  z-index: 2;
   min-height: 2.55rem;
   border-radius: 10px;
   font-family: inherit;
@@ -69,6 +80,8 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .abandon-dialog__leave {
@@ -76,6 +89,11 @@
   background:
     linear-gradient(180deg, #3de08c 0%, #00b85c 52%, #006b38 100%);
   color: #ffffff;
+}
+
+.abandon-dialog__leave:disabled {
+  opacity: 0.7;
+  cursor: wait;
 }
 
 .abandon-dialog__cancel {

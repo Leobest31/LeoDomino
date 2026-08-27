@@ -84,14 +84,16 @@
 }
 
 .player-panel__tray {
-  display: flex;
-  justify-content: center;
+  display: block;
+  box-sizing: border-box;
   overflow-x: auto;
   overflow-y: hidden;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
-  margin-inline: auto;
-  padding: 0.04rem 0.28rem 0.02rem;
+  min-width: 0;
+  margin-inline: 0;
+  padding: 6px 0.28rem 0.02rem;
+  margin-top: -6px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(201, 162, 39, 0.18);
   background:
@@ -100,21 +102,36 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 4px 12px rgba(0, 0, 0, 0.2);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(201, 162, 39, 0.3) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: none;
+  scroll-padding-inline: 0.28rem;
   transition: padding 180ms var(--ease-out);
+}
+
+.player-panel__tray::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .player-panel__hand {
   display: flex;
+  flex-wrap: nowrap;
   align-items: flex-end;
   justify-content: center;
   gap: var(--player-hand-gap, var(--domino-gap));
   width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
   min-height: var(--player-hand-h, var(--domino-hand-h));
   margin: 0;
+  padding-inline: 0.12rem;
   padding-bottom: 0;
+  white-space: nowrap;
 }
 
 .player-panel__hand > * {
@@ -130,12 +147,11 @@
 }
 
 /* Hand size comes from CSS vars — don’t force a 44px floor that fights compact scale */
-.player-panel .domino--interactive {
-  min-width: 0;
-}
-
+.player-panel .domino--interactive,
 .player-panel .leo-domino-premium.is-interactive {
   min-width: 0;
+  /* Horizontal pan scrolls the overflowing rack; vertical move still starts drag. */
+  touch-action: pan-x;
 }
 
 .player-panel .domino--selected {
@@ -167,7 +183,7 @@
   }
 
   .player-panel__tray {
-    padding: 0.04rem 0.4rem 0.02rem;
+    padding: 6px 0.4rem 0.02rem;
   }
 }
 
@@ -177,13 +193,13 @@
   }
 
   .player-panel__tray {
-    padding: 0.04rem 0.22rem 0.02rem;
+    padding: 6px 0.22rem 0.02rem;
   }
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
   .player-panel__tray {
-    padding: 0.04rem 0.22rem;
+    padding: 6px 0.22rem 0.02rem;
   }
 
   .player-panel__hand {

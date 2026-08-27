@@ -795,6 +795,26 @@
   align-items: stretch;
 }
 
+.home__invite-friends {
+  appearance: none;
+  width: 100%;
+  min-height: 2.35rem;
+  margin-top: 2px;
+  padding: 0 0.9rem;
+  border: 1px solid rgba(61, 224, 140, 0.4);
+  border-radius: 12px;
+  background: var(--home-emerald-metal);
+  box-shadow: var(--home-btn-gloss);
+  color: #04140c;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
 .home-mode {
   appearance: none;
   display: flex;
@@ -907,6 +927,56 @@
   justify-content: center;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.home-mode__cta--live {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.home-mode__live {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.home-mode__live--on {
+  background: #8dffb8;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.4),
+    0 0 7px 2px rgba(90, 255, 160, 0.95);
+}
+
+.home-mode__live--off {
+  background: #1a221e;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.14),
+    0 0 0 1px rgba(210, 230, 220, 0.42);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-mode__live--on {
+    animation: home-mode-live-pulse 2.6s ease-in-out infinite;
+  }
+}
+
+@keyframes home-mode-live-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.28),
+      0 0 6px 1px rgba(80, 255, 150, 0.75);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.4),
+      0 0 9px 2px rgba(80, 255, 150, 0.95);
+  }
 }
 
 .home-mode__cta--emerald {

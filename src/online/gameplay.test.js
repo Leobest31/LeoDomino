@@ -91,8 +91,13 @@ function mockClient(handler) {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
   const page = readFileSync(join(root, "src/pages/FindMatchPage.jsx"), "utf8");
   const gamePage = readFileSync(join(root, "src/pages/GamePage.jsx"), "utf8");
+  const onlinePage = readFileSync(join(root, "src/pages/OnlineGamePage.jsx"), "utf8");
+  const hook = readFileSync(join(root, "src/hooks/useOnlineMatch.js"), "utf8");
   assert.doesNotMatch(page, /enterOnlineMatch|getGameView|submitGameAction/);
   assert.doesNotMatch(gamePage, /enterOnlineMatch|getGameView|submitGameAction/);
+  assert.match(onlinePage, /useOnlineMatch/);
+  assert.match(hook, /enterOnlineMatch/);
+  assert.match(hook, /submitGameAction/);
 }
 
 console.log("  ✓ gameplay client adapter");

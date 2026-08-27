@@ -121,6 +121,20 @@ function publicSpinner(state) {
   };
 }
 
+/**
+ * Pin the dealt table so the public session always serializes a real board
+ * array (never a missing key that SQL COALESCE could treat as "keep old chain").
+ */
+function pinDealtRoundTable(state) {
+  return {
+    ...state,
+    board: Array.isArray(state.board) ? state.board.slice() : [],
+    spinnerId: state.spinnerId ?? null,
+    spinnerNorth: Array.isArray(state.spinnerNorth) ? state.spinnerNorth.slice() : [],
+    spinnerSouth: Array.isArray(state.spinnerSouth) ? state.spinnerSouth.slice() : [],
+  };
+}
+
 /** Safe public projection persisted on game_sessions. */
 export function projectPublicSession(state, meta = {}) {
   return {
@@ -131,7 +145,7 @@ export function projectPublicSession(state, meta = {}) {
     round: state.round,
     phase: state.phase,
     scores: Array.isArray(state.scores) ? state.scores.slice() : [0, 0],
-    board: cloneJson(state.board) ?? [],
+    board: Array.isArray(state.board) ? cloneJson(state.board) : [],
     spinner: publicSpinner(state),
     lastPlayPoints: state.lastPlayPoints ?? 0,
     lastPlayPointsSeat: state.lastPlayPointsSeat ?? null,
@@ -310,8 +324,9 @@ export function applyAdvanceRound(state, options = {}) {
   }
   void resolveRuleset(state.rulesetId);
   const seed = options.seed ?? createServerSeed();
+  const next = pinDealtRoundTable(startNextRound(state, { seed }));
   return {
-    state: startNextRound(state, { seed }),
+    state: next,
     actionType: ONLINE_ACTION_ADVANCE_ROUND,
     safePayload: {},
   };
@@ -319,6 +334,46 @@ export function applyAdvanceRound(state, options = {}) {
 
 export function matchStatusForEngine(state) {
   return state.phase === PHASE.MATCH_OVER ? "finished" : "playing";
+}
+
+/**
+ * Intentional abandon. Winner is always the other seated player.
+ * Does not take a client-supplied winner.
+ *
+ * @param {object} state
+ * @param {0|1} forfeitSeat
+ */
+export function applyOnlineForfeit(state, forfeitSeat) {
+  if (!state) {
+    throw new GameplayError("MATCH_NOT_FOUND", "Match not found");
+  }
+  if (state.phase === PHASE.MATCH_OVER) {
+    return { state, idempotent: true };
+  }
+  const seat = forfeitSeat === PLAYER_B_SEAT ? PLAYER_B_SEAT : PLAYER_A_SEAT;
+  const winnerSeat = seat === PLAYER_A_SEAT ? PLAYER_B_SEAT : PLAYER_A_SEAT;
+  return {
+    state: {
+      ...state,
+      phase: PHASE.MATCH_OVER,
+      matchWinner: winnerSeat,
+      roundResult: {
+        reason: "forfeit",
+        forfeitSeat: seat,
+        winnerIndex: winnerSeat,
+      },
+    },
+    idempotent: false,
+    winnerSeat,
+    forfeitSeat: seat,
+  };
+}
+
+export function isForfeitView(view) {
+  return (
+    view?.roundResult?.reason === "forfeit" ||
+    (view?.status === "match_over" && view?.roundResult?.forfeitSeat != null)
+  );
 }
 
 export function haitianOpeningOk(state) {

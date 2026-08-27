@@ -12,8 +12,23 @@ import { getSupabaseClient } from "./supabaseClient.js";
 export const FIND_MATCH_STYLE_IDS = V1_GAME_STYLE_IDS;
 export const FIND_MATCH_RULESET_IDS = Object.freeze(["legacy", "haitian", "american"]);
 
-export const MATCH_REQUEST_SELECT =
+export const MATCH_REQUEST_SELECT_LEGACY =
   "id, creator_id, ruleset_id, status, created_at, expires_at, match_id, acceptor_id, profiles!creator_id ( display_name, avatar_id, country_code )";
+
+export const MATCH_REQUEST_SELECT =
+  `${MATCH_REQUEST_SELECT_LEGACY}, visibility, invitee_id`;
+
+export const FRIEND_MATCH_INVITE_SELECT =
+  `${MATCH_REQUEST_SELECT}, invitee:profiles!invitee_id ( display_name, avatar_id, country_code )`;
+
+/** Must match SQL interval '5 minutes' in stale occupancy cleanup. */
+export const STALE_MATCH_GRACE_MS = 5 * 60 * 1000;
+export const MATCH_PRESENCE_HEARTBEAT_MS = 20 * 1000;
+
+function isMissingInviteColumnError(error) {
+  const msg = String(error?.message || error?.details || "");
+  return /visibility|invitee_id/i.test(msg);
+}
 
 const ALLOWED_RULESETS = new Set(FIND_MATCH_RULESET_IDS);
 
@@ -79,9 +94,13 @@ export function normalizeMatchRequest(row) {
   if (!row) return null;
   const profile = unwrapProfile(row.profiles);
   const rulesetId = row.ruleset_id;
+  const inviteeProfile = unwrapProfile(row.invitee);
+  const visibility = row.visibility === "friend" ? "friend" : "public";
   return {
     id: row.id,
     creatorId: row.creator_id,
+    inviteeId: row.invitee_id ?? null,
+    visibility,
     rulesetId,
     styleId: styleIdFromRulesetId(rulesetId),
     status: row.status,
@@ -95,6 +114,14 @@ export function normalizeMatchRequest(row) {
       avatarId: profile.avatarId,
       countryCode: profile.countryCode,
     },
+    invitee: row.invitee_id
+      ? {
+          playerId: row.invitee_id,
+          displayName: inviteeProfile.displayName,
+          avatarId: inviteeProfile.avatarId,
+          countryCode: inviteeProfile.countryCode,
+        }
+      : null,
   };
 }
 
@@ -120,8 +147,17 @@ export function isMatchRequestExpired(request, now = Date.now()) {
  * @param {{ creatorId?: string, status?: string, expiresAt?: string }|null|undefined} request
  * @param {string} playerId
  */
+export function isPublicMatchRequest(request) {
+  return request?.visibility !== "friend";
+}
+
+/**
+ * @param {{ creatorId?: string, status?: string, expiresAt?: string, visibility?: string }|null|undefined} request
+ * @param {string} playerId
+ */
 export function canAcceptMatchRequest(request, playerId) {
   return (
+    isPublicMatchRequest(request) &&
     request?.status === "open" &&
     Boolean(playerId) &&
     !isOwnMatchRequest(request, playerId) &&
@@ -130,13 +166,85 @@ export function canAcceptMatchRequest(request, playerId) {
 }
 
 /**
+ * @param {{ visibility?: string, status?: string, inviteeId?: string, expiresAt?: string }|null|undefined} request
+ * @param {string} playerId
+ */
+export function canAcceptFriendInvite(request, playerId) {
+  return (
+    request?.visibility === "friend" &&
+    request?.status === "open" &&
+    Boolean(playerId) &&
+    request.inviteeId === playerId &&
+    !isMatchRequestExpired(request)
+  );
+}
+
+/**
+ * Informational Home/Find Match count. Does not replace accept_match_request.
+ * A request is joinable when the current player could potentially accept it:
+ * OPEN, unexpired, not own, and the creator is not already seated.
+ *
+ * @param {Array<{ creatorId?: string, status?: string, expiresAt?: string }|null|undefined>} requests
+ * @param {string} playerId
+ * @param {Iterable<string>|Set<string>} [busyCreatorIds]
+ */
+export function countJoinableOpenRequests(requests, playerId, busyCreatorIds) {
+  if (!playerId || !Array.isArray(requests) || requests.length === 0) return 0;
+  const busy = busyCreatorIds instanceof Set ? busyCreatorIds : new Set(busyCreatorIds || []);
+  let count = 0;
+  for (const request of requests) {
+    if (!canAcceptMatchRequest(request, playerId)) continue;
+    if (request.creatorId && busy.has(request.creatorId)) continue;
+    count += 1;
+  }
+  return count;
+}
+
+function availabilityFromCount(count) {
+  const safe = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  return { count: safe, available: safe > 0 };
+}
+
+/**
+ * Real joinable OPEN count for the Home indicator.
+ * Prefers the occupancy-aware SQL count; falls back to the public OPEN list.
+ *
+ * @param {string} playerId
+ * @param {object} [client]
+ */
+export async function loadFindMatchAvailability(playerId, client) {
+  if (!playerId) return availabilityFromCount(0);
+  const db = clientOf(client);
+  if (typeof db.rpc === "function") {
+    const { data, error } = await db.rpc("count_joinable_open_match_requests");
+    if (!error && data != null && data !== "") {
+      const count = Number(data);
+      if (Number.isFinite(count) && count >= 0) {
+        return availabilityFromCount(count);
+      }
+    }
+  }
+  const open = await listOpenMatchRequests(db);
+  return availabilityFromCount(countJoinableOpenRequests(open, playerId));
+}
+
+/**
  * @param {object} error
  * @param {string} [fallbackCode]
  */
 export function throwFromPostgrest(error, fallbackCode = "RPC") {
-  const msg = String(error?.message || error?.details || error?.hint || "");
+  const msg = String(error?.message || error?.details || error?.hint || error?.code || "");
   if (/cannot accept own/i.test(msg)) {
     throw new MatchmakingError("SELF_ACCEPT", msg, error);
+  }
+  if (/PLAYER_BUSY|active_match_players/i.test(msg) || error?.code === "P0001") {
+    throw new MatchmakingError("PLAYER_BUSY", msg, error);
+  }
+  if (/REQUEST_ALREADY_ACCEPTED/i.test(msg)) {
+    throw new MatchmakingError("REQUEST_ALREADY_ACCEPTED", msg, error);
+  }
+  if (/REQUEST_UNAVAILABLE/i.test(msg)) {
+    throw new MatchmakingError("REQUEST_UNAVAILABLE", msg, error);
   }
   if (/match request expired/i.test(msg)) {
     throw new MatchmakingError("EXPIRED", msg, error);
@@ -144,8 +252,11 @@ export function throwFromPostgrest(error, fallbackCode = "RPC") {
   if (/match request is not open|cannot cancel match request/i.test(msg)) {
     throw new MatchmakingError("NOT_OPEN", msg, error);
   }
-  if (/match request not found/i.test(msg)) {
+  if (/match request not found|match not found|invitee required/i.test(msg)) {
     throw new MatchmakingError("NOT_FOUND", msg, error);
+  }
+  if (/not a seated player/i.test(msg)) {
+    throw new MatchmakingError("NOT_A_PLAYER", msg, error);
   }
   if (/authentication required/i.test(msg)) {
     throw new MatchmakingError("AUTH", msg, error);
@@ -153,10 +264,60 @@ export function throwFromPostgrest(error, fallbackCode = "RPC") {
   if (/invalid ruleset_id/i.test(msg)) {
     throw new MatchmakingError("INVALID_STYLE", msg, error);
   }
-  if (/duplicate key|unique constraint|one_open_per_creator/i.test(msg)) {
+  if (/cannot invite yourself/i.test(msg)) {
+    throw new MatchmakingError("SELF_INVITE", msg, error);
+  }
+  if (/not friends/i.test(msg)) {
+    throw new MatchmakingError("NOT_FRIENDS", msg, error);
+  }
+  if (/only the invitee may accept|cannot decline invitation/i.test(msg)) {
+    throw new MatchmakingError("NOT_INVITEE", msg, error);
+  }
+  if (/duplicate key|unique constraint|one_open_per_creator|one_open_friend_pair/i.test(msg)) {
     throw new MatchmakingError("ALREADY_OPEN", msg, error);
   }
   throw new MatchmakingError(fallbackCode, msg || "request failed", error);
+}
+
+/** Stale/busy accept must not enter a table. Refresh the list instead. */
+export function isStaleMatchAcceptError(error) {
+  return (
+    error instanceof MatchmakingError &&
+    (error.code === "PLAYER_BUSY" ||
+      error.code === "REQUEST_UNAVAILABLE" ||
+      error.code === "REQUEST_ALREADY_ACCEPTED" ||
+      error.code === "NOT_OPEN" ||
+      error.code === "NOT_FOUND" ||
+      error.code === "EXPIRED" ||
+      error.code === "NOT_FRIENDS" ||
+      error.code === "NOT_INVITEE")
+  );
+}
+
+export function friendInviteErrorKey(error) {
+  switch (error?.code) {
+    case "PLAYER_BUSY":
+      return "findMatch.alreadyInMatch";
+    case "NOT_FRIENDS":
+      return "friends.notFriendsPlay";
+    case "SELF_INVITE":
+    case "SELF_ACCEPT":
+      return "friends.self";
+    case "ALREADY_OPEN":
+      return "friends.inviteAlreadyOpen";
+    case "INVALID_STYLE":
+      return "findMatch.invalidStyle";
+    case "NOT_INVITEE":
+    case "REQUEST_UNAVAILABLE":
+    case "NOT_OPEN":
+    case "EXPIRED":
+    case "REQUEST_ALREADY_ACCEPTED":
+      return "findMatch.playerUnavailable";
+    case "AUTH":
+      return "findMatch.unavailable";
+    default:
+      return "friends.inviteError";
+  }
 }
 
 /**
@@ -172,7 +333,7 @@ export async function createMatchRequest(styleId, client) {
   const { data, error } = await clientOf(client)
     .from("match_requests")
     .insert({ ruleset_id: rulesetId })
-    .select(MATCH_REQUEST_SELECT)
+    .select(MATCH_REQUEST_SELECT_LEGACY)
     .single();
   if (error) throwFromPostgrest(error, "CREATE_FAILED");
   return normalizeMatchRequest(data);
@@ -182,17 +343,25 @@ export async function createMatchRequest(styleId, client) {
  * @param {object} [client]
  */
 export async function listOpenMatchRequests(client) {
-  const { data, error } = await clientOf(client)
-    .from("match_requests")
-    .select(MATCH_REQUEST_SELECT)
-    .eq("status", "open")
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false });
+  const db = clientOf(client);
+  const run = (selectCols, publicOnly) => {
+    let query = db
+      .from("match_requests")
+      .select(selectCols)
+      .eq("status", "open")
+      .gt("expires_at", new Date().toISOString());
+    if (publicOnly) query = query.neq("visibility", "friend");
+    return query.order("created_at", { ascending: false });
+  };
+  let { data, error } = await run(MATCH_REQUEST_SELECT, true);
+  if (error && isMissingInviteColumnError(error)) {
+    ({ data, error } = await run(MATCH_REQUEST_SELECT_LEGACY, false));
+  }
   if (error) throwFromPostgrest(error, "LIST_FAILED");
   return (data ?? [])
     .map((row) => normalizeMatchRequest(row))
     .filter(Boolean)
-    .filter((row) => !isMatchRequestExpired(row));
+    .filter((row) => isPublicMatchRequest(row) && !isMatchRequestExpired(row));
 }
 
 /**
@@ -202,16 +371,24 @@ export async function listOpenMatchRequests(client) {
  */
 export async function getOwnLatestRequest(playerId, client) {
   if (!playerId) return null;
-  const { data, error } = await clientOf(client)
-    .from("match_requests")
-    .select(MATCH_REQUEST_SELECT)
-    .eq("creator_id", playerId)
-    .in("status", ["open", "accepted"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const db = clientOf(client);
+  const run = (selectCols, publicOnly) => {
+    let query = db
+      .from("match_requests")
+      .select(selectCols)
+      .eq("creator_id", playerId)
+      .in("status", ["open", "accepted"]);
+    if (publicOnly) query = query.neq("visibility", "friend");
+    return query.order("created_at", { ascending: false }).limit(1).maybeSingle();
+  };
+  let { data, error } = await run(MATCH_REQUEST_SELECT, true);
+  if (error && isMissingInviteColumnError(error)) {
+    ({ data, error } = await run(MATCH_REQUEST_SELECT_LEGACY, false));
+  }
   if (error) throwFromPostgrest(error, "LIST_FAILED");
-  return normalizeMatchRequest(data);
+  const own = normalizeMatchRequest(data);
+  if (own?.status === "open" && isMatchRequestExpired(own)) return null;
+  return own ?? null;
 }
 
 /**
@@ -301,6 +478,161 @@ export async function cancelMatchRequest(requestId, client) {
     p_request_id: requestId,
   });
   if (error) throwFromPostgrest(error, "CANCEL_FAILED");
+}
+
+/**
+ * Send a private friend-match invitation. Not listed on public Find Match.
+ * @param {string} inviteeId
+ * @param {string} styleId
+ * @param {object} [client]
+ */
+export async function sendFriendMatchInvite(inviteeId, styleId, client) {
+  const rulesetId = toFindMatchRulesetId(styleId);
+  if (!rulesetId) {
+    throw new MatchmakingError("INVALID_STYLE", "invalid Find Match style");
+  }
+  if (!inviteeId) {
+    throw new MatchmakingError("NOT_FOUND", "invitee required");
+  }
+  const db = clientOf(client);
+  const { data, error } = await db.rpc("send_friend_match_invite", {
+    p_invitee_id: inviteeId,
+    p_ruleset_id: rulesetId,
+  });
+  if (error) throwFromPostgrest(error, "INVITE_FAILED");
+  const requestId = typeof data === "string" ? data : data?.id;
+  if (!requestId) {
+    return {
+      id: null,
+      creatorId: null,
+      inviteeId,
+      visibility: "friend",
+      status: "open",
+    };
+  }
+  const { data: row, error: rowError } = await db
+    .from("match_requests")
+    .select(FRIEND_MATCH_INVITE_SELECT)
+    .eq("id", requestId)
+    .maybeSingle();
+  if (rowError && !isMissingInviteColumnError(rowError)) {
+    throwFromPostgrest(rowError, "INVITE_FAILED");
+  }
+  return (
+    normalizeMatchRequest(row) || {
+      id: requestId,
+      inviteeId,
+      visibility: "friend",
+      status: "open",
+    }
+  );
+}
+
+/**
+ * Incoming open friend invites for the authenticated player.
+ * @param {string} playerId
+ * @param {object} [client]
+ */
+export async function listIncomingFriendInvites(playerId, client) {
+  if (!playerId) return [];
+  const { data, error } = await clientOf(client)
+    .from("match_requests")
+    .select(FRIEND_MATCH_INVITE_SELECT)
+    .eq("visibility", "friend")
+    .eq("status", "open")
+    .eq("invitee_id", playerId)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+  if (error) {
+    if (isMissingInviteColumnError(error)) return [];
+    throwFromPostgrest(error, "LIST_FAILED");
+  }
+  return (data ?? [])
+    .map((row) => normalizeMatchRequest(row))
+    .filter((row) => canAcceptFriendInvite(row, playerId));
+}
+
+/**
+ * Outgoing open friend invites created by this player.
+ * @param {string} playerId
+ * @param {object} [client]
+ */
+export async function listOutgoingFriendInvites(playerId, client) {
+  if (!playerId) return [];
+  const { data, error } = await clientOf(client)
+    .from("match_requests")
+    .select(FRIEND_MATCH_INVITE_SELECT)
+    .eq("visibility", "friend")
+    .eq("status", "open")
+    .eq("creator_id", playerId)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+  if (error) {
+    if (isMissingInviteColumnError(error)) return [];
+    throwFromPostgrest(error, "LIST_FAILED");
+  }
+  return (data ?? []).map((row) => normalizeMatchRequest(row)).filter(Boolean);
+}
+
+/**
+ * Invitee declines a pending friend invitation. No match is created.
+ * @param {string} requestId
+ * @param {object} [client]
+ */
+export async function declineFriendMatchInvite(requestId, client) {
+  const { error } = await clientOf(client).rpc("decline_friend_match_invite", {
+    p_request_id: requestId,
+  });
+  if (error) throwFromPostgrest(error, "DECLINE_FAILED");
+}
+
+/**
+ * Intentional abandon of an active online match. Backend derives the winner
+ * as the opponent of auth.uid(). Idempotent if the match is already finished.
+ * @param {string} matchId
+ * @param {object} [client]
+ */
+export async function forfeitOnlineMatch(matchId, client) {
+  if (!matchId) return { ok: false };
+  const { data, error } = await clientOf(client).rpc("forfeit_online_match", {
+    p_match_id: matchId,
+  });
+  if (error) throwFromPostgrest(error, "FORFEIT_FAILED");
+  return data ?? { ok: true };
+}
+
+/**
+ * Seated player leaves a live table. Delegates to forfeit_online_match.
+ * @param {string} matchId
+ * @param {object} [client]
+ */
+export async function abortOnlineMatch(matchId, client) {
+  return forfeitOnlineMatch(matchId, client);
+}
+
+/**
+ * Seated-player heartbeat. Missing RPC (pre-migration) is a no-op.
+ * @param {string} matchId
+ * @param {object} [client]
+ */
+export async function touchMyMatchPresence(matchId, client) {
+  if (!matchId) return { ok: false, touched: false };
+  const { data, error } = await clientOf(client).rpc("touch_my_match_presence", {
+    p_match_id: matchId,
+  });
+  if (error) return { ok: false, touched: false };
+  return data ?? { ok: true };
+}
+
+/**
+ * Backend-authoritative stale occupancy sweep. Idempotent. Missing RPC is a no-op.
+ * @param {object} [client]
+ */
+export async function cleanupStaleOccupiedMatches(client) {
+  const { data, error } = await clientOf(client).rpc("cleanup_stale_occupied_matches");
+  if (error) return 0;
+  const cleaned = Number(data);
+  return Number.isFinite(cleaned) && cleaned > 0 ? Math.floor(cleaned) : 0;
 }
 
 /**
