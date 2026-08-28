@@ -101,18 +101,20 @@ assert.equal(await authService.getSession(), null, "starts signed out");
 
 const created = await authService.createAccount({
   email: "Player@LeoDomino.test",
-  username: "  Leonard   B   Philostin  ",
+  username: "  LeonardB  ",
+  displayName: "  Leonard   B   Philostin  ",
   password: "secret12",
   confirmPassword: "secret12",
   countryCode: "HT",
 });
 
 assert.equal(created.email, "player@leodomino.test");
-assert.equal(created.username, "Leonard B Philostin");
+assert.equal(created.username, "leonardb");
 assert.equal(created.displayName, "Leonard B Philostin");
 assert.match(created.playerId, /^leo_[a-f0-9]{12}$/);
 assert.equal("password" in created, false, "public account has no password field");
 assert.notEqual(created.displayName, created.playerId, "visible name is not the unique account id");
+assert.notEqual(created.username, created.displayName, "username is not display_name");
 
 const raw = storedRaw();
 assert.equal(raw.includes("secret12"), false, "plaintext password is not stored");
@@ -122,6 +124,7 @@ assert.equal(JSON.parse(raw)[0].playerId, created.playerId);
 
 const session = await authService.getSession();
 assert.equal(session.playerId, created.playerId);
+assert.equal(session.username, "leonardb");
 assert.equal(session.displayName, "Leonard B Philostin");
 assert.equal(loadSession().playerId, created.playerId);
 assert.equal(typeof loadSession().token, "string");
@@ -129,19 +132,34 @@ assert.equal(loadSession().token.includes("secret12"), false);
 
 const duplicateName = await authService.createAccount({
   email: "other@leodomino.test",
-  username: "Leonard B Philostin",
+  username: "leonard_other",
+  displayName: "Leonard B Philostin",
   password: "secret12",
   confirmPassword: "secret12",
   countryCode: "US",
 });
 assert.equal(duplicateName.displayName, "Leonard B Philostin");
-assert.notEqual(duplicateName.playerId, created.playerId, "same visible name keeps a distinct playerId");
+assert.equal(duplicateName.username, "leonard_other");
+assert.notEqual(duplicateName.playerId, created.playerId, "same display name keeps a distinct playerId");
+
+await assert.rejects(
+  () =>
+    authService.createAccount({
+      email: "taken@leodomino.test",
+      username: "LeonardB",
+      password: "secret12",
+      confirmPassword: "secret12",
+      countryCode: "HT",
+    }),
+  (error) => error instanceof AuthError && error.code === AUTH_ERROR.USERNAME_TAKEN,
+  "username uniqueness is case-insensitive"
+);
 
 await assert.rejects(
   () =>
     authService.createAccount({
       email: "player@leodomino.test",
-      username: "Other Player",
+      username: "other_player",
       password: "secret12",
       confirmPassword: "secret12",
       countryCode: "HT",
@@ -198,7 +216,8 @@ assert.equal((await authService.getSession()).avatarId, DEFAULT_AVATAR_ID);
   const chosen = PLAYER_AVATAR_IDS[4];
   const withAvatar = await authService.createAccount({
     email: "avatar@leodomino.test",
-    username: "Amina Player",
+    username: "amina_player",
+    displayName: "Amina Player",
     avatarId: chosen,
     password: "secret12",
     confirmPassword: "secret12",
@@ -215,7 +234,8 @@ assert.equal((await authService.getSession()).avatarId, DEFAULT_AVATAR_ID);
   assert.equal(JSON.parse(storedRaw()).find((row) => row.playerId === restored.playerId).avatarId, chosen);
   const fallback = await authService.createAccount({
     email: "fallback@leodomino.test",
-    username: "Fallback Player",
+    username: "fallback_player",
+    displayName: "Fallback Player",
     avatarId: "not-a-real-avatar",
     password: "secret12",
     confirmPassword: "secret12",
@@ -228,7 +248,7 @@ assert.equal((await authService.getSession()).avatarId, DEFAULT_AVATAR_ID);
     () =>
       authService.createAccount({
         email: "nocountry@leodomino.test",
-        username: "No Country",
+        username: "no_country",
         password: "secret12",
         confirmPassword: "secret12",
       }),
@@ -237,10 +257,12 @@ assert.equal((await authService.getSession()).avatarId, DEFAULT_AVATAR_ID);
   void missingCountry;
 
   const renamed = await authService.updateProfile({
-    username: "Leonard B Philostin",
+    username: "fallback_player",
+    displayName: "Leonard B Philostin",
     avatarId: PLAYER_AVATAR_IDS[11],
     countryCode: "HT",
   });
+  assert.equal(renamed.username, "fallback_player");
   assert.equal(renamed.displayName, "Leonard B Philostin");
   assert.equal(renamed.avatarId, PLAYER_AVATAR_IDS[11]);
   assert.equal(renamed.countryCode, "HT");

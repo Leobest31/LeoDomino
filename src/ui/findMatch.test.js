@@ -23,7 +23,7 @@ const css = read("pages/FindMatchPage.css");
 const en = read("i18n/locales/en.js");
 const ht = read("i18n/locales/ht.js");
 
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "game"/);
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game"/);
 assert.match(app, /<FindMatchPage/);
 assert.match(app, /onFindMatch=\{\(\) => setPhase\("findMatch"\)\}/);
 assert.match(app, /phase === "findMatch"/);

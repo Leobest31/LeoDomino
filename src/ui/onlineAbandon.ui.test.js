@@ -26,7 +26,8 @@ assert.match(onlinePage, /handleAbandonLeave/);
 assert.match(onlinePage, /onMainMenu=\{requestLeave\}/);
 assert.match(onlinePage, /onNewGame=\{\(\) => requestLeave\("home"\)\}/);
 assert.match(onlinePage, /isForfeitView\(view\)/);
-assert.match(onlinePage, /online\.opponentForfeit/);
+assert.match(onlinePage, /online\.matchWonForfeit/);
+assert.match(onlinePage, /online\.matchLostForfeit/);
 assert.match(
   onlinePage.slice(onlinePage.indexOf("const handleAbandonCancel"), onlinePage.indexOf("const handleAbandonLeave")),
   /setAbandonIntent\(null\)/
@@ -35,6 +36,11 @@ assert.doesNotMatch(
   onlinePage.slice(onlinePage.indexOf("const handleAbandonCancel"), onlinePage.indexOf("const handleAbandonLeave")),
   /leave\(|onMainMenu/
 );
+assert.doesNotMatch(
+  onlinePage.slice(onlinePage.indexOf("const handleAbandonLeave"), onlinePage.indexOf("const tableEpochRef")),
+  /onMainMenu/,
+  "abandon confirm stays on the table for the match report"
+);
 assert.match(dialog, /game\.abandonBody/);
 assert.match(dialog, /common\.cancel/);
 assert.match(dialog, /data-abandon-leave="true"/);
@@ -42,7 +48,8 @@ assert.match(dialog, /disabled=\{busy\}/);
 assert.match(dialog, /data-abandon-error=\{errorKey\}/);
 assert.match(dialog, /stopPropagation/);
 assert.match(modal, /message/);
-assert.match(en, /opponentForfeit:/);
+assert.match(en, /matchWonForfeit:/);
+assert.match(en, /matchLostForfeit:/);
 assert.match(en, /forfeitFailed:/);
 
 assert.match(onlinePage, /leavingRef\.current = true/);
@@ -69,7 +76,8 @@ assert.match(hook, /touchMyMatchPresence/);
 assert.match(hook, /MATCH_PRESENCE_HEARTBEAT_MS/);
 assert.match(hook, /visibilitychange/);
 assert.doesNotMatch(hook, /beforeunload/);
-assert.match(app, /match.status === "aborted" \|\| match.status === "finished"/);
+assert.match(app, /match.status === "aborted"/);
+assert.doesNotMatch(app, /match.status === "aborted" \|\| match.status === "finished"/);
 assert.match(app, /cleanupStaleOccupiedMatches/);
 assert.match(app, /clearOnlineSession/);
 

@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { AUTH_ERROR } from "./constants.js";
 import { AuthError } from "./errors.js";
-import { accountFromUser, createCloudAuth } from "./cloudAuth.js";
+import { accountFromUser, createCloudAuth, isUsernameInvalidError, isUsernameTakenError } from "./cloudAuth.js";
 import { DEFAULT_AVATAR_ID } from "./avatars.js";
 
 const UUID = "11111111-2222-4333-8444-555555555555";
@@ -16,13 +16,34 @@ function userRecord(overrides = {}) {
     email: "player@leodomino.test",
     created_at: "2026-08-21T12:00:00.000Z",
     user_metadata: {
-      username: "Leonard B Philostin",
+      username: "leonardb",
       displayName: "Leonard B Philostin",
       avatarId: DEFAULT_AVATAR_ID,
       countryCode: "HT",
     },
     ...overrides,
   };
+}
+
+function profileBuilder(result = { data: null, error: null }) {
+  const builder = {
+    select() {
+      return builder;
+    },
+    update() {
+      return builder;
+    },
+    eq() {
+      return builder;
+    },
+    maybeSingle() {
+      return Promise.resolve(result);
+    },
+    then(onFulfilled, onRejected) {
+      return Promise.resolve(result).then(onFulfilled, onRejected);
+    },
+  };
+  return builder;
 }
 
 function mockClient(handlers) {
@@ -50,6 +71,22 @@ function mockClient(handlers) {
         return { data: { subscription: { unsubscribe() {} } } };
       },
     },
+    from(_table) {
+      if (handlers.from) return handlers.from(_table);
+      return profileBuilder({
+        data: {
+          username: "leonardb",
+          display_name: "Leonard B Philostin",
+          avatar_id: DEFAULT_AVATAR_ID,
+          country_code: "HT",
+        },
+        error: null,
+      });
+    },
+    rpc(name, args) {
+      if (handlers.rpc) return handlers.rpc(name, args);
+      return Promise.resolve({ data: true, error: null });
+    },
   };
 }
 
@@ -59,6 +96,8 @@ function mockClient(handlers) {
   assert.doesNotMatch(account.playerId, /^leo_/, "cloud identity is not a client-generated leo_ id");
   assert.equal("password" in account, false);
   assert.equal(account.email, "player@leodomino.test");
+  assert.equal(account.username, "leonardb");
+  assert.equal(account.displayName, "Leonard B Philostin");
   assert.equal(account.countryCode, "HT");
 }
 
@@ -67,7 +106,8 @@ function mockClient(handlers) {
     async signUp({ email, password, options }) {
       assert.equal(email, "player@leodomino.test");
       assert.equal(password, "Secret12ab");
-      assert.equal(options.data.username, "Leonard B Philostin");
+      assert.equal(options.data.username, "leonardb");
+      assert.equal(options.data.displayName, "Leonard B Philostin");
       assert.equal(options.data.avatarId, DEFAULT_AVATAR_ID);
       assert.equal(options.data.countryCode, "HT");
       const user = userRecord();
@@ -77,13 +117,15 @@ function mockClient(handlers) {
   const auth = createCloudAuth(() => supabase);
   const created = await auth.createAccount({
     email: "Player@LeoDomino.test",
-    username: "  Leonard   B   Philostin  ",
+    username: "LeonardB",
+    displayName: "  Leonard   B   Philostin  ",
     password: "Secret12ab",
     confirmPassword: "Secret12ab",
     countryCode: "HT",
   });
   assert.equal(created.playerId, UUID);
   assert.equal(created.displayName, "Leonard B Philostin");
+  assert.equal(created.username, "leonardb");
   assert.equal(JSON.stringify(created).includes("Secret12ab"), false, "password is not stored on the public account");
 }
 
@@ -192,6 +234,63 @@ function mockClient(handlers) {
 }
 
 {
+  const writes = [];
+  let storedUsername = null;
+  const user = userRecord({
+    user_metadata: {
+      username: "lbest",
+      displayName: "Lbest",
+      avatarId: DEFAULT_AVATAR_ID,
+      countryCode: "HT",
+    },
+  });
+  const supabase = mockClient({
+    async getSession() {
+      return { data: { session: { user } }, error: null };
+    },
+    rpc(name, args) {
+      assert.equal(name, "is_username_available");
+      assert.equal(args.p_username, "lbest");
+      return Promise.resolve({ data: true, error: null });
+    },
+    from() {
+      const builder = {
+        select() {
+          return builder;
+        },
+        update(payload) {
+          writes.push(payload);
+          if (payload?.username) storedUsername = payload.username;
+          return builder;
+        },
+        eq() {
+          return builder;
+        },
+        maybeSingle() {
+          return Promise.resolve({
+            data: {
+              username: storedUsername,
+              display_name: "Lbest",
+              avatar_id: DEFAULT_AVATAR_ID,
+              country_code: "HT",
+            },
+            error: null,
+          });
+        },
+        then(onFulfilled, onRejected) {
+          return Promise.resolve({ data: null, error: null }).then(onFulfilled, onRejected);
+        },
+      };
+      return builder;
+    },
+  });
+  const auth = createCloudAuth(() => supabase);
+  const session = await auth.getSession();
+  assert.equal(session.username, "lbest");
+  assert.equal(writes.some((row) => row?.username === "lbest"), true, "metadata username is claimed onto profiles.username");
+}
+
+{
   const source = await import("node:fs").then((fs) =>
     fs.readFileSync(new URL("./cloudAuth.js", import.meta.url), "utf8")
   );
@@ -199,6 +298,7 @@ function mockClient(handlers) {
   assert.match(source, /signInWithPassword/);
   assert.match(source, /signOut/);
   assert.match(source, /getSession/);
+  assert.match(source, /claimUsernameFromMetadata/);
   assert.match(source, /onAuthStateChange/);
   assert.doesNotMatch(source, /createPlayerId/);
   assert.doesNotMatch(source, /hashPassword|PBKDF2/);
@@ -214,6 +314,34 @@ function mockClient(handlers) {
   );
   assert.doesNotMatch(useMatch, /cloudAuth|supabase/);
   assert.doesNotMatch(gamePage, /cloudAuth|supabaseClient/);
+}
+
+{
+  assert.equal(isUsernameTakenError({ message: "duplicate key value violates unique constraint profiles_username_unique" }), true);
+  assert.equal(isUsernameInvalidError({ message: "username is required" }), true);
+  assert.equal(isUsernameInvalidError({ message: "invalid username" }), true);
+  assert.equal(isUsernameInvalidError({ message: "username cannot be cleared" }), true);
+}
+
+{
+  const auth = createCloudAuth(() =>
+    mockClient({
+      async signUp() {
+        return { data: { user: null, session: null }, error: { message: "username is required" } };
+      },
+    })
+  );
+  await assert.rejects(
+    () =>
+      auth.createAccount({
+        email: "player@leodomino.test",
+        username: "leonard",
+        password: "Secret12ab",
+        confirmPassword: "Secret12ab",
+        countryCode: "HT",
+      }),
+    (error) => error instanceof AuthError && error.code === AUTH_ERROR.USERNAME
+  );
 }
 
 console.log("  ✓ Cloud auth adapter");

@@ -29,16 +29,24 @@ const pt = read("i18n/locales/pt.js");
 assert.match(app, /<FriendsPage/);
 assert.match(app, /useOwnFriendsPresence/);
 assert.match(app, /onFriends=\{\(\) => setPhase\("friends"\)\}/);
-assert.match(home, /onOpenFriends/);
-assert.match(profile, /data-profile-friends="true"/);
+assert.match(home, /onPress=\{openFriends\}/);
+assert.match(home, /<NotificationsPanel[\s\S]*onOpenFriends/);
+assert.doesNotMatch(profile, /data-profile-friends/);
+assert.doesNotMatch(profile, /onOpenFriends/);
 assert.doesNotMatch(home, /data-home-nav-item="friends"/);
 
 assert.match(page, /data-friends="true"/);
 assert.match(page, /data-friends-search="true"/);
+assert.match(page, /data-friend-username/);
+assert.match(page, /friends\.searchPlaceholder/);
+assert.match(page, /home\.playFriend/);
 assert.match(page, /data-friends-incoming="true"/);
 assert.match(page, /data-friends-outgoing="true"/);
 assert.match(page, /data-friends-list="true"/);
 assert.match(page, /data-friends-play="true"/);
+assert.match(page, /data-friends-message="true"/);
+assert.match(page, /onOpenChat/);
+assert.doesNotMatch(profile, /data-chat|ChatPage|sendFriendMessage/);
 assert.match(page, /onPlayWithFriend/);
 assert.doesNotMatch(page, /home\.comingSoonNotice/);
 assert.match(page, /friends\.wantsToPlay/);
@@ -53,8 +61,28 @@ assert.match(page, /friends\.statusOffline/);
 assert.match(css, /friends__status--online/);
 assert.match(css, /friends__status--inMatch/);
 assert.match(css, /#5dff9a|#3de08c/);
+assert.match(css, /"avatar who"/);
+assert.match(css, /"actions actions"/);
+assert.match(css, /friends__who-status/);
+assert.match(css, /\[data-friends-play="true"\]/);
+assert.match(css, /flex:\s*1 1 100%/);
+assert.match(page, /friends__rel/);
+assert.match(page, /relation=\{relation\}/);
+assert.match(page, /relation="friends"/);
 
 assert.match(button, /data-friend-add="true"/);
+assert.match(button, /data-friend-remove="true"/);
+assert.match(page, /data-friends-remove-confirm="true"/);
+assert.match(page, /data-friends-remove-cancel="true"/);
+assert.match(page, /data-friends-remove-confirm-action="true"/);
+assert.match(page, /friends\.removeConfirm/);
+assert.match(page, /onRemove=\{\(\) => confirmRemove/);
+assert.match(hook, /unfriendPlayer/);
+assert.match(hook, /subscribeFriendships/);
+assert.match(adapter, /rpc\("unfriend_player"/);
+assert.match(adapter, /mergeUsernameSearchRows/);
+assert.match(adapter, /p_query: needle/);
+assert.doesNotMatch(adapter, /ilike\("display_name"/);
 assert.match(button, /data-friend-relation="friends"/);
 assert.match(button, /data-friend-relation="outgoing"/);
 assert.match(button, /data-friend-accept="true"/);
@@ -67,6 +95,7 @@ assert.match(findMatch, /matched\.opponent\.playerId !== playerId/);
 assert.match(findMatch, /friends\.relationFor\(matched\.opponent\.playerId\)/);
 assert.match(findMatch, /friends\.sendTo\(matched\.opponent\.playerId\)/);
 assert.match(findMatch, /useFriendsBoard\(\{ watchOnline: false \}\)/);
+assert.doesNotMatch(findMatch, /onRemove|data-friend-remove/);
 assert.doesNotMatch(findMatch, /track\(|channel\("presence"|Presence/);
 assert.doesNotMatch(
   findMatch.slice(findMatch.indexOf("const handleAccept"), findMatch.indexOf("const handleCancel")),
@@ -78,8 +107,9 @@ assert.match(online, /friends\.relationFor\(rival\.playerId\)/);
 assert.match(online, /useFriendsBoard\(\{ watchOnline: false \}\)/);
 assert.doesNotMatch(online, /submitGameAction[\s\S]{0,80}sendFriendRequest/);
 
-assert.match(adapter, /PROFILE_PUBLIC_SELECT = "id, display_name, avatar_id, country_code"/);
+assert.match(adapter, /PROFILE_PUBLIC_SELECT = "id, username, display_name, avatar_id, country_code"/);
 assert.doesNotMatch(adapter, /email|phone|raw_user_meta/);
+assert.match(adapter, /rpc\("search_players_by_username"/);
 assert.match(adapter, /rpc\("send_friend_request"/);
 assert.match(adapter, /rpc\("cancel_friend_request"/);
 assert.match(adapter, /rpc\("respond_to_friend_request"/);
@@ -99,8 +129,17 @@ for (const catalog of [en, ht, fr, es, pt]) {
   assert.match(catalog, /statusInMatch:/);
   assert.match(catalog, /statusOffline:/);
   assert.match(catalog, /wantsToPlay:/);
+  assert.match(catalog, /message:/);
+  assert.match(catalog, /removeFriend:/);
+  assert.match(catalog, /removeConfirm:/);
   assert.match(catalog, /inviteSent:/);
   assert.match(catalog, /searchPlaceholder:/);
 }
+
+assert.match(en, /Search by username/);
+assert.match(ht, /Chèche pa non itilizatè/);
+assert.match(es, /Buscar por nombre de usuario/);
+assert.match(pt, /Procurar por nome de utilizador/);
+assert.match(fr, /Rechercher par nom d/);
 
 console.log("  ✓ Friends UI contract");

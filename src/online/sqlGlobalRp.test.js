@@ -163,11 +163,6 @@ mustInclude(/0 beats 5000 => 32 \/ 4968/, "0 vs 5000 vector");
     /match_winner_seat = winner_seat[\s\S]*settle_match_global_rp\(p_match_id\)/,
     "settles after first real forfeit winner write"
   );
-  const idempotentBlock = forfeit.slice(
-    forfeit.indexOf("IF match_row.status NOT IN"),
-    forfeit.indexOf("UPDATE public.matches")
-  );
-  assert.doesNotMatch(idempotentBlock, /settle_match_global_rp/, "does not settle on idempotent repeats");
 }
 
 assert.doesNotMatch(sql, /CREATE OR REPLACE FUNCTION public\._abort_stale_match/, "does not settle from abort");

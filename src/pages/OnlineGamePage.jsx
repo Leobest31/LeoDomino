@@ -537,7 +537,6 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
       .then((ok) => {
         if (!ok) return;
         setAbandonIntent(null);
-        onMainMenu?.();
       })
       .finally(() => {
         leavingRef.current = false;
@@ -702,7 +701,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
               </div>
             }
             centerBelow={
-              <div data-hud-zone="match-points">
+              <div className="game-page__hud-match" data-hud-zone="match-points">
                 <ScoreBoard
                   scores={viewerSeat === 0 ? scores : [scores[1], scores[0]]}
                   names={displayNames}
@@ -714,20 +713,12 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
                   hideRound={americanHud}
                   scoreFormat={hudScoreFormat}
                 />
-                {styleLabel ? (
-                  <p className="game-page__hud-name" data-online-style={rulesetId}>
-                    {styleLabel}
-                  </p>
-                ) : null}
-              </div>
-            }
-            endBefore={
-              <div
-                className="game-page__hud-cluster game-page__hud-cluster--rival"
-                data-hud-zone="rival"
-              >
-                <div className="game-page__hud-id game-page__hud-id--end">
-                  <span className="game-page__hud-name">{rivalName}</span>
+                <div className="game-page__hud-match-tags">
+                  {styleLabel ? (
+                    <p className="game-page__hud-tag" data-online-style={rulesetId}>
+                      {styleLabel}
+                    </p>
+                  ) : null}
                   {rival?.playerId ? (
                     <div data-online-rival-friend={rival.playerId}>
                       <FriendButton
@@ -741,6 +732,16 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
                       />
                     </div>
                   ) : null}
+                </div>
+              </div>
+            }
+            endBefore={
+              <div
+                className="game-page__hud-cluster game-page__hud-cluster--rival"
+                data-hud-zone="rival"
+              >
+                <div className="game-page__hud-id game-page__hud-id--end">
+                  <span className="game-page__hud-name">{rivalName}</span>
                   <SeatScore
                     value={rivalScore}
                     name={rivalName}
@@ -869,14 +870,14 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         winnerName={winnerName}
         scores={scores}
         roundsPlayed={view.round}
-        globalRp={matchRp}
-        message={
+        title={
           isForfeitView(view)
             ? humanWonMatch
-              ? t("online.opponentForfeit")
-              : t("online.youForfeit")
-            : null
+              ? t("online.matchWonForfeit")
+              : t("online.matchLostForfeit")
+            : t("matchOver.title")
         }
+        globalRp={matchRp}
         primaryActionLabel={t("findMatch.backHome")}
         onNewMatch={requestLeave}
         onMainMenu={requestLeave}

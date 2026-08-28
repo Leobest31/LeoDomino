@@ -14,10 +14,12 @@ import {
   saveSession,
 } from "./localStore.js";
 import {
+  normalizeDisplayName,
   normalizeEmail,
   normalizeUsername,
   publicAccount,
   validateCountry,
+  validateDisplayName,
   validateEmail,
   validatePassword,
   validatePasswordConfirm,
@@ -57,18 +59,21 @@ export const localAuth = {
 
   async createAccount(input) {
     const email = normalizeEmail(input.email);
-    const playerName = normalizeUsername(input.username);
+    const username = normalizeUsername(input.username);
+    const displayName = normalizeDisplayName(input.displayName, username);
     const avatarId = normalizeAvatarId(input.avatarId);
     const countryCode = normalizeCountryCode(input.countryCode);
 
     failIf(validateEmail(email), "email");
-    failIf(validateUsername(playerName), "username");
+    failIf(validateUsername(username), "username");
+    failIf(validateDisplayName(input.displayName), "displayName");
     failIf(validatePassword(input.password), "password");
     failIf(validatePasswordConfirm(input.password, input.confirmPassword), "confirmPassword");
     failIf(validateCountry(countryCode), "country");
 
     const accounts = loadAccounts();
     if (findAccount(accounts, { email })) fail(AUTH_ERROR.EMAIL_TAKEN, "email");
+    if (findAccount(accounts, { username })) fail(AUTH_ERROR.USERNAME_TAKEN, "username");
 
     let passwordRecord;
     try {
@@ -80,8 +85,8 @@ export const localAuth = {
     const record = {
       playerId: createPlayerId(),
       email,
-      username: playerName,
-      displayName: playerName,
+      username,
+      displayName,
       avatarId,
       countryCode,
       createdAt: new Date().toISOString(),
@@ -116,21 +121,25 @@ export const localAuth = {
     const session = loadSession();
     if (!session?.playerId) fail(AUTH_ERROR.CREDENTIALS);
 
-    const playerName = normalizeUsername(input.username);
+    const username = normalizeUsername(input.username);
+    const displayName = normalizeDisplayName(input.displayName, username);
     const avatarId = normalizeAvatarId(input.avatarId);
     const countryCode = normalizeCountryCode(input.countryCode);
 
-    failIf(validateUsername(playerName), "username");
+    failIf(validateUsername(username), "username");
+    failIf(validateDisplayName(input.displayName), "displayName");
     failIf(validateCountry(countryCode), "country");
 
     const accounts = loadAccounts();
     const index = accounts.findIndex((row) => row.playerId === session.playerId);
     if (index < 0) fail(AUTH_ERROR.CREDENTIALS);
+    const taken = findAccount(accounts, { username });
+    if (taken && taken.playerId !== session.playerId) fail(AUTH_ERROR.USERNAME_TAKEN, "username");
 
     const next = {
       ...accounts[index],
-      username: playerName,
-      displayName: playerName,
+      username,
+      displayName,
       avatarId,
       countryCode,
     };

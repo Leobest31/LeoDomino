@@ -1,10 +1,12 @@
-import { AUTH_ERROR, PASSWORD_MIN_LENGTH, PLAYER_NAME_MAX, PLAYER_NAME_MIN } from "./constants.js";
+import { AUTH_ERROR, PASSWORD_MIN_LENGTH, PLAYER_NAME_MAX, PLAYER_NAME_MIN, USERNAME_MAX, USERNAME_MIN } from "./constants.js";
 import { normalizeAvatarId } from "./avatars.js";
 import { normalizeCountryCode } from "./countries.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** Visible player name: letters, spaces, and common name marks. Not the unique id. */
+/** Visible display name: letters, spaces, and common name marks. Not the unique id. */
 const PLAYER_NAME_RE = /^[\p{L}\p{M}](?:[\p{L}\p{M} .'-]*[\p{L}\p{M}])?$/u;
+/** Unique handle: lowercase letter, then letters/digits/underscore. */
+const UNIQUE_USERNAME_RE = /^[a-z][a-z0-9_]{2,19}$/;
 const UNSAFE_NAME_MARKS = "<>{}[]\\/";
 
 function hasUnsafeNameChars(name) {
@@ -26,7 +28,9 @@ export function normalizePlayerName(value) {
 }
 
 export function normalizeUsername(value) {
-  return normalizePlayerName(value);
+  let handle = String(value ?? "").trim().toLowerCase();
+  if (handle.startsWith("@")) handle = handle.slice(1).trim();
+  return handle;
 }
 
 export function normalizeDisplayName(value, username) {
@@ -42,12 +46,12 @@ export function validateEmail(value) {
 }
 
 export function validateUsername(value) {
-  const name = normalizePlayerName(value);
-  if (!name) return AUTH_ERROR.REQUIRED;
-  if (name.length < PLAYER_NAME_MIN || name.length > PLAYER_NAME_MAX) {
+  const handle = normalizeUsername(value);
+  if (!handle) return AUTH_ERROR.REQUIRED;
+  if (handle.length < USERNAME_MIN || handle.length > USERNAME_MAX) {
     return AUTH_ERROR.USERNAME;
   }
-  if (hasUnsafeNameChars(name) || !PLAYER_NAME_RE.test(name)) {
+  if (!UNIQUE_USERNAME_RE.test(handle)) {
     return AUTH_ERROR.USERNAME;
   }
   return null;
@@ -62,7 +66,13 @@ export function validateCountry(value) {
 export function validateDisplayName(value) {
   const name = normalizePlayerName(value);
   if (!name) return null;
-  return validateUsername(name);
+  if (name.length < PLAYER_NAME_MIN || name.length > PLAYER_NAME_MAX) {
+    return AUTH_ERROR.DISPLAY_NAME;
+  }
+  if (hasUnsafeNameChars(name) || !PLAYER_NAME_RE.test(name)) {
+    return AUTH_ERROR.DISPLAY_NAME;
+  }
+  return null;
 }
 
 export function validatePassword(value) {

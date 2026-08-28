@@ -4,26 +4,44 @@ import { useAudio } from "../audio";
 import { IconHome } from "../components/Icon";
 import PlayerAvatar from "../components/PlayerAvatar";
 import FriendButton from "../components/FriendButton";
-import { countryFlag } from "../auth/countries.js";
-import { canSearchPlayers, FRIEND_STATUSES } from "../online/friends.js";
+import { countryFlag, countryName } from "../auth/countries.js";
+import { canSearchPlayers, FRIEND_RELATIONS, FRIEND_STATUSES } from "../online/friends.js";
 import { useFriendsBoard } from "../hooks/useFriends.js";
 import { useFriendMatchInvites } from "../hooks/useFriendMatchInvites.js";
 import "./FriendsPage.css";
 
-function PersonRow({ person, status, actions }) {
+function PersonRow({ person, status, relation, actions }) {
+  const { t, locale } = useI18n();
   const flag = countryFlag(person?.countryCode);
+  const country = countryName(person?.countryCode, locale);
+  const isFriend = relation === FRIEND_RELATIONS.friends || relation === "friends";
   return (
     <li className="friends__row" data-friend-id={person?.playerId}>
       <PlayerAvatar avatarId={person?.avatarId} size="sm" alt="" />
       <div className="friends__who">
         <p className="friends__name">{person?.displayName}</p>
-        {flag ? (
-          <p className="friends__meta">
-            <span aria-hidden="true">{flag}</span>
+        {person?.username ? (
+          <p className="friends__handle" data-friend-username={person.username}>
+            {`@${person.username}`}
           </p>
         ) : null}
+        {flag || country ? (
+          <p className="friends__meta" data-friend-country={person?.countryCode || ""}>
+            {flag ? <span aria-hidden="true">{flag}</span> : null}
+            {country ? <span>{country}</span> : null}
+          </p>
+        ) : null}
+        {isFriend || status ? (
+          <div className="friends__who-status">
+            {isFriend ? (
+              <span className="friends__rel" data-friend-relation="friends">
+                {t("friends.friends")}
+              </span>
+            ) : null}
+            {status ? <StatusChip status={status} /> : null}
+          </div>
+        ) : null}
       </div>
-      {status ? <StatusChip status={status} /> : null}
       <div className="friends__actions">{actions}</div>
     </li>
   );
@@ -50,6 +68,7 @@ function FriendsPage({
   onMainMenu,
   onPlayWithFriend,
   onEnterMatch,
+  onOpenChat,
   noticeKey,
   onNoticeConsumed,
 }) {
@@ -60,7 +79,9 @@ function FriendsPage({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
   const [notice, setNotice] = useState("");
+  const [removeTarget, setRemoveTarget] = useState(null);
 
   const tap = (fn) => {
     unlock();
@@ -86,6 +107,7 @@ function FriendsPage({
     if (!canSearchPlayers(query)) {
       setResults([]);
       setSearching(false);
+      setSearchFailed(false);
       return undefined;
     }
     let cancelled = false;
@@ -93,10 +115,16 @@ function FriendsPage({
     const timer = window.setTimeout(() => {
       searchPlayersByName(query)
         .then((rows) => {
-          if (!cancelled) setResults(rows);
+          if (!cancelled) {
+            setSearchFailed(false);
+            setResults(rows);
+          }
         })
         .catch(() => {
-          if (!cancelled) setResults([]);
+          if (!cancelled) {
+            setSearchFailed(true);
+            setResults([]);
+          }
         })
         .finally(() => {
           if (!cancelled) setSearching(false);
@@ -123,6 +151,13 @@ function FriendsPage({
     });
   };
 
+  const confirmRemove = (person) => {
+    tap(() => {
+      if (!person?.playerId) return;
+      setRemoveTarget(person);
+    });
+  };
+
   const board = friends.board;
   const screen = friends.state;
 
@@ -138,7 +173,7 @@ function FriendsPage({
             <span className="friends__back-chevron" aria-hidden="true" />
             <span>{t("common.back")}</span>
           </button>
-          <h1 className="friends__title">{t("friends.title")}</h1>
+          <h1 className="friends__title">{t("home.playFriend")}</h1>
           <button type="button" className="friends__menu" onClick={() => tap(onMainMenu)} aria-label={t("common.mainMenu")}>
             <IconHome />
             <span>{t("common.mainMenu")}</span>
@@ -156,6 +191,8 @@ function FriendsPage({
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t("friends.searchPlaceholder")}
                 autoComplete="off"
+                spellCheck={false}
+                inputMode="text"
                 data-friends-search="true"
               />
             </label>
@@ -163,7 +200,10 @@ function FriendsPage({
               <p className="friends__hint">{t("friends.searchHint")}</p>
             ) : null}
             {searching ? <p className="friends__hint">{t("friends.loading")}</p> : null}
-            {canSearchPlayers(query) && !searching && results.length === 0 ? (
+            {canSearchPlayers(query) && !searching && searchFailed ? (
+              <p className="friends__hint">{t("friends.error")}</p>
+            ) : null}
+            {canSearchPlayers(query) && !searching && !searchFailed && results.length === 0 ? (
               <p className="friends__hint">{t("friends.emptySearch")}</p>
             ) : null}
             {results.length > 0 ? (
@@ -174,6 +214,7 @@ function FriendsPage({
                     <PersonRow
                       key={person.playerId}
                       person={person}
+                      relation={relation}
                       actions={
                         <FriendButton
                           relation={relation}
@@ -182,6 +223,7 @@ function FriendsPage({
                           onAccept={() => friends.accept(friends.incomingRequestId(person.playerId))}
                           onDecline={() => friends.decline(friends.incomingRequestId(person.playerId))}
                           onCancel={() => friends.cancel(friends.outgoingRequestId(person.playerId))}
+                          onRemove={() => confirmRemove(person)}
                         />
                       }
                     />
@@ -300,11 +342,30 @@ function FriendsPage({
                       key={person.playerId}
                       person={person}
                       status={friends.statusFor(person.playerId)}
+                      relation="friends"
                       actions={
                         <>
-                          <span className="friend-btn friend-btn--state" data-friend-relation="friends">
-                            {t("friends.friends")}
-                          </span>
+                          <FriendButton
+                            relation="friends"
+                            busy={Boolean(friends.busy)}
+                            onRemove={() => confirmRemove(person)}
+                          />
+                          <button
+                            type="button"
+                            className="friend-btn friend-btn--ghost"
+                            data-friends-message="true"
+                            onClick={() =>
+                              tap(() =>
+                                onOpenChat?.({
+                                  friendId: person.playerId,
+                                  isFriend: true,
+                                  person,
+                                })
+                              )
+                            }
+                          >
+                            {t("friends.message")}
+                          </button>
                           <button
                             type="button"
                             className="friend-btn friend-btn--add"
@@ -334,6 +395,42 @@ function FriendsPage({
         <p className="friends__toast" role="status">
           {notice}
         </p>
+      ) : null}
+      {removeTarget ? (
+        <div className="friends__confirm" role="dialog" aria-modal="true" data-friends-remove-confirm="true">
+          <div className="friends__confirm-card">
+            <p>
+              {t("friends.removeConfirm", {
+                name: removeTarget.displayName || removeTarget.username || t("friends.title"),
+              })}
+            </p>
+            <div className="friends__confirm-actions">
+              <button
+                type="button"
+                className="friend-btn friend-btn--ghost"
+                data-friends-remove-cancel="true"
+                onClick={() => tap(() => setRemoveTarget(null))}
+              >
+                {t("friends.cancel")}
+              </button>
+              <button
+                type="button"
+                className="friend-btn friend-btn--remove"
+                data-friends-remove-confirm-action="true"
+                disabled={Boolean(friends.busy)}
+                onClick={() =>
+                  tap(() => {
+                    const id = removeTarget.playerId;
+                    setRemoveTarget(null);
+                    friends.removeFriend(id);
+                  })
+                }
+              >
+                {t("friends.removeConfirmAction")}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </main>
   );

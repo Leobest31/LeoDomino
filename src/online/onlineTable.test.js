@@ -8,7 +8,9 @@ import { isAutoPlaceable, legalEndsForTile } from "../game/interaction.js";
 import assert from "node:assert/strict";
 import {
   assertNeverClassicRuleset,
+  applyForfeitTerminalFields,
   asViewerSnapshot,
+  occupancyTouchMissed,
   boardTilesFromView,
   canEnterAcceptedMatch,
   clearOnlineSession,
@@ -18,6 +20,7 @@ import {
   INTERACTION_SOURCE_PUBLIC,
   INTERACTION_SOURCE_VIEWER,
   isInteractableTurn,
+  isMatchOverView,
   isRealtimeSessionEvent,
   isRoundOverView,
   keepAuthoritativeView,
@@ -1145,6 +1148,52 @@ function findDrawState(rulesetId) {
   assert.deepEqual(viewA.scores, scoresAfterRound1);
   assert.equal(viewA.matchId, viewB.matchId);
   assert.equal(roundIdentityFromView(viewA), roundIdentityFromView(viewB));
+}
+
+{
+  const playing = asViewerSnapshot({
+    matchId: "m-forfeit",
+    version: 4,
+    viewerSeat: 1,
+    phase: "playing",
+    status: "playing",
+    currentSeat: 1,
+    scores: [20, 10],
+    board: [],
+    myHand: ["0-1"],
+    legalMoves: [{ tileId: "0-1", end: "left" }],
+    canPlay: true,
+    canDraw: false,
+    canPass: false,
+    rulesetId: "legacy",
+  });
+  const merged = mergeRealtimeSessionView(playing, {
+    table: "game_sessions",
+    new: {
+      version: 5,
+      phase: "matchOver",
+      status: "match_over",
+      match_winner_seat: 1,
+      round_result: { reason: "forfeit", forfeitSeat: 0, winnerIndex: 1 },
+      scores: [20, 10],
+    },
+  });
+  assert.equal(isMatchOverView(merged), true);
+  assert.equal(merged.matchWinnerSeat, 1);
+  assert.equal(merged.roundResult.reason, "forfeit");
+  assert.equal(
+    shouldRefreshViewerAfterRealtime(playing, merged, { busy: true, inFlightBaseVersion: 4 }),
+    true,
+    "winner refreshes even if an in-flight action was pending"
+  );
+  const terminal = applyForfeitTerminalFields(playing, { winnerSeat: 1, forfeitSeat: 0 });
+  assert.equal(terminal.matchWinnerSeat, 1);
+  assert.equal(isMatchOverView(terminal), true);
+  const seatZeroWin = applyForfeitTerminalFields(playing, { winnerSeat: 0, forfeitSeat: 1 });
+  assert.equal(seatZeroWin.matchWinnerSeat, 0);
+  assert.equal(occupancyTouchMissed({ ok: true, touched: false }), true);
+  assert.equal(occupancyTouchMissed({ ok: true, touched: true }), false);
+  assert.equal(occupancyTouchMissed({ ok: true }), false);
 }
 
 console.log("  ✓ online table helpers");

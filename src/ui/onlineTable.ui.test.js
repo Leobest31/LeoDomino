@@ -47,6 +47,8 @@ assert.doesNotMatch(findMatch, /chat|sendMessage/);
 
 assert.match(onlinePage, /useOnlineMatch/);
 assert.match(onlinePage, /data-online-table="true"/);
+assert.match(onlinePage, /className="game-page__hud-match"/);
+assert.match(onlinePage, /game-page__hud-match-tags/);
 assert.match(onlinePage, /data-online-match-id/);
 assert.match(onlinePage, /data-online-ruleset/);
 assert.match(onlinePage, /playTile\(/);

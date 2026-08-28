@@ -28,9 +28,11 @@ import {
   isMatchOverView,
   isRealtimeSessionEvent,
   isRoundOverView,
+  applyForfeitTerminalFields,
   keepAuthoritativeView,
   lockedRulesetId,
   mergeRealtimeSessionView,
+  occupancyTouchMissed,
   ONLINE_ACTION_TIMEOUT_MS,
   onlineErrorKey,
   persistOnlineSession,
@@ -101,7 +103,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         refreshQueuedRef.current = false;
         last = asViewerSnapshot(await getGameView(id));
         if (unmountedRef.current) return last;
-        applyView(last);
+        applyView(last, { force: isMatchOverView(last) });
       } while (refreshQueuedRef.current && !unmountedRef.current);
       return last;
     } finally {
@@ -147,7 +149,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         }
       }
       if (unmountedRef.current) return;
-      applyView(next);
+      applyView(next, { force: isMatchOverView(next) });
       setStatus("ready");
     } catch (error) {
       if (unmountedRef.current) return;
@@ -170,9 +172,18 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     let cancelled = false;
     const beat = () => {
       if (cancelled || isMatchOverView(viewRef.current)) return;
-      touchMyMatchPresence(matchId).catch(() => {
-        /* presence is best-effort until the stale-occupancy RPC exists */
-      });
+      touchMyMatchPresence(matchId)
+        .then((result) => {
+          if (cancelled || isMatchOverView(viewRef.current)) return;
+          if (occupancyTouchMissed(result)) {
+            void refreshView().catch(() => {
+              /* keep last authoritative view */
+            });
+          }
+        })
+        .catch(() => {
+          /* presence is best-effort until the stale-occupancy RPC exists */
+        });
     };
     beat();
     const intervalId = window.setInterval(beat, MATCH_PRESENCE_HEARTBEAT_MS);
@@ -185,7 +196,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [matchId, status]);
+  }, [matchId, refreshView, status]);
 
   useEffect(() => {
     if (!matchId || status !== "ready") return undefined;
@@ -197,7 +208,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       let merged = previous;
       try {
         merged = mergeRealtimeSessionView(previous, payload);
-        applyView(merged);
+        applyView(merged, { force: isMatchOverView(merged) });
       } catch {
         /* still consider refresh */
       }
@@ -407,7 +418,16 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       if (!settled?.ok) {
         throw settled.error || new MatchmakingError("FORFEIT_FAILED", "forfeit failed");
       }
-      clearOnlineSession();
+      try {
+        const next = asViewerSnapshot(await getGameView(id));
+        if (!unmountedRef.current) applyView(next, { force: true });
+      } catch {
+        if (!unmountedRef.current) {
+          applyView(applyForfeitTerminalFields(viewRef.current, settled.value), {
+            force: true,
+          });
+        }
+      }
       return true;
     } catch (error) {
       if (timeoutId) window.clearTimeout(timeoutId);
@@ -426,7 +446,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       }
       return false;
     }
-  }, []);
+  }, [applyView]);
 
   return {
     status,

@@ -4,9 +4,9 @@
  */
 import { getSupabaseClient } from "./supabaseClient.js";
 
-export const PROFILE_PUBLIC_SELECT = "id, display_name, avatar_id, country_code";
+export const PROFILE_PUBLIC_SELECT = "id, username, display_name, avatar_id, country_code";
 export const FRIEND_REQUEST_SELECT =
-  "id, sender_id, receiver_id, status, created_at, responded_at, sender:profiles!sender_id ( display_name, avatar_id, country_code ), receiver:profiles!receiver_id ( display_name, avatar_id, country_code )";
+  "id, sender_id, receiver_id, status, created_at, responded_at, sender:profiles!sender_id ( username, display_name, avatar_id, country_code ), receiver:profiles!receiver_id ( username, display_name, avatar_id, country_code )";
 
 export const FRIEND_RELATIONS = Object.freeze({
   self: "self",
@@ -37,11 +37,16 @@ function clientOf(client) {
 
 function unwrapProfile(raw) {
   const profile = Array.isArray(raw) ? raw[0] : raw;
+  const username =
+    typeof profile?.username === "string" && profile.username.trim()
+      ? String(profile.username).trim().toLowerCase()
+      : "";
   return {
+    username,
     displayName:
       typeof profile?.display_name === "string" && profile.display_name
         ? profile.display_name
-        : "Player",
+        : username || "Player",
     avatarId:
       typeof profile?.avatar_id === "string" && profile.avatar_id
         ? profile.avatar_id
@@ -50,11 +55,12 @@ function unwrapProfile(raw) {
   };
 }
 
-export function normalizePublicProfile(row, playerId = row?.id) {
+export function normalizePublicProfile(row, playerId = row?.id || row?.player_id || row?.playerId) {
   if (!row && !playerId) return null;
   const profile = unwrapProfile(row);
   return {
-    playerId: row?.id || playerId,
+    playerId: row?.id || row?.player_id || row?.playerId || playerId,
+    username: profile.username,
     displayName: profile.displayName,
     avatarId: profile.avatarId,
     countryCode: profile.countryCode,
@@ -86,8 +92,68 @@ export function escapeIlike(value) {
   return String(value || "").replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
+function isMissingSearchRpc(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || error?.details || error?.hint || "").toLowerCase();
+  return (
+    code === "PGRST202" ||
+    code === "42883" ||
+    message.includes("could not find the function") ||
+    (message.includes("search_players_by_username") && message.includes("does not exist"))
+  );
+}
+
+export function searchQuery(query) {
+  let needle = String(query || "").trim();
+  if (needle.startsWith("@")) needle = needle.slice(1).trim();
+  return needle.toLowerCase().slice(0, 20);
+}
+
 export function canSearchPlayers(query) {
-  return String(query || "").trim().length >= 2;
+  return searchQuery(query).length >= 2;
+}
+
+export function usernameMatchesQuery(username, query) {
+  const handle = String(username || "").trim().toLowerCase();
+  const needle = searchQuery(query);
+  return Boolean(handle && needle && handle.includes(needle));
+}
+
+export function rankUsernameSearchHits(rows, query) {
+  const needle = searchQuery(query);
+  return [...(rows || [])].sort((left, right) => {
+    const a = String(left?.username || "").toLowerCase();
+    const b = String(right?.username || "").toLowerCase();
+    const aExact = a === needle ? 1 : 0;
+    const bExact = b === needle ? 1 : 0;
+    if (aExact !== bExact) return bExact - aExact;
+    const aPrefix = a.startsWith(needle) ? 1 : 0;
+    const bPrefix = b.startsWith(needle) ? 1 : 0;
+    if (aPrefix !== bPrefix) return bPrefix - aPrefix;
+    return a.localeCompare(b);
+  });
+}
+
+export function mergeUsernameSearchRows(rpcRows, extraFriends, query, playerId) {
+  const byId = new Map();
+  for (const row of rpcRows || []) {
+    if (!row?.playerId || row.playerId === playerId) continue;
+    byId.set(row.playerId, row);
+  }
+  for (const row of extraFriends || []) {
+    if (!row?.playerId || row.playerId === playerId) continue;
+    if (!usernameMatchesQuery(row.username, query)) continue;
+    if (!byId.has(row.playerId)) {
+      byId.set(row.playerId, {
+        playerId: row.playerId,
+        username: row.username || "",
+        displayName: row.displayName || row.username || "Player",
+        avatarId: row.avatarId || "marcus",
+        countryCode: row.countryCode || "",
+      });
+    }
+  }
+  return rankUsernameSearchHits([...byId.values()], query);
 }
 
 export function relationBetween(targetId, playerId, board = {}) {
@@ -138,6 +204,12 @@ export function throwFromFriendsError(error, fallbackCode = "RPC") {
   if (/friend request not found/i.test(msg)) {
     throw new FriendsError("NOT_FOUND", msg, error);
   }
+  if (/not friends/i.test(msg)) {
+    throw new FriendsError("NOT_FRIENDS", msg, error);
+  }
+  if (/cannot unfriend yourself/i.test(msg)) {
+    throw new FriendsError("SELF", msg, error);
+  }
   if (/authentication required/i.test(msg)) {
     throw new FriendsError("AUTH", msg, error);
   }
@@ -171,18 +243,65 @@ export async function respondToFriendRequest(requestId, action, client) {
   return data;
 }
 
-export async function searchPlayers(query, playerId, client) {
-  if (!playerId || !canSearchPlayers(query)) return [];
-  const needle = escapeIlike(String(query).trim()).slice(0, 40);
-  const { data, error } = await clientOf(client)
+async function searchProfilesByUsernameColumn(db, needle, playerId) {
+  const { data, error } = await db
     .from("profiles")
     .select(PROFILE_PUBLIC_SELECT)
-    .ilike("display_name", `%${needle}%`)
+    .not("username", "is", null)
+    .ilike("username", `%${escapeIlike(needle)}%`)
     .neq("id", playerId)
-    .order("display_name", { ascending: true })
     .limit(12);
   if (error) throwFromFriendsError(error, "SEARCH_FAILED");
-  return (data ?? []).map((row) => normalizePublicProfile(row)).filter(Boolean);
+  return data ?? [];
+}
+
+export async function searchPlayers(query, playerId, client, extraFriends = []) {
+  if (!playerId || !canSearchPlayers(query)) return [];
+  const needle = searchQuery(query);
+  const db = clientOf(client);
+  let rows = [];
+  let rpcError = null;
+  let rpcOk = false;
+  if (typeof db.rpc === "function") {
+    const { data, error } = await db.rpc("search_players_by_username", {
+      p_query: needle,
+    });
+    if (!error) {
+      rpcOk = true;
+      rows = Array.isArray(data) ? data : data ? [data] : [];
+    } else {
+      rpcError = error;
+    }
+  }
+  if (rows.length === 0 && typeof db.from === "function") {
+    try {
+      rows = await searchProfilesByUsernameColumn(db, needle, playerId);
+    } catch (fallbackError) {
+      if (rpcOk) {
+        rows = [];
+      } else if (rpcError && !isMissingSearchRpc(rpcError)) {
+        throwFromFriendsError(rpcError, "SEARCH_FAILED");
+      } else {
+        throwFromFriendsError(fallbackError, "SEARCH_FAILED");
+      }
+    }
+  } else if (rows.length === 0 && rpcError && !isMissingSearchRpc(rpcError)) {
+    throwFromFriendsError(rpcError, "SEARCH_FAILED");
+  }
+  const mapped = rows
+    .map((row) => normalizePublicProfile(row))
+    .filter((row) => row?.playerId && row.playerId !== playerId);
+  return mergeUsernameSearchRows(mapped, extraFriends, query, playerId);
+}
+
+export async function unfriendPlayer(friendId, client) {
+  if (!friendId) {
+    throw new FriendsError("NOT_FOUND", "friend id required");
+  }
+  const { error } = await clientOf(client).rpc("unfriend_player", {
+    p_friend_id: friendId,
+  });
+  if (error) throwFromFriendsError(error, "UNFRIEND_FAILED");
 }
 
 export async function listPendingFriendRequests(playerId, client) {
@@ -266,6 +385,23 @@ export function subscribeFriendRequests(onEvent, client) {
   };
 }
 
+export function subscribeFriendships(onEvent, client) {
+  const db = clientOf(client);
+  const channel = db.channel("leo-friendships");
+  channel
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "friendships" },
+      (payload) => {
+        onEvent?.(payload);
+      }
+    )
+    .subscribe();
+  return () => {
+    db.removeChannel(channel);
+  };
+}
+
 export function startOwnFriendsPresence(playerId, client) {
   if (!playerId) return () => {};
   const db = clientOf(client);
@@ -313,6 +449,8 @@ export function friendsErrorKey(error) {
       return "friends.alreadyPending";
     case "NOT_FOUND":
       return "friends.notFound";
+    case "NOT_FRIENDS":
+      return "friends.notFriendsPlay";
     case "AUTH":
       return "friends.unavailable";
     default:

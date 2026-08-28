@@ -17,6 +17,7 @@ function MatchOverModal({
   roundsPlayed = 1,
   durationSeconds = 0,
   primaryActionLabel = null,
+  title = null,
   message = null,
   globalRp = null,
   onNewMatch,
@@ -119,7 +120,7 @@ function MatchOverModal({
         </div>
 
         <h2 id={titleId} className="match-over__title">
-          {t("matchOver.title")}
+          {title || t("matchOver.title")}
         </h2>
 
         {message ? (

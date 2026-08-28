@@ -13,54 +13,17 @@ import {
   friendStatus,
   friendsErrorKey,
   listFriendsInActiveMatch,
+  mergeUsernameSearchRows,
   normalizePublicProfile,
+  rankUsernameSearchHits,
   relationBetween,
   respondToFriendRequest,
   searchPlayers,
+  searchQuery,
   sendFriendRequest,
+  unfriendPlayer,
+  usernameMatchesQuery,
 } from "./friends.js";
-
-function queryBuilder(result, capture = {}) {
-  const builder = {
-    select(sql) {
-      capture.select = sql;
-      return builder;
-    },
-    ilike(column, value) {
-      capture.ilike = [column, value];
-      return builder;
-    },
-    neq(column, value) {
-      capture.neq = [column, value];
-      return builder;
-    },
-    in(column, value) {
-      capture.in = [column, value];
-      return builder;
-    },
-    eq(column, value) {
-      capture.eq = capture.eq || [];
-      capture.eq.push([column, value]);
-      return builder;
-    },
-    or(value) {
-      capture.or = value;
-      return builder;
-    },
-    order(column, opts) {
-      capture.order = [column, opts];
-      return builder;
-    },
-    limit(n) {
-      capture.limit = n;
-      return builder;
-    },
-    then(onFulfilled, onRejected) {
-      return Promise.resolve(result).then(onFulfilled, onRejected);
-    },
-  };
-  return builder;
-}
 
 const ME = "player-me";
 const THEM = "player-them";
@@ -141,17 +104,58 @@ const BOARD = {
 }
 
 {
-  assert.equal(PROFILE_PUBLIC_SELECT, "id, display_name, avatar_id, country_code");
+  assert.equal(searchQuery("Lbest"), "lbest");
+  assert.equal(searchQuery("@lbest"), "lbest");
+  assert.equal(searchQuery("  @LBest  "), "lbest");
+  assert.equal(usernameMatchesQuery("lbest", "Lbest"), true);
+  assert.equal(usernameMatchesQuery("lbest", "@lbest"), true);
+  assert.equal(usernameMatchesQuery("lbest", "lb"), true);
+  assert.equal(usernameMatchesQuery("marie", "lbest"), false);
+  assert.equal(usernameMatchesQuery("", "lbest"), false);
+  const ranked = rankUsernameSearchHits(
+    [
+      { username: "lbestie", playerId: "2" },
+      { username: "lbest", playerId: "1" },
+      { username: "albest", playerId: "3" },
+    ],
+    "Lbest"
+  );
+  assert.deepEqual(
+    ranked.map((row) => row.username),
+    ["lbest", "lbestie", "albest"]
+  );
+  const merged = mergeUsernameSearchRows(
+    [],
+    [{ playerId: THEM, username: "lbest", displayName: "Lbest", avatarId: "marcus", countryCode: "HT" }],
+    "lbest",
+    ME
+  );
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].playerId, THEM);
+  assert.equal(merged[0].username, "lbest");
+  const displayOnly = mergeUsernameSearchRows(
+    [],
+    [{ playerId: THEM, username: "", displayName: "Lbest", avatarId: "marcus", countryCode: "HT" }],
+    "lbest",
+    ME
+  );
+  assert.deepEqual(displayOnly, []);
+}
+
+{
+  assert.equal(PROFILE_PUBLIC_SELECT, "id, username, display_name, avatar_id, country_code");
   assert.doesNotMatch(PROFILE_PUBLIC_SELECT, /email|phone|raw_user_meta|identities|token/i);
   const mapped = normalizePublicProfile({
     id: THEM,
+    username: "marie",
     display_name: "Marie",
     avatar_id: "amina",
     country_code: "HT",
     email: "hidden@example.com",
     phone: "+15555550100",
   });
-  assert.deepEqual(Object.keys(mapped).sort(), ["avatarId", "countryCode", "displayName", "playerId"]);
+  assert.deepEqual(Object.keys(mapped).sort(), ["avatarId", "countryCode", "displayName", "playerId", "username"]);
+  assert.equal(mapped.username, "marie");
   assert.equal(mapped.email, undefined);
   assert.equal(mapped.phone, undefined);
 }
@@ -159,36 +163,133 @@ const BOARD = {
 {
   assert.equal(canSearchPlayers("a"), false);
   assert.equal(canSearchPlayers("ma"), true);
+  assert.equal(canSearchPlayers("@ma"), true);
   assert.equal(escapeIlike("a%b_c\\d"), "a\\%b\\_c\\\\d");
   const capture = {};
+  const lbestRow = {
+    id: THEM,
+    username: "lbest",
+    display_name: "Lbest",
+    avatar_id: "marcus",
+    country_code: "HT",
+    email: "secret@example.com",
+  };
   const client = {
-    from(table) {
-      assert.equal(table, "profiles");
-      return queryBuilder(
-        {
-          data: [
-            {
-              id: THEM,
-              display_name: "Marie",
-              avatar_id: "amina",
-              country_code: "HT",
-              email: "secret@example.com",
-            },
-          ],
-          error: null,
-        },
-        capture
-      );
+    rpc(name, args) {
+      capture.rpc = { name, args };
+      return Promise.resolve({
+        data: [lbestRow],
+        error: null,
+      });
     },
   };
-  const rows = await searchPlayers("Marie", ME, client);
-  assert.equal(capture.select, PROFILE_PUBLIC_SELECT);
-  assert.doesNotMatch(capture.select, /email|phone/i);
+  const rows = await searchPlayers("Lbest", ME, client);
+  assert.equal(capture.rpc.name, "search_players_by_username");
+  assert.equal(capture.rpc.args.p_query, "lbest");
   assert.equal(rows.length, 1);
   assert.equal(rows[0].playerId, THEM);
+  assert.equal(rows[0].username, "lbest");
   assert.equal(rows[0].email, undefined);
+  for (const typed of ["lbest", "Lbest", "@lbest", "  @LBest  "]) {
+    const found = await searchPlayers(typed, ME, client);
+    assert.equal(found[0]?.username, "lbest", typed);
+    assert.equal(capture.rpc.args.p_query, "lbest", typed);
+  }
   const skipped = await searchPlayers("Marie", "", client);
   assert.deepEqual(skipped, []);
+  const selfHit = await searchPlayers("lbest", ME, {
+    rpc() {
+      return Promise.resolve({
+        data: [{ id: ME, username: "lbest", display_name: "Me", avatar_id: "marcus", country_code: "HT" }],
+        error: null,
+      });
+    },
+  });
+  assert.deepEqual(selfHit, []);
+  const missing = await searchPlayers("ma", ME, {
+    rpc() {
+      return Promise.resolve({ data: null, error: { code: "PGRST202", message: "could not find the function" } });
+    },
+  });
+  assert.deepEqual(missing, []);
+  await assert.rejects(
+    () =>
+      searchPlayers("lbest", ME, {
+        rpc() {
+          return Promise.resolve({ data: null, error: { code: "57014", message: "statement timeout" } });
+        },
+      }),
+    (error) => error instanceof FriendsError && error.code === "SEARCH_FAILED"
+  );
+  const fromFriends = await searchPlayers(
+    "@Lbest",
+    ME,
+    {
+      rpc() {
+        return Promise.resolve({ data: [], error: null });
+      },
+    },
+    [{ playerId: THEM, username: "lbest", displayName: "Lbest", avatarId: "marcus", countryCode: "HT" }]
+  );
+  assert.equal(fromFriends.length, 1);
+  assert.equal(fromFriends[0].username, "lbest");
+  const recovered = await searchPlayers("lbest", ME, {
+    rpc() {
+      return Promise.resolve({ data: [], error: { code: "PGRST202", message: "could not find the function" } });
+    },
+    from() {
+      const query = {
+        select() {
+          return query;
+        },
+        not() {
+          return query;
+        },
+        ilike(column, pattern) {
+          capture.ilike = { column, pattern };
+          return query;
+        },
+        neq() {
+          return query;
+        },
+        limit() {
+          return Promise.resolve({
+            data: [lbestRow],
+            error: null,
+          });
+        },
+      };
+      return query;
+    },
+  });
+  assert.equal(recovered.length, 1);
+  assert.equal(recovered[0].username, "lbest");
+  assert.equal(capture.ilike.column, "username");
+  assert.match(capture.ilike.pattern, /lbest/);
+  const displayNameSearch = await searchPlayers(
+    "Lbest",
+    ME,
+    {
+      rpc() {
+        return Promise.resolve({ data: [], error: null });
+      },
+    },
+    [{ playerId: THEM, username: "", displayName: "Lbest", avatarId: "marcus", countryCode: "HT" }]
+  );
+  assert.deepEqual(displayNameSearch, []);
+}
+
+{
+  const capture = {};
+  const client = {
+    rpc(name, args) {
+      capture.rpc = { name, args };
+      return Promise.resolve({ data: null, error: null });
+    },
+  };
+  await unfriendPlayer(THEM, client);
+  assert.equal(capture.rpc.name, "unfriend_player");
+  assert.equal(capture.rpc.args.p_friend_id, THEM);
 }
 
 {

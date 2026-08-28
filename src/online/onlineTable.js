@@ -338,12 +338,45 @@ export function isMatchOverView(view) {
 }
 
 /**
+ * Server forfeit RPC fields patched onto the live viewer so both seats can
+ * open the result report without inventing a winner locally.
+ */
+export function applyForfeitTerminalFields(view, result) {
+  if (!view || typeof view !== "object") return view ?? null;
+  const winnerSeat = Number(result?.winnerSeat);
+  if (winnerSeat !== 0 && winnerSeat !== 1) return view;
+  const forfeitSeat =
+    result?.forfeitSeat === 0 || result?.forfeitSeat === 1
+      ? result.forfeitSeat
+      : winnerSeat === 0
+        ? 1
+        : 0;
+  return {
+    ...view,
+    phase: "matchOver",
+    status: "match_over",
+    matchWinnerSeat: winnerSeat,
+    roundResult: {
+      reason: "forfeit",
+      forfeitSeat,
+      winnerIndex: winnerSeat,
+    },
+  };
+}
+
+export function occupancyTouchMissed(result) {
+  return Boolean(result) && result.touched === false;
+}
+
+/**
  * Realtime is public-only. Fetch Edge getGameView only when the merged
  * snapshot is not already a coherent viewer for this version.
  * Skip the echo fetch when our in-flight HTTP action will supply that viewer.
+ * Terminal forfeit/match-over must never skip the viewer refresh.
  */
 export function shouldRefreshViewerAfterRealtime(previous, merged, options = {}) {
   if (!merged) return false;
+  if (isMatchOverView(merged) && !isMatchOverView(previous)) return true;
   if (hasCoherentInteraction(merged)) return false;
   const nextV = viewVersion(merged);
   const prevV = viewVersion(previous);

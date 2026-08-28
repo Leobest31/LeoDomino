@@ -24,6 +24,7 @@ import {
 import BrandLogo from "../components/BrandLogo";
 import SettingsPanel from "../components/SettingsPanel";
 import ProfilePanel from "../components/ProfilePanel";
+import NotificationsPanel from "../components/NotificationsPanel";
 import { resolvePlayerAvatar } from "../auth/avatars.media.js";
 import {
   DominoSpread,
@@ -33,7 +34,7 @@ import {
   LeoBestPortrait,
   StoreChest,
 } from "../components/HomeArt";
-import { IconUser } from "../components/Icon";
+import { IconChat, IconUser } from "../components/Icon";
 import {
   AI_DIFFICULTY_STORAGE_KEY,
   DEFAULT_DIFFICULTY,
@@ -41,6 +42,10 @@ import {
 } from "../game/ai/difficulties.js";
 import { useAuth } from "../auth";
 import { useFindMatchAvailability } from "../hooks/useFindMatchAvailability.js";
+import { useFriendsBoard } from "../hooks/useFriends.js";
+import { useFriendMatchInvites } from "../hooks/useFriendMatchInvites.js";
+import { useFriendChat } from "../hooks/useFriendChat.js";
+import { formatInboxBadge, inboxBadgeCount } from "../online/friendChat.js";
 import { useReferralInvite } from "../hooks/useReferralInvite.js";
 import { loadMatch } from "../persistence/index.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
@@ -71,14 +76,18 @@ const HOME_PREVIEW = Object.freeze({
  * Premium Home dashboard — Figma visual shell, existing Home only.
  * PLAY VS LEOBEST is the only live gameplay path.
  */
-function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
+function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, onOpenChat, onEnterMatch }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
   const { session, openLogin } = useAuth();
   const findMatchAvailability = useFindMatchAvailability();
   const referral = useReferralInvite({ enabled: Boolean(session) });
+  const friends = useFriendsBoard({ watchOnline: false });
+  const invites = useFriendMatchInvites({ onEnterMatch });
+  const chat = useFriendChat();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [canResume, setCanResume] = useState(() => Boolean(loadMatch()));
   const [difficulty, setDifficulty] = useState(() =>
@@ -93,6 +102,7 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
   useEffect(() => {
     setSettingsOpen(false);
     setProfileOpen(false);
+    setInboxOpen(false);
   }, [session?.playerId]);
 
   useEffect(() => {
@@ -138,6 +148,10 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
     tap(() => setNotice(t("home.comingSoonNotice")));
   };
 
+  const openFriends = () => {
+    tap(() => onFriends?.());
+  };
+
   const openSettings = () => {
     tap(() => setSettingsOpen(true));
   };
@@ -161,6 +175,22 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
    */
   const handlePlayOnline = () => {
     tap(() => onFindMatch?.());
+  };
+
+  const inboxCount = inboxBadgeCount({
+    incomingFriendRequests: friends.board.incoming.length,
+    incomingMatchInvites: invites.incoming.length,
+    unreadMessageCount: chat.unreadTotal,
+  });
+  const inboxBadge = formatInboxBadge(inboxCount);
+  const chatBadge = formatInboxBadge(chat.unreadTotal);
+
+  const openInbox = () => {
+    tap(() => setInboxOpen(true));
+  };
+
+  const openLiveChat = () => {
+    tap(() => onChat?.());
   };
 
   const goToStore = () => {
@@ -202,13 +232,32 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
           <button
             type="button"
             className="home__icon-btn"
-            onClick={showComingSoon}
+            data-home-cta="liveChat"
+            onClick={openLiveChat}
+            aria-label={t("chat.entry")}
+          >
+            <IconChat className="home__chat-glyph" />
+            {chatBadge ? (
+              <span className="home__badge" data-home-chat-badge="true">
+                {chatBadge}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            className="home__icon-btn"
+            data-home-cta="notifications"
+            onClick={openInbox}
             aria-label={t("home.notifications")}
           >
             <span className="home__bell-glyph">
               <HomeGlyph src={homeIconBell} size={18} />
             </span>
-            <span className="home__badge">{HOME_PREVIEW.notices}</span>
+            {inboxBadge ? (
+              <span className="home__badge" data-home-badge="true">
+                {inboxBadge}
+              </span>
+            ) : null}
           </button>
           <button
             type="button"
@@ -368,7 +417,7 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
             title={t("home.playFriend")}
             subtitle={t("home.friendSub")}
             action={t("home.invite")}
-            onPress={showComingSoon}
+            onPress={openFriends}
           />
           <ModeCard
             id="private"
@@ -380,6 +429,15 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
             onPress={showComingSoon}
           />
         </section>
+
+        <button
+          type="button"
+          className="home__live-chat"
+          data-home-cta="liveChat"
+          onClick={openLiveChat}
+        >
+          {t("chat.entry")}
+        </button>
 
         <button
           type="button"
@@ -512,10 +570,15 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends }) {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         referral={referral}
-        onOpenFriends={() => {
-          setProfileOpen(false);
-          onFriends?.();
-        }}
+      />
+      <NotificationsPanel
+        open={inboxOpen}
+        onClose={() => setInboxOpen(false)}
+        friends={friends}
+        invites={invites}
+        conversations={chat.conversations}
+        onOpenFriends={() => onFriends?.()}
+        onOpenChat={(focus) => onOpenChat?.(focus)}
       />
     </main>
   );

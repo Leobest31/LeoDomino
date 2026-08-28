@@ -4,6 +4,7 @@ import { useAudio } from "../audio";
 import { AUTH_ERROR, DEFAULT_AVATAR_ID, useAuth } from "../auth";
 import { PLAYER_AVATARS } from "../auth/avatars.media.js";
 import { countryFlag, countryName } from "../auth/countries.js";
+import { validateUsername } from "../auth/validation.js";
 import CountryPicker from "./CountryPicker";
 import PlayerAvatar from "./PlayerAvatar";
 import { IconClose } from "./Icon";
@@ -11,11 +12,12 @@ import { isReferralSuccessNotice } from "../online/referrals.js";
 import { getMyGlobalRating, subscribeGlobalRatingRefresh } from "../online/globalRp.js";
 import "./ProfilePanel.css";
 
-function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
+function ProfilePanel({ open, onClose, referral }) {
   const { t, locale, formatNumber } = useI18n();
   const { play } = useAudio();
   const { session, updateProfile, busy } = useAuth();
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [avatarId, setAvatarId] = useState(DEFAULT_AVATAR_ID);
   const [countryCode, setCountryCode] = useState("");
   const [error, setError] = useState("");
@@ -25,7 +27,9 @@ function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
 
   useEffect(() => {
     if (!open || !session) return;
-    setUsername(session.displayName || session.username || "");
+    const handle = session.username || "";
+    setUsername(validateUsername(handle) ? "" : handle);
+    setDisplayName(session.displayName || session.username || "");
     setAvatarId(session.avatarId || DEFAULT_AVATAR_ID);
     setCountryCode(session.countryCode || "");
     setError("");
@@ -69,7 +73,7 @@ function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
     setError("");
     setSaved(false);
     try {
-      await updateProfile({ username, avatarId, countryCode });
+      await updateProfile({ username, displayName, avatarId, countryCode });
       setSaved(true);
     } catch (err) {
       setError(err?.code || AUTH_ERROR.GENERIC);
@@ -88,7 +92,12 @@ function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
         </header>
         <div className="profile-panel__hero">
           <PlayerAvatar avatarId={avatarId} size="md" alt="" />
-          <p className="profile-panel__name">{username || session.displayName}</p>
+          <p className="profile-panel__name">{displayName || session.displayName}</p>
+          {username ? (
+            <p className="profile-panel__handle" data-profile-handle="true">
+              @{username}
+            </p>
+          ) : null}
           <p className="profile-panel__country">
             {flag ? (
               <>
@@ -99,19 +108,6 @@ function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
               t("auth.countryPlaceholder")
             )}
           </p>
-          {onOpenFriends ? (
-            <button
-              type="button"
-              className="profile-panel__friends"
-              data-profile-friends="true"
-              onClick={() => {
-                play("button");
-                onOpenFriends();
-              }}
-            >
-              {t("friends.title")}
-            </button>
-          ) : null}
         </div>
         <section
           className="profile-panel__global-rp"
@@ -208,7 +204,19 @@ function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
             <input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              autoComplete="name"
+              autoComplete="username"
+              spellCheck={false}
+              data-profile-username="true"
+            />
+            <span className="profile-panel__hint">{t("auth.usernameHint")}</span>
+          </label>
+          <label className="profile-panel__field">
+            <span>{t("auth.displayName")}</span>
+            <input
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              autoComplete="nickname"
+              data-profile-display-name="true"
             />
           </label>
           <div className="profile-panel__field">
@@ -238,7 +246,17 @@ function ProfilePanel({ open, onClose, onOpenFriends, referral }) {
           </label>
           {error ? (
             <p className="profile-panel__error" role="alert">
-              {t(error === AUTH_ERROR.USERNAME ? "auth.errorUsername" : error === AUTH_ERROR.COUNTRY ? "auth.errorCountry" : "auth.errorGeneric")}
+              {t(
+                error === AUTH_ERROR.USERNAME
+                  ? "auth.errorUsername"
+                  : error === AUTH_ERROR.USERNAME_TAKEN
+                    ? "auth.errorUsernameTaken"
+                    : error === AUTH_ERROR.DISPLAY_NAME
+                      ? "auth.errorDisplayName"
+                      : error === AUTH_ERROR.COUNTRY
+                        ? "auth.errorCountry"
+                        : "auth.errorGeneric"
+              )}
             </p>
           ) : null}
           {saved ? <p className="profile-panel__saved">{t("profile.saved")}</p> : null}

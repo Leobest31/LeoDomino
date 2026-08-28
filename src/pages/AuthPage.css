@@ -519,6 +519,13 @@
   font-weight: 600;
 }
 
+.auth__hint {
+  margin: -0.15rem 0 0.15rem;
+  color: rgba(200, 210, 220, 0.72);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
 .auth__error--form {
   margin: 0;
 }

@@ -51,6 +51,9 @@ assert.match(onlinePage, /notifyGlobalRatingRefresh/);
 assert.match(onlinePage, /isOnlineMatchAborted/);
 assert.match(onlinePage, /globalRp=\{matchRp\}/);
 assert.match(onlinePage, /display\.kind === "rated"/);
+assert.match(onlinePage, /online\.matchLostForfeit/);
+assert.match(onlinePage, /online\.matchWonForfeit/);
+assert.match(modal, /title \|\| t\("matchOver.title"\)/);
 
 {
   const modalMount = gamePage.slice(gamePage.indexOf("<MatchOverModal"), gamePage.indexOf("/>", gamePage.indexOf("<MatchOverModal")) + 2);

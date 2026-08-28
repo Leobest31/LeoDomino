@@ -8,6 +8,7 @@ function FriendButton({
   onAccept,
   onDecline,
   onCancel,
+  onRemove,
   busy = false,
   compact = false,
 }) {
@@ -15,6 +16,19 @@ function FriendButton({
   if (!relation || relation === FRIEND_RELATIONS.self) return null;
 
   if (relation === FRIEND_RELATIONS.friends) {
+    if (onRemove) {
+      return (
+        <button
+          type="button"
+          className="friend-btn friend-btn--remove"
+          data-friend-remove="true"
+          disabled={busy}
+          onClick={onRemove}
+        >
+          {t("friends.removeFriend")}
+        </button>
+      );
+    }
     return (
       <span className="friend-btn friend-btn--state" data-friend-relation="friends">
         {t("friends.friends")}

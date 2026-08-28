@@ -6,6 +6,7 @@ import AuthPage from "./pages/AuthPage";
 import GameStylePage from "./pages/GameStylePage";
 import FindMatchPage from "./pages/FindMatchPage";
 import FriendsPage from "./pages/FriendsPage";
+import ChatPage from "./pages/ChatPage";
 import GamePage from "./pages/GamePage";
 import OnlineGamePage from "./pages/OnlineGamePage";
 import {
@@ -19,7 +20,7 @@ import { ONLINE_MODE, lockedRulesetId, readOnlineSession, clearOnlineSession } f
 import { useOwnFriendsPresence } from "./hooks/useFriends.js";
 import "./App.css";
 
-/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "friends" | "game"} AppPhase */
+/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "friends" | "chat" | "game"} AppPhase */
 
 /**
  * Startup: brand intro → Login (or Home if signed in) → Game Style → table.
@@ -36,6 +37,8 @@ function App() {
   const [matchOptions, setMatchOptions] = useState(null);
   const [friendInvitee, setFriendInvitee] = useState(null);
   const [friendsNoticeKey, setFriendsNoticeKey] = useState("");
+  const [chatFocus, setChatFocus] = useState(null);
+  const [chatReturnTo, setChatReturnTo] = useState("home");
   const recoveredOnlineRef = useRef(false);
   const friendInviteBusyRef = useRef(false);
   useOwnFriendsPresence();
@@ -51,7 +54,7 @@ function App() {
   useEffect(() => {
     if (!authReady || phase === "intro" || signedIn) return undefined;
     if (!authView) openLogin();
-    if (phase === "game" || phase === "gameStyle" || phase === "findMatch" || phase === "friends") {
+    if (phase === "game" || phase === "gameStyle" || phase === "findMatch" || phase === "friends" || phase === "chat") {
       setMatchOptions(null);
       setPhase("home");
     }
@@ -79,7 +82,7 @@ function App() {
       .then(() => getMatchWithPlayers(saved.matchId))
       .then((match) => {
         if (cancelled || !match?.id) return;
-        if (match.status === "aborted" || match.status === "finished") {
+        if (match.status === "aborted") {
           clearOnlineSession();
           return;
         }
@@ -163,8 +166,16 @@ function App() {
 
   const handleMainMenu = () => {
     setMatchOptions(null);
+    setChatFocus(null);
+    setChatReturnTo("home");
     setGameKey((key) => key + 1);
     setPhase("home");
+  };
+
+  const openChat = (focus = null, returnTo = "home") => {
+    setChatReturnTo(returnTo === "friends" ? "friends" : "home");
+    setChatFocus(focus);
+    setPhase("chat");
   };
 
   const bootShell =
@@ -172,7 +183,8 @@ function App() {
     phase === "home" ||
     phase === "gameStyle" ||
     phase === "findMatch" ||
-    phase === "friends";
+    phase === "friends" ||
+    phase === "chat";
   const showAuth = Boolean(authView) || (phase !== "intro" && authReady && !signedIn);
   const onlineTable = matchOptions?.mode === ONLINE_MODE;
 
@@ -192,6 +204,9 @@ function App() {
           onPlayVsLeoBest={() => setPhase("gameStyle")}
           onFindMatch={() => setPhase("findMatch")}
           onFriends={() => setPhase("friends")}
+          onChat={() => openChat(null, "home")}
+          onOpenChat={(focus) => openChat(focus, "home")}
+          onEnterMatch={handleEnterOnlineMatch}
           onResume={handleResume}
         />
       ) : null}
@@ -217,6 +232,16 @@ function App() {
             setPhase("gameStyle");
           }}
           onEnterMatch={handleEnterOnlineMatch}
+          onOpenChat={(focus) => openChat(focus, "friends")}
+        />
+      ) : null}
+
+      {phase === "chat" && signedIn ? (
+        <ChatPage
+          focus={chatFocus}
+          onFocusConsumed={() => setChatFocus(null)}
+          onBack={() => setPhase(chatReturnTo === "friends" ? "friends" : "home")}
+          onMainMenu={() => setPhase("home")}
         />
       ) : null}
 

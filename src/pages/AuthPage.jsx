@@ -30,6 +30,8 @@ function errorKey(code) {
       return "auth.errorUsername";
     case AUTH_ERROR.USERNAME_TAKEN:
       return "auth.errorUsernameTaken";
+    case AUTH_ERROR.DISPLAY_NAME:
+      return "auth.errorDisplayName";
     case AUTH_ERROR.EMAIL_TAKEN:
       return "auth.errorEmailTaken";
     case AUTH_ERROR.COUNTRY:
@@ -136,7 +138,8 @@ function AuthPage() {
     ];
     if (isCreate) {
       list.push(
-        { name: "username", type: "text", autoComplete: "name", label: t("auth.username") }
+        { name: "username", type: "text", autoComplete: "username", label: t("auth.username") },
+        { name: "displayName", type: "text", autoComplete: "nickname", label: t("auth.displayName") },
       );
     }
     list.push({
@@ -239,7 +242,11 @@ function AuthPage() {
                       ) : null}
                     </label>
                     {isCreate && field.name === "username" ? (
+                      <p className="auth__hint">{t("auth.usernameHint")}</p>
+                    ) : null}
+                    {isCreate && field.name === "displayName" ? (
                       <>
+                      <p className="auth__hint">{t("auth.displayNameHint")}</p>
                       <div className="auth__avatar-field">
                         <span className="auth__label">{t("auth.avatar")}</span>
                         <div className="auth__avatars" role="listbox" aria-label={t("auth.avatar")}>

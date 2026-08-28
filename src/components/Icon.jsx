@@ -30,6 +30,18 @@ export function IconHome({ className = "" }) {
   );
 }
 
+export function IconChat({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">
+      <path
+        d="M5.2 6.2h13.6A1.6 1.6 0 0 1 20.4 7.8v8.2a1.6 1.6 0 0 1-1.6 1.6H11l-3.8 2.6v-2.6H5.2A1.6 1.6 0 0 1 3.6 16V7.8A1.6 1.6 0 0 1 5.2 6.2z"
+        {...stroke}
+      />
+      <path d="M7.6 10.2h8.8M7.6 13.2h5.6" {...stroke} />
+    </svg>
+  );
+}
+
 export function IconClose({ className = "" }) {
   return (
     <svg className={className} viewBox="0 0 24 24" width="1.15em" height="1.15em" aria-hidden="true">

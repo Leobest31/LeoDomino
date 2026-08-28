@@ -1,3 +1,10 @@
+.friends,
+.friends *,
+.friends *::before,
+.friends *::after {
+  box-sizing: border-box;
+}
+
 .friends {
   --fm-navy: #0c121c;
   --fm-gold: rgba(201, 162, 39, 0.55);
@@ -144,22 +151,29 @@
 
 .friends__row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
-    "avatar who status"
-    "avatar who actions";
-  align-items: center;
+    "avatar who"
+    "actions actions";
+  align-items: start;
   column-gap: 0.55rem;
-  padding: 0.45rem 0.2rem;
+  row-gap: 0.5rem;
+  padding: 0.5rem 0.1rem 0.65rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .friends__row .player-avatar {
   grid-area: avatar;
+  align-self: start;
 }
 
 .friends__who {
   grid-area: who;
   min-width: 0;
+  display: grid;
+  gap: 0.1rem;
 }
 
 .friends__name,
@@ -172,6 +186,20 @@
 
 .friends__name {
   font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.friends__handle {
+  margin: 0.08rem 0 0;
+  color: #e8c547;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .friends__meta,
@@ -181,12 +209,36 @@
   font-size: 0.78rem;
 }
 
+.friends__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.12rem;
+  min-width: 0;
+}
+
+.friends__who-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.55rem;
+  margin-top: 0.2rem;
+  min-width: 0;
+}
+
+.friends__rel {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e8c547;
+}
+
 .friends__error {
   color: #ffb4b4;
 }
 
 .friends__status {
-  grid-area: status;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -195,6 +247,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--fm-muted);
+  white-space: nowrap;
 }
 
 .friends__status-dot {
@@ -224,10 +277,38 @@
 
 .friends__actions {
   grid-area: actions;
-  justify-self: end;
-  display: inline-flex;
-  gap: 0.35rem;
+  display: flex;
   flex-wrap: wrap;
+  gap: 0.4rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.friends__actions > * {
+  min-width: 0;
+}
+
+.friends__actions .friend-btn__pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex: 1 1 100%;
+}
+
+.friends__actions .friend-btn__pair > * {
+  flex: 1 1 calc(50% - 0.2rem);
+}
+
+.friends__actions [data-friend-remove="true"],
+.friends__actions [data-friends-message="true"] {
+  flex: 1 1 calc(50% - 0.2rem);
+  min-height: 2.05rem;
+}
+
+.friends__actions [data-friends-play="true"] {
+  flex: 1 1 100%;
+  min-height: 2.45rem;
+  font-size: 0.78rem;
 }
 
 .friends__invite-copy {
@@ -249,4 +330,37 @@
   border-radius: 10px;
   background: #121a28;
   border: 1px solid rgba(201, 162, 39, 0.4);
+}
+
+.friends__confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(4, 7, 12, 0.72);
+}
+
+.friends__confirm-card {
+  width: min(100%, 20rem);
+  padding: 1.1rem 1rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  background: #121a28;
+  color: var(--fm-ink);
+}
+
+.friends__confirm-card p {
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.friends__confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  flex-wrap: wrap;
 }

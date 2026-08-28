@@ -1,0 +1,155 @@
+.inbox-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: end center;
+}
+
+.inbox-panel__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 4, 8, 0.62);
+}
+
+.inbox-panel__sheet {
+  position: relative;
+  z-index: 1;
+  width: min(26.5rem, 100%);
+  max-height: min(92dvh, 44rem);
+  overflow: auto;
+  display: grid;
+  gap: 0.75rem;
+  padding:
+    0.9rem 0.9rem
+    max(1rem, env(safe-area-inset-bottom, 0px));
+  border: 1px solid rgba(201, 162, 39, 0.38);
+  border-radius: 22px 22px 0 0;
+  background:
+    linear-gradient(180deg, rgba(14, 20, 28, 0.98) 0%, rgba(6, 10, 14, 0.98) 100%);
+  box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.45);
+  color: #f2ede5;
+}
+
+.inbox-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.inbox-panel__header h2,
+.inbox-panel__section h3 {
+  margin: 0;
+  color: #e8d39a;
+  font-size: 0.92rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.inbox-panel__section h3 {
+  font-size: 0.78rem;
+  margin-bottom: 0.45rem;
+}
+
+.inbox-panel__close {
+  appearance: none;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  border-radius: 50%;
+  background: rgba(8, 12, 18, 0.8);
+  color: #e8d39a;
+}
+
+.inbox-panel__empty,
+.inbox-panel__error,
+.inbox-panel__body,
+.inbox-panel__name {
+  margin: 0;
+}
+
+.inbox-panel__empty,
+.inbox-panel__body {
+  color: rgba(169, 183, 195, 0.82);
+  font-size: 0.82rem;
+}
+
+.inbox-panel__error {
+  color: #ffb4b4;
+}
+
+.inbox-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.inbox-panel__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.1rem;
+}
+
+.inbox-panel__copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.inbox-panel__name {
+  font-weight: 700;
+}
+
+.inbox-panel__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: end;
+}
+
+.inbox-panel__open {
+  appearance: none;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.inbox-panel__badge {
+  min-width: 1.35rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #3de08c 0%, #00b85c 100%);
+  color: #04140c;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.inbox-panel__friends {
+  appearance: none;
+  width: 100%;
+  min-height: 2.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  background: transparent;
+  color: #f3e2a4;
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}

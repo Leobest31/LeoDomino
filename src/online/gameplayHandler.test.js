@@ -497,9 +497,12 @@ async function playUntilNotPlaying(store, startView) {
   session.phase = "matchOver";
   session.matchWinnerSeat = 1;
   session.roundResult = applied.state.roundResult;
+  const viewA = await handleGetGameView({ userId: PLAYER_A, matchId: MATCH_ID, store });
   const viewB = await handleGetGameView({ userId: PLAYER_B, matchId: MATCH_ID, store });
   assert.equal(viewB.matchWinnerSeat, 1);
+  assert.equal(viewA.matchWinnerSeat, 1);
   assert.equal(viewB.roundResult.reason, "forfeit");
+  assert.equal(viewA.roundResult.reason, "forfeit");
   const move = view.legalMoves[0];
   await assert.rejects(
     () =>

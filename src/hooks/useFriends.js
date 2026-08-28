@@ -15,7 +15,9 @@ import {
   sendFriendRequest,
   startOwnFriendsPresence,
   subscribeFriendRequests,
+  subscribeFriendships,
   subscribeFriendsPresence,
+  unfriendPlayer,
 } from "../online/friends.js";
 
 export function useOwnFriendsPresence() {
@@ -70,15 +72,32 @@ export function useFriendsBoard({ watchOnline = true } = {}) {
   useEffect(() => {
     refresh();
     if (!onlineReady) return undefined;
-    let stop = () => {};
+    const stops = [];
     try {
-      stop = subscribeFriendRequests(() => {
-        refresh();
-      });
+      stops.push(
+        subscribeFriendRequests(() => {
+          refresh();
+        })
+      );
     } catch {
-      stop = () => {};
+      /* optional realtime */
     }
-    return () => stop();
+    try {
+      stops.push(
+        subscribeFriendships(() => {
+          refresh();
+        })
+      );
+    } catch {
+      /* optional realtime */
+    }
+    const poll = window.setInterval(() => {
+      void refresh();
+    }, 8000);
+    return () => {
+      window.clearInterval(poll);
+      for (const stop of stops) stop?.();
+    };
   }, [onlineReady, refresh]);
 
   useEffect(() => {
@@ -155,9 +174,13 @@ export function useFriendsBoard({ watchOnline = true } = {}) {
     (requestId) => run("cancel", () => cancelFriendRequest(requestId)),
     [run]
   );
+  const removeFriend = useCallback(
+    (friendId) => run("unfriend", () => unfriendPlayer(friendId)),
+    [run]
+  );
   const search = useCallback(
-    (query) => searchPlayers(query, playerId),
-    [playerId]
+    (query) => searchPlayers(query, playerId, undefined, board.friends),
+    [board.friends, playerId]
   );
 
   return useMemo(
@@ -177,6 +200,7 @@ export function useFriendsBoard({ watchOnline = true } = {}) {
       accept,
       decline,
       cancel,
+      removeFriend,
       search,
     }),
     [
@@ -195,6 +219,7 @@ export function useFriendsBoard({ watchOnline = true } = {}) {
       accept,
       decline,
       cancel,
+      removeFriend,
       search,
     ]
   );

@@ -18,7 +18,7 @@ const home = read("pages/HomePage.jsx");
 const style = read("pages/GameStylePage.jsx");
 const page = read("pages/GamePage.jsx");
 
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "game"/, "App phases are Home-first");
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game"/, "App phases are Home-first");
 assert.doesNotMatch(app, /GameSetupPage/, "obsolete Setup is not the live hub");
 assert.match(app, /setPhase\("home"\)/, "splash and Main Menu return to Home");
 assert.match(app, /onPlayVsLeoBest=\{\(\) => setPhase\("gameStyle"\)\}/, "Play vs LeoBest opens Game Style");
@@ -56,9 +56,11 @@ assert.match(app, /onFindMatch=\{\(\) => setPhase\("findMatch"\)\}/, "Find Match
 assert.match(app, /<FindMatchPage/, "Find Match page is mounted");
 assert.match(home, /ProfilePanel/, "Home opens player profile from the avatar");
 assert.match(home, /openProfile/, "signed-in avatar opens Profile");
-assert.match(home, /onOpenFriends/, "Profile can open Friends");
+assert.match(home, /<NotificationsPanel[\s\S]*onOpenFriends/, "notification inbox can open Friends");
 assert.match(app, /<FriendsPage/, "Friends page is mounted");
-assert.match(app, /onFriends=\{\(\) => setPhase\("friends"\)\}/, "Friends opens from Home/Profile");
+assert.match(app, /onFriends=\{\(\) => setPhase\("friends"\)\}/, "Friends opens from Home Play a Friend");
+assert.match(home, /onPress=\{openFriends\}/, "Play a Friend CTA opens the Friends hub");
+assert.doesNotMatch(home.slice(home.indexOf('id="friend"'), home.indexOf('id="private"')), /showComingSoon/, "Play a Friend is not Coming Soon");
 assert.match(app, /phase === "friends" && signedIn/, "Friends is gated on a signed-in session");
 assert.match(home, /openLogin/, "signed-out profile opens Login");
 assert.match(home, /data-home-cta="account"/, "Home has an account entry control");
@@ -79,6 +81,8 @@ assert.match(app, /phase === "game" && signedIn/, "the table is gated on a signe
   assert.match(authPage, /authEarthNight/, "Login uses the realistic night Earth asset");
   assert.match(authPage, /CountryPicker/, "Create Account includes a country picker");
   assert.match(authPage, /PLAYER_AVATARS/, "Create Account includes avatar choices");
+  assert.match(authPage, /auth\.usernameHint/, "Create Account explains unique username rules");
+  assert.match(authPage, /name: "displayName"/, "Create Account collects display name separately");
   assert.match(authPage, /LEGAL_URLS/, "Login includes Terms and Privacy");
   assert.match(authPage, /isCloudAuth/, "password copy follows the active auth adapter");
   assert.match(authPage, /auth\.securityNote/, "cloud auth uses the protected-account note");
@@ -87,8 +91,11 @@ assert.match(app, /phase === "game" && signedIn/, "the table is gated on a signe
   assert.match(provider, /setAuthView\("login"\)/, "logout returns immediately to Login");
   assert.match(config, /FIRST_LAUNCH_LOCALE = "en"/, "first-ever launch defaults to English");
 }
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "game"/, "App phases stay Home-first");
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game"/, "App phases stay Home-first");
 assert.match(home, /id="online"/, "Find Match card exists");
+assert.match(home, /data-home-cta="liveChat"/, "Home has a Live Chat entry");
+assert.match(home, /data-home-cta="notifications"/, "Home bell opens notifications");
+assert.doesNotMatch(home.slice(home.indexOf("home__header-end"), home.indexOf("home__avatar-btn")), /showComingSoon/, "Home bell is not Coming Soon");
 assert.match(home, /data-home-cta="inviteFriends"/, "Home has Invite Friends");
 assert.match(home, /data-referral="true"|referral=\{referral\}/, "Profile receives referral props");
 assert.match(home, /id="friend"/, "Play with a Friend card exists");

@@ -121,10 +121,10 @@ assert.doesNotMatch(home, /match_requests|accept_match_request/, "Home does not 
 assert.doesNotMatch(styles, /match_requests|accept_match_request/, "GameStylePage unchanged");
 assert.doesNotMatch(matchHook, /match_requests|accept_match_request/, "useMatch unchanged");
 
-assert.doesNotMatch(
+assert.match(
   readFileSync(join(root, "src/auth/cloudAuth.js"), "utf8"),
-  /from\("profiles"\)|\.from\('profiles'\)/,
-  "Auth still uses user_metadata; profiles migration is gradual"
+  /from\("profiles"\)/,
+  "Auth writes public.profiles for unique username and display_name"
 );
 
 console.log("  ✓ Find Match + friends SQL foundation contract");

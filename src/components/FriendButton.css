@@ -57,3 +57,8 @@
   padding: 0 0.45rem;
   font-size: 0.64rem;
 }
+
+.friend-btn--remove {
+  border-color: rgba(255, 120, 110, 0.45);
+  color: #ffc4bc;
+}

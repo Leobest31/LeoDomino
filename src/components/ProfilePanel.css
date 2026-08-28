@@ -88,6 +88,22 @@
   font-size: 0.88rem;
 }
 
+.profile-panel__handle {
+  margin: 0.15rem 0 0;
+  color: #e8c547;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.profile-panel__hint {
+  color: rgba(169, 183, 195, 0.78);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
 .profile-panel__flag {
   font-size: 1.35rem;
   line-height: 1;
