@@ -76,7 +76,7 @@ const HOME_PREVIEW = Object.freeze({
  * Premium Home dashboard — Figma visual shell, existing Home only.
  * PLAY VS LEOBEST is the only live gameplay path.
  */
-function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, onOpenChat, onEnterMatch }) {
+function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, onOpenChat, onEnterMatch, showAdmin, onOpenAdmin }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
   const { session, openLogin } = useAuth();
@@ -565,6 +565,11 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, o
         onClose={() => setSettingsOpen(false)}
         difficulty={difficulty}
         onDifficultyChange={handleDifficultyChange}
+        showAdmin={Boolean(showAdmin)}
+        onOpenAdmin={() => {
+          setSettingsOpen(false);
+          onOpenAdmin?.();
+        }}
       />
       <ProfilePanel
         open={profileOpen}

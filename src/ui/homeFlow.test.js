@@ -18,7 +18,7 @@ const home = read("pages/HomePage.jsx");
 const style = read("pages/GameStylePage.jsx");
 const page = read("pages/GamePage.jsx");
 
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game"/, "App phases are Home-first");
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game" \| "admin"/, "App phases are Home-first");
 assert.doesNotMatch(app, /GameSetupPage/, "obsolete Setup is not the live hub");
 assert.match(app, /setPhase\("home"\)/, "splash and Main Menu return to Home");
 assert.match(app, /onPlayVsLeoBest=\{\(\) => setPhase\("gameStyle"\)\}/, "Play vs LeoBest opens Game Style");

@@ -19,9 +19,12 @@ import {
 import { capturePendingReferralFromWindow } from "./online/referrals.js";
 import { ONLINE_MODE, lockedRulesetId, readOnlineSession, clearOnlineSession } from "./online/onlineTable.js";
 import { useOwnFriendsPresence } from "./hooks/useFriends.js";
+import { probeAmIStaff } from "./online/adminDashboard.js";
+import { enterAdminLocation, goBackFromAdmin, isAdminLocation, leaveAdminLocation } from "./online/adminRoute.js";
+import AdminPage from "./pages/AdminPage.jsx";
 import "./App.css";
 
-/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "friends" | "chat" | "game"} AppPhase */
+/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "friends" | "chat" | "game" | "admin"} AppPhase */
 
 /**
  * Startup: brand intro → Login (or Home if signed in) → Game Style → table.
@@ -43,6 +46,7 @@ function App() {
   const [chatReturnTo, setChatReturnTo] = useState("home");
   const recoveredOnlineRef = useRef(false);
   const friendInviteBusyRef = useRef(false);
+  const [staffRole, setStaffRole] = useState(null);
   useOwnFriendsPresence();
 
   useEffect(() => {
@@ -56,12 +60,60 @@ function App() {
   useEffect(() => {
     if (!authReady || phase === "intro" || signedIn) return undefined;
     if (!authView) openLogin();
-    if (phase === "game" || phase === "gameStyle" || phase === "findMatch" || phase === "friends" || phase === "chat") {
+    if (
+      phase === "game" ||
+      phase === "gameStyle" ||
+      phase === "findMatch" ||
+      phase === "friends" ||
+      phase === "chat" ||
+      phase === "admin"
+    ) {
       setMatchOptions(null);
+      if (phase === "admin") leaveAdminLocation();
       setPhase("home");
     }
     return undefined;
   }, [authReady, signedIn, phase, authView, openLogin]);
+
+  useEffect(() => {
+    if (!playable) {
+      setStaffRole(null);
+      return undefined;
+    }
+    let cancelled = false;
+    probeAmIStaff()
+      .then((result) => {
+        if (!cancelled) setStaffRole(result.isStaff ? result.role : false);
+      })
+      .catch(() => {
+        if (!cancelled) setStaffRole(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playable, session?.playerId]);
+
+  useEffect(() => {
+    if (!authReady || !playable || phase === "intro") return undefined;
+    if (isAdminLocation() && phase !== "admin") setPhase("admin");
+    return undefined;
+  }, [authReady, playable, phase]);
+
+  useEffect(() => {
+    const onNav = () => {
+      if (isAdminLocation()) {
+        if (playable) setPhase("admin");
+        return;
+      }
+      setPhase((current) => (current === "admin" ? "home" : current));
+    };
+    window.addEventListener("popstate", onNav);
+    window.addEventListener("hashchange", onNav);
+    return () => {
+      window.removeEventListener("popstate", onNav);
+      window.removeEventListener("hashchange", onNav);
+    };
+  }, [playable]);
 
   useEffect(() => {
     if (!authReady || !playable || phase !== "home") return undefined;
@@ -171,7 +223,17 @@ function App() {
     setChatFocus(null);
     setChatReturnTo("home");
     setGameKey((key) => key + 1);
+    leaveAdminLocation();
     setPhase("home");
+  };
+
+  const handleAdminBack = () => {
+    goBackFromAdmin(typeof window !== "undefined" ? window : null, handleMainMenu);
+  };
+
+  const openAdmin = () => {
+    enterAdminLocation();
+    setPhase("admin");
   };
 
   const openChat = (focus = null, returnTo = "home") => {
@@ -186,7 +248,8 @@ function App() {
     phase === "gameStyle" ||
     phase === "findMatch" ||
     phase === "friends" ||
-    phase === "chat";
+    phase === "chat" ||
+    phase === "admin";
   const showAuth = Boolean(authView) || (phase !== "intro" && authReady && !signedIn);
   const onlineTable = matchOptions?.mode === ONLINE_MODE;
 
@@ -212,6 +275,8 @@ function App() {
           onOpenChat={(focus) => openChat(focus, "home")}
           onEnterMatch={handleEnterOnlineMatch}
           onResume={handleResume}
+          showAdmin={typeof staffRole === "string"}
+          onOpenAdmin={openAdmin}
         />
       ) : null}
 
@@ -265,6 +330,10 @@ function App() {
           }}
           onPlay={handlePlay}
         />
+      ) : null}
+
+      {phase === "admin" && playable ? (
+        <AdminPage onBack={handleAdminBack} />
       ) : null}
 
       {phase === "game" && playable && onlineTable ? (

@@ -32,6 +32,8 @@ function SettingsPanel({
   onClose,
   difficulty,
   onDifficultyChange,
+  showAdmin,
+  onOpenAdmin,
 }) {
   const { t } = useI18n();
   const { volume, muted, ambient, setVolume, setMuted, setAmbient, play } = useAudio();
@@ -220,6 +222,19 @@ function SettingsPanel({
                 >
                   {t("auth.logout")}
                 </button>
+                {showAdmin ? (
+                  <button
+                    type="button"
+                    className="btn btn--ghost settings-panel__account-btn"
+                    data-settings-admin="true"
+                    onClick={() => tap(() => {
+                      onClose();
+                      onOpenAdmin?.();
+                    })}
+                  >
+                    {t("admin.openAdmin")}
+                  </button>
+                ) : null}
                 {isCloudAuth() ? (
                   <div className="settings-panel__delete" data-account-delete="true">
                     {!deleteOpen ? (
