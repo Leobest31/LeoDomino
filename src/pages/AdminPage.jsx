@@ -9,6 +9,8 @@ import {
   ADMIN_PAGE_SIZE,
   fetchAdminLiveMatches,
   fetchAdminOverview,
+  fetchAdminPlayerRpHistory,
+  fetchAdminTopRp,
   fetchAdminUsers,
   liveMatchStatusKey,
   overviewCardsFromPayload,
@@ -17,8 +19,7 @@ import {
 import AdminSpectatorView from "./AdminSpectatorView.jsx";
 import "./AdminPage.css";
 
-const NAV = Object.freeze(["overview", "users", "liveMatches"]);
-const NEXT = Object.freeze(["globalRp"]);
+const NAV = Object.freeze(["overview", "users", "liveMatches", "globalRp"]);
 
 function errorMessageKey(error) {
   if (error?.code === ADMIN_ERROR.AUTH) return "admin.signInRequired";
@@ -69,6 +70,15 @@ function AdminPage({ onBack }) {
   const [watchingMatchId, setWatchingMatchId] = useState(null);
   const watchingMatchIdRef = useRef(null);
   watchingMatchIdRef.current = watchingMatchId;
+  const [rpOffset, setRpOffset] = useState(0);
+  const [rpPage, setRpPage] = useState({ players: [], total: 0, limit: ADMIN_PAGE_SIZE, offset: 0 });
+  const [rpError, setRpError] = useState("");
+  const [rpLoading, setRpLoading] = useState(false);
+  const [rpSelected, setRpSelected] = useState(null);
+  const [rpHistory, setRpHistory] = useState({ events: [], total: 0, limit: ADMIN_PAGE_SIZE, offset: 0 });
+  const [rpHistoryError, setRpHistoryError] = useState("");
+  const [rpHistoryLoading, setRpHistoryLoading] = useState(false);
+  const [rpHistoryOffset, setRpHistoryOffset] = useState(0);
 
   const checkAccess = useCallback(async () => {
     setGate("checking");
@@ -145,6 +155,34 @@ function AdminPage({ onBack }) {
     }
   }, []);
 
+  const loadTopRp = useCallback(async (query) => {
+    setRpLoading(true);
+    setRpError("");
+    try {
+      setRpPage(await fetchAdminTopRp(query));
+    } catch (error) {
+      setRpPage({ players: [], total: 0, limit: ADMIN_PAGE_SIZE, offset: query.offset || 0 });
+      setRpError(errorMessageKey(error));
+    } finally {
+      setRpLoading(false);
+    }
+  }, []);
+
+  const loadRpHistory = useCallback(async (playerId, query) => {
+    setRpHistoryLoading(true);
+    setRpHistoryError("");
+    try {
+      const page = await fetchAdminPlayerRpHistory(playerId, query);
+      setRpHistory(page);
+      if (page.player) setRpSelected(page.player);
+    } catch (error) {
+      setRpHistory({ events: [], total: 0, limit: ADMIN_PAGE_SIZE, offset: query.offset || 0 });
+      setRpHistoryError(errorMessageKey(error));
+    } finally {
+      setRpHistoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (gate !== "ok" || section !== "overview") return undefined;
     void loadOverview();
@@ -177,6 +215,18 @@ function AdminPage({ onBack }) {
     return () => window.clearInterval(handle);
   }, [gate, section, liveOffset, loadLiveMatches]);
 
+  useEffect(() => {
+    if (gate !== "ok" || section !== "globalRp") return undefined;
+    void loadTopRp({ offset: rpOffset, limit: ADMIN_PAGE_SIZE });
+    return undefined;
+  }, [gate, section, rpOffset, loadTopRp]);
+
+  useEffect(() => {
+    if (gate !== "ok" || !rpSelected?.playerId) return undefined;
+    void loadRpHistory(rpSelected.playerId, { offset: rpHistoryOffset, limit: ADMIN_PAGE_SIZE });
+    return undefined;
+  }, [gate, rpSelected?.playerId, rpHistoryOffset, loadRpHistory]);
+
   const cards = useMemo(() => overviewCardsFromPayload(overview), [overview]);
   const pageCount = Math.max(1, Math.ceil((userPage.total || 0) / (userPage.limit || ADMIN_PAGE_SIZE)));
   const pageNumber = Math.floor((userPage.offset || 0) / (userPage.limit || ADMIN_PAGE_SIZE)) + 1;
@@ -186,6 +236,14 @@ function AdminPage({ onBack }) {
   const livePageNumber = Math.floor((livePage.offset || 0) / (livePage.limit || ADMIN_PAGE_SIZE)) + 1;
   const liveCanPrev = (livePage.offset || 0) > 0;
   const liveCanNext = (livePage.offset || 0) + livePage.matches.length < (livePage.total || 0);
+  const rpPageCount = Math.max(1, Math.ceil((rpPage.total || 0) / (rpPage.limit || ADMIN_PAGE_SIZE)));
+  const rpPageNumber = Math.floor((rpPage.offset || 0) / (rpPage.limit || ADMIN_PAGE_SIZE)) + 1;
+  const rpCanPrev = (rpPage.offset || 0) > 0;
+  const rpCanNext = (rpPage.offset || 0) + rpPage.players.length < (rpPage.total || 0);
+  const rpHistoryPageCount = Math.max(1, Math.ceil((rpHistory.total || 0) / (rpHistory.limit || ADMIN_PAGE_SIZE)));
+  const rpHistoryPageNumber = Math.floor((rpHistory.offset || 0) / (rpHistory.limit || ADMIN_PAGE_SIZE)) + 1;
+  const rpHistoryCanPrev = (rpHistory.offset || 0) > 0;
+  const rpHistoryCanNext = (rpHistory.offset || 0) + rpHistory.events.length < (rpHistory.total || 0);
 
   const formatWhen = (value) => {
     if (!value) return "—";
@@ -201,6 +259,12 @@ function AdminPage({ onBack }) {
   const styleLabel = (rulesetId) => {
     const style = gameStyleForRulesetId(rulesetId);
     return t(style?.nameKey || "setup.gameStyle.classic");
+  };
+
+  const finishReasonLabel = (reason) => {
+    if (reason === "forfeit") return t("admin.finishForfeit");
+    if (reason === "completed") return t("admin.finishCompleted");
+    return reason || "—";
   };
 
   const scoreLabel = (match) => {
@@ -265,21 +329,10 @@ function AdminPage({ onBack }) {
                     setSelected(null);
                     setLiveSelected(null);
                     setWatchingMatchId(null);
+                    setRpSelected(null);
                   }}
                 >
                   {t(`admin.${id}`)}
-                </button>
-              ))}
-              {NEXT.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  className="admin-page__nav-btn is-disabled"
-                  data-admin-nav-item={id}
-                  disabled
-                >
-                  <span>{t(`admin.${id}`)}</span>
-                  <span className="admin-page__soon">{t("admin.comingNext")}</span>
                 </button>
               ))}
             </nav>
@@ -527,6 +580,96 @@ function AdminPage({ onBack }) {
                 </div>
               </div>
             ) : null}
+
+            {section === "globalRp" ? (
+              <div data-admin-top-rp="true">
+                <header className="admin-page__header">
+                  <h2>{t("admin.globalRp")}</h2>
+                  <button
+                    type="button"
+                    className="admin-page__btn admin-page__btn--ghost"
+                    disabled={rpLoading}
+                    onClick={() => void loadTopRp({ offset: rpOffset, limit: ADMIN_PAGE_SIZE })}
+                  >
+                    {t("admin.retry")}
+                  </button>
+                </header>
+                {rpError ? (
+                  <p className="admin-page__error" role="alert">
+                    {t(rpError)}
+                  </p>
+                ) : null}
+                {rpLoading && rpPage.players.length === 0 ? (
+                  <p className="admin-page__empty" data-admin-top-rp-loading="true">
+                    {t("admin.loading")}
+                  </p>
+                ) : null}
+                <div className="admin-page__table-wrap">
+                  <table className="admin-page__table">
+                    <thead>
+                      <tr>
+                        <th>{t("admin.rank")}</th>
+                        <th>{t("admin.displayName")}</th>
+                        <th>{t("admin.username")}</th>
+                        <th>{t("admin.rp")}</th>
+                        <th>{t("admin.wins")}</th>
+                        <th>{t("admin.losses")}</th>
+                        <th>{t("admin.ratedMatches")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rpPage.players.map((player) => (
+                        <tr
+                          key={player.playerId}
+                          data-admin-top-rp-player={player.playerId}
+                          onClick={() => {
+                            setRpHistoryOffset(0);
+                            setRpSelected(player);
+                          }}
+                        >
+                          <td>{player.rank == null ? "—" : formatNumber(player.rank)}</td>
+                          <td>{player.displayName || "—"}</td>
+                          <td>{player.username || "—"}</td>
+                          <td>{formatNumber(player.rp)}</td>
+                          <td>{formatNumber(player.wins)}</td>
+                          <td>{formatNumber(player.losses)}</td>
+                          <td>{formatNumber(player.matchesPlayed)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {!rpLoading && !rpError && rpPage.players.length === 0 ? (
+                  <p className="admin-page__empty" data-admin-top-rp-empty="true">
+                    {t("admin.noTopRp")}
+                  </p>
+                ) : null}
+                <div className="admin-page__pager" data-admin-top-rp-page="true">
+                  <button
+                    type="button"
+                    className="admin-page__btn admin-page__btn--ghost"
+                    disabled={!rpCanPrev || rpLoading}
+                    onClick={() => setRpOffset(Math.max(0, rpOffset - ADMIN_PAGE_SIZE))}
+                  >
+                    {t("admin.previous")}
+                  </button>
+                  <p>
+                    {t("admin.pageOf", {
+                      page: formatNumber(rpPageNumber),
+                      pages: formatNumber(rpPageCount),
+                    })}
+                  </p>
+                  <button
+                    type="button"
+                    className="admin-page__btn admin-page__btn--ghost"
+                    disabled={!rpCanNext || rpLoading}
+                    onClick={() => setRpOffset(rpOffset + ADMIN_PAGE_SIZE)}
+                  >
+                    {t("admin.next")}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}
@@ -716,6 +859,158 @@ function AdminPage({ onBack }) {
             >
               {t("admin.watchLive")}
             </button>
+          </aside>
+        </div>
+      ) : null}
+      {gate === "ok" && rpSelected ? (
+        <div className="admin-page__drawer-wrap">
+          <button
+            type="button"
+            className="admin-page__drawer-backdrop"
+            aria-label={t("admin.closeDetail")}
+            onClick={() => setRpSelected(null)}
+          />
+          <aside className="admin-page__drawer" data-admin-rp-detail="true" aria-label={t("admin.rankedActivity")}>
+            <header className="admin-page__drawer-head">
+              <h2>{t("admin.rankedActivity")}</h2>
+              <button type="button" className="admin-page__icon-btn" onClick={() => setRpSelected(null)}>
+                <IconClose />
+                <span className="sr-only">{t("admin.closeDetail")}</span>
+              </button>
+            </header>
+            <div className="admin-page__drawer-hero">
+              <img src={resolvePlayerAvatar(rpSelected.avatarId)} alt="" width={72} height={72} />
+              <div>
+                <p className="admin-page__drawer-name">{rpSelected.displayName || "—"}</p>
+                <p>{rpSelected.username || "—"}</p>
+              </div>
+            </div>
+            <dl className="admin-page__facts">
+              <div>
+                <dt>{t("admin.rank")}</dt>
+                <dd>{rpSelected.rank == null ? "—" : formatNumber(rpSelected.rank)}</dd>
+              </div>
+              <div>
+                <dt>{t("admin.rp")}</dt>
+                <dd>{formatNumber(rpSelected.rp)}</dd>
+              </div>
+              <div>
+                <dt>{t("admin.wins")}</dt>
+                <dd>{formatNumber(rpSelected.wins)}</dd>
+              </div>
+              <div>
+                <dt>{t("admin.losses")}</dt>
+                <dd>{formatNumber(rpSelected.losses)}</dd>
+              </div>
+              <div>
+                <dt>{t("admin.ratedMatches")}</dt>
+                <dd>{formatNumber(rpSelected.matchesPlayed)}</dd>
+              </div>
+              <div>
+                <dt>{t("admin.playerId")}</dt>
+                <dd className="admin-page__mono">{rpSelected.playerId}</dd>
+              </div>
+            </dl>
+            {rpHistoryError ? (
+              <p className="admin-page__error" role="alert">
+                {t(rpHistoryError)}
+              </p>
+            ) : null}
+            {rpHistoryLoading && rpHistory.events.length === 0 ? (
+              <p className="admin-page__empty" data-admin-rp-history-loading="true">
+                {t("admin.loading")}
+              </p>
+            ) : null}
+            {!rpHistoryLoading && !rpHistoryError && rpHistory.events.length === 0 ? (
+              <p className="admin-page__empty" data-admin-rp-history-empty="true">
+                {t("admin.noRpHistory")}
+              </p>
+            ) : null}
+            <ol className="admin-page__rp-history" data-admin-rp-history="true">
+              {rpHistory.events.map((event) => (
+                <li
+                  key={event.matchId}
+                  className="admin-page__rp-event"
+                  data-admin-rp-event={event.matchId}
+                  data-admin-rp-result={event.result}
+                >
+                  <div className="admin-page__rp-event-top">
+                    <span className={`admin-page__pill ${event.result === "win" ? "is-ok" : "is-deleted"}`}>
+                      {event.result === "win" ? t("admin.rpWin") : t("admin.rpLoss")}
+                    </span>
+                    <time dateTime={event.settledAt} data-admin-rp-settled-at={event.settledAt}>
+                      {formatWhen(event.settledAt)}
+                    </time>
+                  </div>
+                  <p className="admin-page__rp-event-vs">
+                    {t("admin.vs")} {playerLabel(event.opponent)}
+                  </p>
+                  <dl className="admin-page__rp-event-facts">
+                    <div>
+                      <dt>{t("admin.rpBefore")}</dt>
+                      <dd>{formatNumber(event.rpBefore)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("admin.rpChange")}</dt>
+                      <dd>
+                        {event.rpDelta > 0 ? "+" : ""}
+                        {formatNumber(event.rpDelta)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t("admin.rpAfter")}</dt>
+                      <dd>{formatNumber(event.rpAfter)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("admin.style")}</dt>
+                      <dd>{styleLabel(event.rulesetId)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("admin.matchType")}</dt>
+                      <dd>{event.rated ? t("admin.rated") : t("admin.unrated")}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("admin.matchKind")}</dt>
+                      <dd>
+                        {event.matchKind === "friend" ? t("admin.matchKindFriend") : t("admin.matchKindPublic")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t("admin.finishReason")}</dt>
+                      <dd>{finishReasonLabel(event.finishReason)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("admin.matchId")}</dt>
+                      <dd className="admin-page__mono">{event.matchId}</dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ol>
+            <div className="admin-page__pager" data-admin-rp-history-page="true">
+              <button
+                type="button"
+                className="admin-page__btn admin-page__btn--ghost"
+                disabled={!rpHistoryCanPrev || rpHistoryLoading}
+                onClick={() => setRpHistoryOffset(Math.max(0, rpHistoryOffset - ADMIN_PAGE_SIZE))}
+              >
+                {t("admin.previous")}
+              </button>
+              <p>
+                {t("admin.pageOf", {
+                  page: formatNumber(rpHistoryPageNumber),
+                  pages: formatNumber(rpHistoryPageCount),
+                })}
+              </p>
+              <button
+                type="button"
+                className="admin-page__btn admin-page__btn--ghost"
+                disabled={!rpHistoryCanNext || rpHistoryLoading}
+                onClick={() => setRpHistoryOffset(rpHistoryOffset + ADMIN_PAGE_SIZE)}
+              >
+                {t("admin.next")}
+              </button>
+            </div>
           </aside>
         </div>
       ) : null}
