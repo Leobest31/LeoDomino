@@ -6,15 +6,15 @@
 **App:** LeoDomino Version 1  
 **App ID:** `com.leodomino.app`  
 **App version:** 1.0.0  
-**Last updated:** 2026-08-09
+**Last updated:** 2026-08-28
 
 ---
 
 ## How can we help?
 
-LeoDomino V1 is an offline-first domino game. You can play without creating an account.
+LeoDomino V1 is an offline-first double-six domino game. You can play against AI without creating an account. With a LeoDomino account you can also use online play, friends, and Global Ranking.
 
-Online multiplayer and League are **not** available in Version 1. They may appear as “Coming Soon” in the app, but they are not active yet.
+Signed-in players can send **general feedback**, **bug reports**, and **feature suggestions** from **Settings → Send Feedback** in the app.
 
 ---
 
@@ -24,15 +24,16 @@ Online multiplayer and League are **not** available in Version 1. They may appea
 **Privacy email:** support@leodomino.com  
 **Operator:** LEONORD B PHILOSTIN
 
-Please include:
+If you email us, please include:
 
 1. Device model and system version  
 2. App version (1.0.0 or the version shown in your store / device settings)  
 3. Game style (Classic, Haitian, American, Dominican, or Puerto Rican)  
 4. Player count (2, 3, or 4)  
-5. What happened, and steps to reproduce if you can  
+5. Whether the issue happened offline, online, or in friends play  
+6. What happened, and steps to reproduce if you can  
 
-We do not offer live chat support in Version 1.
+We do not offer live customer-support chat. Friends-only Live Chat in the app is for players messaging each other, not LeoDomino support staff.
 
 ---
 
@@ -53,17 +54,17 @@ Some styles only work with certain player counts. For example:
 If **Play** is disabled on Setup, change the player count or game style until they match.
 
 ### Playing offline
-Version 1 is designed for offline play. You do not need a LeoDomino account or an online connection to play against AI.
+You can play against AI without a LeoDomino account or an online connection. Online Find Match, friends, and ranked play need a signed-in account and a network connection.
 
 If you installed LeoDomino as a web app, open it from the installed icon after the first successful load so offline files can be used.
 
 ### Sound or vibration
-- Check the sound setting on Setup  
+- Check the sound setting in Settings  
 - Check your device silent / Do Not Disturb modes  
 - Vibration needs device support and the in-app preference turned on  
 
 ### Saved games / Resume
-Progress is stored **on your device**.
+Offline match progress is stored **on your device**.
 
 Try:
 
@@ -74,11 +75,11 @@ Try:
 
 **Warning:** Clearing LeoDomino storage or uninstalling usually deletes:
 
-- Saved matches  
+- Saved local matches  
 - Local career statistics  
 - Language and other app preferences on that device  
 
-Version 1 has **no cloud backup**, so LeoDomino cannot restore that data after it is removed.
+Local device progress has **no cloud backup**, so LeoDomino cannot restore that data after it is removed. Your online account, friends, and Global Ranking stay on the server until you delete the account.
 
 ---
 
@@ -105,12 +106,10 @@ Support page URL: `https://leodomino.com/support`
 
 ---
 
-## Not available in Version 1
+## Coming later
 
-Please do not expect Version 1 support for:
+These appear in the app as Coming Soon and are not active support topics yet:
 
-- Online multiplayer  
-- League, rankings, or championships  
-- Friends or chat  
-- Account login or password reset  
-- Cloud save across devices  
+- League / LeoDomino Cup  
+- Challenge  
+- LeoCoins store  

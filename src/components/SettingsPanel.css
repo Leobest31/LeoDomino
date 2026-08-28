@@ -261,6 +261,61 @@
   min-height: 2.5rem;
 }
 
+.settings-panel__feedback,
+.settings-panel__rate {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid rgba(201, 162, 39, 0.18);
+}
+
+.settings-panel__feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.settings-panel__textarea {
+  width: 100%;
+  min-height: 7.5rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-panel-border);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--color-text);
+  font: inherit;
+  resize: vertical;
+}
+
+.settings-panel__feedback-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.settings-panel__feedback-min {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.settings-panel__feedback-success {
+  margin: 0;
+  color: var(--color-accent-strong);
+  font-size: 0.82rem;
+}
+
+.settings-panel__feedback-error {
+  margin: 0;
+  color: #f0b4b4;
+  font-size: 0.78rem;
+}
+
 .settings-panel__legal {
   margin-top: var(--space-lg);
   padding-top: var(--space-md);

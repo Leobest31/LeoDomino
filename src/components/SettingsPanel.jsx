@@ -9,7 +9,16 @@ import {
   winPercentage,
 } from "../persistence/index.js";
 import { LEGAL_URLS } from "../legal/urls.js";
+import { canOpenStoreListing, openConfiguredStoreListing } from "../legal/storeLinks.js";
 import { AUTH_ERROR, isCloudAuth, useAuth } from "../auth";
+import {
+  FEEDBACK_ERROR,
+  FEEDBACK_MAX_LENGTH,
+  FEEDBACK_MIN_LENGTH,
+  submitMyFeedback,
+  validateFeedbackInput,
+} from "../online/feedback.js";
+import { getPlatform } from "../monitoring/client.js";
 import { IconClose } from "./Icon";
 import LanguageSwitcher from "./LanguageSwitcher";
 import DifficultySwitcher from "./DifficultySwitcher";
@@ -32,6 +41,11 @@ function SettingsPanel({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [feedbackCategory, setFeedbackCategory] = useState("general");
+  const [feedbackBody, setFeedbackBody] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
+  const [feedbackNotice, setFeedbackNotice] = useState("");
+  const [feedbackError, setFeedbackError] = useState("");
   const wasOpen = useRef(false);
 
   useEffect(() => {
@@ -40,6 +54,11 @@ function SettingsPanel({
       setDeleteOpen(false);
       setDeletePassword("");
       setDeleteError("");
+      setFeedbackCategory("general");
+      setFeedbackBody("");
+      setFeedbackSending(false);
+      setFeedbackNotice("");
+      setFeedbackError("");
     }
   }, [open]);
 
@@ -110,6 +129,51 @@ function SettingsPanel({
       onClose();
     } catch (error) {
       setDeleteError(deletionErrorKey(error?.code));
+    }
+  };
+
+  const feedbackErrorKey = (code) => {
+    if (code === FEEDBACK_ERROR.TOO_SHORT) return "feedback.tooShort";
+    if (code === FEEDBACK_ERROR.TOO_LONG) return "feedback.tooLong";
+    if (code === FEEDBACK_ERROR.INVALID_CATEGORY) return "feedback.invalidCategory";
+    if (code === FEEDBACK_ERROR.RATE_LIMIT) return "feedback.rateLimit";
+    if (code === FEEDBACK_ERROR.AUTH || code === FEEDBACK_ERROR.UNAVAILABLE) return "feedback.signIn";
+    return "feedback.error";
+  };
+
+  const canSubmitFeedback = isCloudAuth() && Boolean(session);
+  const feedbackLength = feedbackBody.trim().length;
+  const showFeedbackMinHint = Boolean(feedbackLength) && feedbackLength < FEEDBACK_MIN_LENGTH;
+  const feedbackReady =
+    canSubmitFeedback &&
+    !feedbackSending &&
+    !validateFeedbackInput({ category: feedbackCategory, body: feedbackBody });
+  const canRate = canOpenStoreListing(getPlatform());
+
+  const submitFeedback = async (event) => {
+    event.preventDefault();
+    play("button");
+    setFeedbackNotice("");
+    setFeedbackError("");
+    if (!canSubmitFeedback) {
+      setFeedbackError("feedback.signIn");
+      return;
+    }
+    const invalid = validateFeedbackInput({ category: feedbackCategory, body: feedbackBody });
+    if (invalid) {
+      setFeedbackError(feedbackErrorKey(invalid));
+      return;
+    }
+    setFeedbackSending(true);
+    try {
+      await submitMyFeedback({ category: feedbackCategory, body: feedbackBody });
+      setFeedbackCategory("general");
+      setFeedbackBody("");
+      setFeedbackNotice("feedback.success");
+    } catch (error) {
+      setFeedbackError(feedbackErrorKey(error?.code));
+    } finally {
+      setFeedbackSending(false);
     }
   };
 
@@ -392,6 +456,103 @@ function SettingsPanel({
             >
               {t("settings.resetStats")}
             </button>
+          </section>
+
+          <section className="settings-panel__feedback" data-settings-feedback="true">
+            <h3 className="settings-panel__label">{t("feedback.title")}</h3>
+            {canSubmitFeedback ? (
+              <form className="settings-panel__feedback-form" onSubmit={submitFeedback}>
+                <label className="settings-panel__field">
+                  <span className="settings-panel__label">{t("feedback.category")}</span>
+                  <select
+                    className="settings-panel__select"
+                    value={feedbackCategory}
+                    disabled={feedbackSending}
+                    aria-label={t("feedback.category")}
+                    onChange={(event) => {
+                      setFeedbackCategory(event.target.value);
+                      setFeedbackNotice("");
+                      setFeedbackError("");
+                    }}
+                  >
+                    <option value="general">{t("feedback.general")}</option>
+                    <option value="bug">{t("feedback.bug")}</option>
+                    <option value="feature">{t("feedback.feature")}</option>
+                  </select>
+                </label>
+                <label className="settings-panel__field">
+                  <span className="settings-panel__label">{t("feedback.message")}</span>
+                  <textarea
+                    className="settings-panel__textarea"
+                    value={feedbackBody}
+                    disabled={feedbackSending}
+                    maxLength={FEEDBACK_MAX_LENGTH}
+                    rows={5}
+                    placeholder={t("feedback.placeholder")}
+                    aria-label={t("feedback.message")}
+                    onChange={(event) => {
+                      setFeedbackBody(event.target.value);
+                      setFeedbackNotice("");
+                      setFeedbackError("");
+                    }}
+                  />
+                  <span className="settings-panel__feedback-meta">
+                    {showFeedbackMinHint ? (
+                      <span
+                        className="settings-panel__feedback-min"
+                        data-settings-feedback-min="true"
+                        aria-live="polite"
+                      >
+                        {t("feedback.minHint")}
+                      </span>
+                    ) : null}
+                    <span className="settings-panel__hint">
+                      {feedbackLength}/{FEEDBACK_MAX_LENGTH}
+                    </span>
+                  </span>
+                </label>
+                {feedbackNotice ? (
+                  <p className="settings-panel__feedback-success" role="status">
+                    {t(feedbackNotice)}
+                  </p>
+                ) : null}
+                {feedbackError ? (
+                  <p className="settings-panel__feedback-error" role="alert">
+                    {t(feedbackError)}
+                  </p>
+                ) : null}
+                <button
+                  type="submit"
+                  className="btn btn--ghost settings-panel__account-btn"
+                  data-settings-feedback-submit="true"
+                  disabled={!feedbackReady}
+                >
+                  {feedbackSending ? t("feedback.submitting") : t("feedback.submit")}
+                </button>
+              </form>
+            ) : (
+              <p className="settings-panel__hint">{t("feedback.signIn")}</p>
+            )}
+          </section>
+
+          <section className="settings-panel__rate" data-settings-rate="true">
+            <h3 className="settings-panel__label">{t("feedback.rateTitle")}</h3>
+            <button
+              type="button"
+              className="btn btn--ghost settings-panel__account-btn"
+              data-settings-rate-btn="true"
+              disabled={!canRate}
+              onClick={() =>
+                tap(() => {
+                  openConfiguredStoreListing(getPlatform());
+                })
+              }
+            >
+              {canRate ? t("feedback.rateTitle") : t("feedback.rateComingSoon")}
+            </button>
+            {!canRate ? (
+              <p className="settings-panel__hint">{t("home.comingSoonNotice")}</p>
+            ) : null}
           </section>
 
           <nav className="settings-panel__legal" aria-label={t("legal.navAria")}>
