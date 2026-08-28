@@ -8,19 +8,35 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "url";
 import {
   ADMIN_ERROR,
+  ADMIN_LIVE_MATCH_FIELDS,
+  ADMIN_LIVE_PLAYER_FIELDS,
+  ADMIN_LIVE_POLL_MS,
   ADMIN_PAGE_SIZE,
+  ADMIN_SPECTATOR_FIELDS,
+  ADMIN_SPECTATOR_POLL_MS,
+  ADMIN_SPECTATOR_STRIP_KEYS,
   ADMIN_USER_FIELDS,
   AdminError,
+  buildAdminLiveMatchListPayload,
   buildAdminUserListPayload,
+  fetchAdminLiveMatchView,
+  fetchAdminLiveMatches,
   fetchAdminOverview,
   fetchAdminUsers,
+  isAdminSpectatorEnded,
+  liveMatchStatusKey,
+  normalizeAdminLiveMatch,
+  normalizeAdminLiveMatchList,
   normalizeAdminOverview,
+  normalizeAdminSpectatorView,
   normalizeAdminUser,
   normalizeAdminUserList,
   normalizeStaffProbe,
   overviewCardsFromPayload,
   probeAmIStaff,
   sanitizeAdminSearch,
+  sanitizeSpectatorTile,
+  shouldApplySpectatorSnapshot,
 } from "./adminDashboard.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -29,6 +45,15 @@ const source = readFileSync(join(root, "src/online/adminDashboard.js"), "utf8");
 assert.match(source, /rpc\("am_i_staff"\)/);
 assert.match(source, /rpc\("admin_get_overview"\)/);
 assert.match(source, /rpc\("admin_list_users"/);
+assert.match(source, /rpc\("admin_list_live_matches"/);
+assert.match(source, /rpc\("admin_get_live_match_view"/);
+assert.doesNotMatch(source, /\.from\(/);
+assert.doesNotMatch(source, /get_game_view|submit_game_action|forfeit_online_match/);
+assert.match(source, /ADMIN_SPECTATOR_STRIP_KEYS/);
+assert.ok(ADMIN_SPECTATOR_STRIP_KEYS.includes("myHand"));
+assert.ok(ADMIN_SPECTATOR_STRIP_KEYS.includes("engine_state"));
+assert.ok(ADMIN_SPECTATOR_STRIP_KEYS.includes("game_secrets"));
+assert.ok(ADMIN_SPECTATOR_STRIP_KEYS.includes("deal_seed"));
 assert.doesNotMatch(source, /SERVICE_ROLE|service_role_key|SUPABASE_SERVICE/i);
 assert.doesNotMatch(source, /localStorage|sessionStorage/);
 assert.doesNotMatch(source, /user_metadata|raw_user_meta_data|accountAge/);
@@ -180,10 +205,22 @@ assert.equal(ADMIN_PAGE_SIZE, 25);
     assert.equal(error.code, ADMIN_ERROR.FORBIDDEN);
     return true;
   });
+  await assert.rejects(() => fetchAdminLiveMatches({ offset: 0 }, client), (error) => {
+    assert.equal(error.code, ADMIN_ERROR.FORBIDDEN);
+    return true;
+  });
+  await assert.rejects(() => fetchAdminLiveMatchView("11111111-1111-4111-8111-111111111111", client), (error) => {
+    assert.equal(error.code, ADMIN_ERROR.FORBIDDEN);
+    return true;
+  });
   assert.equal(calls[0].name, "am_i_staff");
   assert.equal(calls[1].name, "admin_get_overview");
   assert.equal(calls[2].name, "admin_list_users");
   assert.deepEqual(calls[2].payload, { p_search: "leo", p_limit: 25, p_offset: 25 });
+  assert.equal(calls[3].name, "admin_list_live_matches");
+  assert.deepEqual(calls[3].payload, { p_limit: 25, p_offset: 0 });
+  assert.equal(calls[4].name, "admin_get_live_match_view");
+  assert.deepEqual(calls[4].payload, { p_match_id: "11111111-1111-4111-8111-111111111111" });
 }
 
 {
@@ -218,12 +255,396 @@ assert.equal(ADMIN_PAGE_SIZE, 25);
 }
 
 {
+  const live = normalizeAdminLiveMatch({
+    match_id: "11111111-1111-4111-8111-111111111111",
+    ruleset_id: "haitian",
+    rated: true,
+    match_kind: "public",
+    match_status: "playing",
+    admin_status: "live",
+    created_at: "2026-08-28T18:00:00.000Z",
+    player_a: {
+      player_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      display_name: "Ada",
+      username: "ada",
+      avatar_id: "amina",
+      rp: 1120,
+      last_seen_at: "2026-08-28T18:01:00.000Z",
+      stale: false,
+      email: "hidden@example.com",
+    },
+    player_b: {
+      player_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      display_name: "Bea",
+      username: "bea",
+      avatar_id: "noah",
+      rp: 980,
+      last_seen_at: "2026-08-28T18:01:10.000Z",
+      stale: false,
+    },
+    score_a: 45,
+    score_b: 30,
+    round: 2,
+    current_seat: 1,
+    current_player_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    session_status: "playing",
+    phase: "playing",
+    session_updated_at: "2026-08-28T18:01:10.000Z",
+    hand_count_a: 5,
+    hand_count_b: 6,
+    reserve_count: 14,
+    version: 8,
+    email: "nope@example.com",
+    myHand: [{ id: "secret" }],
+    engine_state: { players: [] },
+    board: [{ id: "tile" }],
+  });
+  assert.equal(live.matchId, "11111111-1111-4111-8111-111111111111");
+  assert.equal(live.rulesetId, "haitian");
+  assert.equal(live.rated, true);
+  assert.equal(live.adminStatus, "live");
+  assert.equal(live.scoreA, 45);
+  assert.equal(live.scoreB, 30);
+  assert.equal(live.round, 2);
+  assert.equal(live.currentSeat, 1);
+  assert.equal(live.currentPlayerId, live.playerB.playerId);
+  assert.equal(live.playerA.rp, 1120);
+  assert.equal(live.playerB.rp, 980);
+  assert.equal(live.handCountA, 5);
+  assert.equal("email" in live, false);
+  assert.equal("myHand" in live, false);
+  assert.equal("engine_state" in live, false);
+  assert.equal("board" in live, false);
+  assert.equal("email" in live.playerA, false);
+  for (const key of Object.keys(live)) {
+    assert.ok(ADMIN_LIVE_MATCH_FIELDS.includes(key), key);
+  }
+  for (const key of Object.keys(live.playerA)) {
+    assert.ok(ADMIN_LIVE_PLAYER_FIELDS.includes(key), key);
+  }
+  assert.equal(liveMatchStatusKey("live"), "admin.statusLive");
+  assert.equal(liveMatchStatusKey("disconnected"), "admin.statusDisconnected");
+  assert.equal(liveMatchStatusKey("waiting"), "admin.statusWaiting");
+  assert.equal(ADMIN_LIVE_POLL_MS, 8000);
+}
+
+{
+  const waiting = normalizeAdminLiveMatch({
+    match_id: "22222222-2222-4222-8222-222222222222",
+    ruleset_id: "legacy",
+    rated: false,
+    match_kind: "friend",
+    match_status: "ready",
+    admin_status: "waiting",
+    created_at: "2026-08-28T18:02:00.000Z",
+    player_a: { player_id: "a", display_name: "A", username: "a", rp: 1000, stale: false },
+    player_b: { player_id: "b", display_name: "B", username: "b", rp: 1000, stale: false },
+    score_a: null,
+    score_b: null,
+    round: null,
+    current_seat: null,
+    current_player_id: null,
+    session_status: null,
+  });
+  assert.equal(waiting.rated, false);
+  assert.equal(waiting.matchKind, "friend");
+  assert.equal(waiting.adminStatus, "waiting");
+  assert.equal(waiting.scoreA, null);
+  assert.equal(waiting.round, null);
+}
+
+{
+  const stale = normalizeAdminLiveMatch({
+    match_id: "33333333-3333-4333-8333-333333333333",
+    ruleset_id: "american",
+    rated: true,
+    match_kind: "public",
+    match_status: "playing",
+    admin_status: "disconnected",
+    created_at: "2026-08-28T17:00:00.000Z",
+    player_a: {
+      player_id: "a",
+      display_name: "A",
+      username: "a",
+      rp: 1000,
+      last_seen_at: "2026-08-28T17:01:00.000Z",
+      stale: true,
+    },
+    player_b: {
+      player_id: "b",
+      display_name: "B",
+      username: "b",
+      rp: 1000,
+      last_seen_at: "2026-08-28T18:00:00.000Z",
+      stale: false,
+    },
+    score_a: 10,
+    score_b: 20,
+    round: 1,
+    current_seat: 0,
+    current_player_id: "a",
+    session_status: "playing",
+  });
+  assert.equal(stale.adminStatus, "disconnected");
+  assert.equal(stale.playerA.stale, true);
+  assert.equal(stale.playerB.stale, false);
+}
+
+{
+  const page = normalizeAdminLiveMatchList({
+    matches: [
+      {
+        match_id: "m1",
+        ruleset_id: "legacy",
+        rated: true,
+        match_kind: "public",
+        match_status: "playing",
+        admin_status: "live",
+        player_a: { player_id: "a", username: "a", rp: 1000, stale: false },
+        player_b: { player_id: "b", username: "b", rp: 1000, stale: false },
+        score_a: 0,
+        score_b: 0,
+        round: 1,
+      },
+    ],
+    total: 1,
+    limit: 25,
+    offset: 0,
+    email: "nope",
+  });
+  assert.equal(page.total, 1);
+  assert.equal(page.matches[0].playerA.username, "a");
+  assert.equal("email" in page, false);
+  assert.deepEqual(buildAdminLiveMatchListPayload({ limit: 999, offset: -2 }), {
+    p_limit: 50,
+    p_offset: 0,
+  });
+}
+
+{
+  const calls = [];
+  const client = {
+    async rpc(name, payload) {
+      calls.push({ name, payload });
+      return {
+        data: { matches: [], total: 0, limit: 25, offset: 0 },
+        error: null,
+      };
+    },
+  };
+  const empty = await fetchAdminLiveMatches({ offset: 25 }, client);
+  assert.deepEqual(empty.matches, []);
+  assert.equal(calls[0].name, "admin_list_live_matches");
+  assert.deepEqual(calls[0].payload, { p_limit: 25, p_offset: 25 });
+}
+
+{
   const client = {
     async rpc() {
       return { data: null, error: { message: "function admin_get_overview does not exist", code: "42883" } };
     },
   };
   await assert.rejects(() => fetchAdminOverview(client), (error) => error.code === ADMIN_ERROR.UNAVAILABLE);
+}
+
+{
+  assert.equal(sanitizeSpectatorTile({ id: "6-5" }), null);
+  assert.equal(sanitizeSpectatorTile("6-5"), null);
+  assert.deepEqual(
+    sanitizeSpectatorTile({
+      id: "6-5",
+      left: 6,
+      right: 5,
+      orientation: "horizontal",
+      secret: "nope",
+      pips: [6, 5],
+    }),
+    { id: "6-5", left: 6, right: 5, orientation: "horizontal", destination: null, branch: null }
+  );
+}
+
+{
+  const leaked = normalizeAdminSpectatorView({
+    match_id: "11111111-1111-4111-8111-111111111111",
+    ruleset_id: "haitian",
+    rated: true,
+    match_kind: "public",
+    match_status: "playing",
+    admin_status: "live",
+    finish_reason: null,
+    created_at: "2026-08-28T18:00:00.000Z",
+    player_a: {
+      player_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      display_name: "Ada",
+      username: "ada",
+      avatar_id: "amina",
+      rp: 1120,
+      last_seen_at: "2026-08-28T18:01:00.000Z",
+      stale: false,
+      email: "hidden@example.com",
+    },
+    player_b: {
+      player_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      display_name: "Bea",
+      username: "bea",
+      avatar_id: "noah",
+      rp: 980,
+      last_seen_at: "2026-08-28T18:01:10.000Z",
+      stale: false,
+    },
+    score_a: 45,
+    score_b: 30,
+    round: 2,
+    current_seat: 1,
+    current_player_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    session_status: "playing",
+    phase: "playing",
+    session_updated_at: "2026-08-28T18:01:10.000Z",
+    hand_count_a: 6,
+    hand_count_b: 4,
+    reserve_count: 14,
+    version: 8,
+    board: [
+      { id: "6-6", left: 6, right: 6, orientation: "vertical", extra: true },
+      { id: "secret-hand" },
+      "6-5",
+    ],
+    spinner: {
+      id: "6-6",
+      north: [{ id: "6-1", left: 6, right: 1, orientation: "vertical" }],
+      south: [],
+    },
+    last_play_points: 10,
+    last_play_score_terminals: ["6-6"],
+    match_winner_seat: null,
+    myHand: [{ id: "5-5", left: 5, right: 5 }],
+    engine_state: { players: [{ hand: ["5-5", "4-3"] }] },
+    game_secrets: { deal_seed: 99 },
+    deal_seed: 99,
+    legalMoves: [{ tileId: "5-5" }],
+    reserve: ["0-0", "1-1"],
+    boneyard: [{ id: "0-0", left: 0, right: 0 }],
+    hands: [["5-5"], ["4-3"]],
+    round_result: { hands: [["5-5"], ["4-3"]] },
+    email: "nope@example.com",
+  });
+  assert.equal(leaked.matchId, "11111111-1111-4111-8111-111111111111");
+  assert.equal(leaked.board.length, 1);
+  assert.deepEqual(leaked.board[0], {
+    id: "6-6",
+    left: 6,
+    right: 6,
+    orientation: "vertical",
+    destination: null,
+    branch: null,
+  });
+  assert.equal(leaked.spinner.id, "6-6");
+  assert.equal(leaked.spinner.north[0].left, 6);
+  assert.equal(leaked.handCountA, 6);
+  assert.equal(leaked.handCountB, 4);
+  assert.equal(leaked.reserveCount, 14);
+  assert.equal(leaked.lastPlayPoints, 10);
+  assert.deepEqual(leaked.lastPlayScoreTerminals, ["6-6"]);
+  for (const key of Object.keys(leaked)) {
+    assert.ok(ADMIN_SPECTATOR_FIELDS.includes(key), key);
+  }
+  const blob = JSON.stringify(leaked);
+  assert.equal("myHand" in leaked, false);
+  assert.equal("engine_state" in leaked, false);
+  assert.equal("game_secrets" in leaked, false);
+  assert.equal("deal_seed" in leaked, false);
+  assert.equal("reserve" in leaked, false);
+  assert.equal("boneyard" in leaked, false);
+  assert.equal("hands" in leaked, false);
+  assert.equal("legalMoves" in leaked, false);
+  assert.doesNotMatch(blob, /5-5/);
+  assert.doesNotMatch(blob, /4-3/);
+  assert.doesNotMatch(blob, /0-0/);
+  assert.doesNotMatch(blob, /deal_seed/);
+  assert.doesNotMatch(blob, /engine_state/);
+  assert.doesNotMatch(blob, /game_secrets/);
+  assert.doesNotMatch(blob, /myHand/);
+}
+
+{
+  assert.equal(isAdminSpectatorEnded("live"), false);
+  assert.equal(isAdminSpectatorEnded("finished"), true);
+  assert.equal(isAdminSpectatorEnded("forfeit"), true);
+  assert.equal(isAdminSpectatorEnded("aborted"), true);
+  assert.equal(ADMIN_SPECTATOR_POLL_MS, 1500);
+  const first = { version: 1, adminStatus: "live", sessionUpdatedAt: "a", matchStatus: "playing" };
+  const same = { version: 1, adminStatus: "live", sessionUpdatedAt: "a", matchStatus: "playing" };
+  const moved = { version: 2, adminStatus: "live", sessionUpdatedAt: "b", matchStatus: "playing" };
+  const ended = { version: 3, adminStatus: "finished", sessionUpdatedAt: "c", matchStatus: "finished" };
+  assert.equal(shouldApplySpectatorSnapshot(null, first), true);
+  assert.equal(shouldApplySpectatorSnapshot(first, same), false);
+  assert.equal(shouldApplySpectatorSnapshot(first, moved), true);
+  assert.equal(shouldApplySpectatorSnapshot(moved, ended), true);
+}
+
+{
+  const calls = [];
+  const client = {
+    async rpc(name, payload) {
+      calls.push({ name, payload });
+      return {
+        data: {
+          match_id: payload.p_match_id,
+          ruleset_id: "legacy",
+          rated: false,
+          match_kind: "public",
+          match_status: "playing",
+          admin_status: "live",
+          created_at: "2026-08-28T18:00:00.000Z",
+          player_a: { player_id: "a", display_name: "A", username: "a", rp: 1000, stale: false },
+          player_b: { player_id: "b", display_name: "B", username: "b", rp: 1000, stale: false },
+          score_a: 0,
+          score_b: 0,
+          round: 1,
+          current_seat: 0,
+          current_player_id: "a",
+          session_status: "playing",
+          phase: "playing",
+          hand_count_a: 7,
+          hand_count_b: 7,
+          reserve_count: 14,
+          version: 1,
+          board: [{ id: "6-6", left: 6, right: 6, orientation: "vertical" }],
+          spinner: { id: "6-6", north: [], south: [] },
+        },
+        error: null,
+      };
+    },
+  };
+  const view = await fetchAdminLiveMatchView("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", client);
+  assert.equal(calls[0].name, "admin_get_live_match_view");
+  assert.equal(view.board[0].id, "6-6");
+  assert.equal(view.handCountA, 7);
+  assert.equal("myHand" in view, false);
+}
+
+{
+  const client = {
+    async rpc() {
+      return { data: null, error: { message: "authentication required", code: "28000" } };
+    },
+  };
+  await assert.rejects(() => fetchAdminLiveMatchView("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", client), (error) => {
+    assert.equal(error.code, ADMIN_ERROR.AUTH);
+    return true;
+  });
+}
+
+{
+  const client = {
+    async rpc() {
+      return { data: null, error: { message: "permission denied for function admin_get_live_match_view", code: "42501" } };
+    },
+  };
+  await assert.rejects(() => fetchAdminLiveMatchView("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", client), (error) => {
+    assert.equal(error.code, ADMIN_ERROR.FORBIDDEN);
+    return true;
+  });
 }
 
 console.log("  ✓ admin dashboard client contract");

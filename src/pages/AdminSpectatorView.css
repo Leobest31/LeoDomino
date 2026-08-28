@@ -1,0 +1,86 @@
+.admin-spectator {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #05070d;
+}
+
+.admin-spectator__bar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  padding:
+    max(0.45rem, env(safe-area-inset-top, 0px))
+    max(var(--space-md), env(safe-area-inset-right, 0px))
+    0.4rem
+    max(var(--space-md), env(safe-area-inset-left, 0px));
+  border-bottom: 1px solid rgba(201, 162, 39, 0.22);
+  background: linear-gradient(180deg, #070b14 0%, rgba(7, 11, 20, 0.96) 100%);
+}
+
+.admin-spectator__hint {
+  margin: 0;
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.admin-spectator__ended {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.45rem 1rem;
+  text-align: center;
+  color: var(--color-gold-bright);
+  background: rgba(201, 162, 39, 0.12);
+}
+
+.admin-spectator .game-page {
+  flex: 1 1 0;
+  min-height: 0;
+  padding-top: 0;
+}
+
+.admin-spectator__hud {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  width: 100%;
+  padding: 0.35rem 0.55rem 0.45rem;
+}
+
+.admin-spectator__rp {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.admin-spectator .game-page__dock .opponent-panel {
+  width: 100%;
+}
+
+.admin-spectator .game-page__table,
+.admin-spectator .game-page__opponent-rail,
+.admin-spectator .game-page__dock {
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .admin-spectator__hud {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-spectator__hud .game-page__hud-match {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  .admin-spectator__hint {
+    width: 100%;
+    margin-left: 0;
+  }
+}

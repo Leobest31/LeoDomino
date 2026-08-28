@@ -5,6 +5,17 @@ import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient.js";
 
 export const ADMIN_PAGE_SIZE = 25;
 export const ADMIN_SEARCH_MAX = 64;
+export const ADMIN_LIVE_POLL_MS = 8000;
+export const ADMIN_SPECTATOR_POLL_MS = 1500;
+
+export const ADMIN_LIVE_STATUSES = Object.freeze([
+  "waiting",
+  "live",
+  "disconnected",
+  "forfeit",
+  "finished",
+  "aborted",
+]);
 
 export const ADMIN_ERROR = Object.freeze({
   UNAVAILABLE: "unavailable",
@@ -37,6 +48,71 @@ export const ADMIN_USER_FIELDS = Object.freeze([
   "losses",
   "matchesPlayed",
   "inActiveMatch",
+]);
+
+export const ADMIN_LIVE_PLAYER_FIELDS = Object.freeze([
+  "playerId",
+  "displayName",
+  "username",
+  "avatarId",
+  "rp",
+  "lastSeenAt",
+  "stale",
+]);
+
+export const ADMIN_LIVE_MATCH_FIELDS = Object.freeze([
+  "matchId",
+  "rulesetId",
+  "rated",
+  "matchKind",
+  "matchStatus",
+  "adminStatus",
+  "createdAt",
+  "playerA",
+  "playerB",
+  "scoreA",
+  "scoreB",
+  "round",
+  "currentSeat",
+  "currentPlayerId",
+  "sessionStatus",
+  "phase",
+  "sessionUpdatedAt",
+  "handCountA",
+  "handCountB",
+  "reserveCount",
+  "version",
+]);
+
+export const ADMIN_SPECTATOR_STRIP_KEYS = Object.freeze([
+  "myHand",
+  "my_hand",
+  "engine_state",
+  "engineState",
+  "game_secrets",
+  "deal_seed",
+  "dealSeed",
+  "legalMoves",
+  "legal_moves",
+  "canPlay",
+  "canDraw",
+  "canPass",
+  "mustPlayTileId",
+  "reserve",
+  "boneyard",
+  "hands",
+  "round_result",
+  "roundResult",
+]);
+
+export const ADMIN_SPECTATOR_FIELDS = Object.freeze([
+  ...ADMIN_LIVE_MATCH_FIELDS,
+  "finishReason",
+  "board",
+  "spinner",
+  "lastPlayPoints",
+  "lastPlayScoreTerminals",
+  "matchWinnerSeat",
 ]);
 
 export const OVERVIEW_CARD_IDS = Object.freeze([
@@ -85,6 +161,54 @@ function throwFromError(error) {
     throw new AdminError(ADMIN_ERROR.UNAVAILABLE, msg, error);
   }
   throw new AdminError(ADMIN_ERROR.GENERIC, msg, error);
+}
+
+function pipValue(value) {
+  const n = asInt(value);
+  if (n == null || n < 0 || n > 6) return null;
+  return n;
+}
+
+/**
+ * Public played-tile shape only. Never reconstructs faces from a bare tile id.
+ * @param {unknown} tile
+ */
+export function sanitizeSpectatorTile(tile) {
+  if (!tile || typeof tile !== "object" || Array.isArray(tile)) return null;
+  const id = asText(tile.id);
+  const left = pipValue(tile.left);
+  const right = pipValue(tile.right);
+  if (!id || left == null || right == null) return null;
+  const orientation = tile.orientation === "vertical" ? "vertical" : "horizontal";
+  return {
+    id,
+    left,
+    right,
+    orientation,
+    destination: asText(tile.destination) || null,
+    branch: asText(tile.branch ?? tile.destination) || null,
+  };
+}
+
+function sanitizeSpectatorBoard(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(sanitizeSpectatorTile).filter(Boolean);
+}
+
+function sanitizeSpectatorSpinner(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { id: null, north: [], south: [] };
+  }
+  return {
+    id: asText(raw.id),
+    north: sanitizeSpectatorBoard(raw.north),
+    south: sanitizeSpectatorBoard(raw.south),
+  };
+}
+
+function sanitizeTerminalIds(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((id) => asText(id)).filter(Boolean).slice(0, 8);
 }
 
 function dropPrivateKeys(row) {
@@ -242,4 +366,187 @@ export async function fetchAdminUsers(query = {}, client) {
   const { data, error } = await clientOf(client).rpc("admin_list_users", payload);
   if (error) throwFromError(error);
   return normalizeAdminUserList(data);
+}
+
+function asAdminStatus(value) {
+  const status = asText(value);
+  if (!status) return "waiting";
+  if (ADMIN_LIVE_STATUSES.includes(status)) return status;
+  return "waiting";
+}
+
+/**
+ * @param {unknown} row
+ */
+export function normalizeAdminLivePlayer(row) {
+  if (!row || typeof row !== "object") return null;
+  const data = dropPrivateKeys(row);
+  const playerId = asText(data.player_id ?? data.playerId);
+  if (!playerId) return null;
+  return {
+    playerId,
+    displayName: asText(data.display_name ?? data.displayName) || "",
+    username: asText(data.username) || "",
+    avatarId: asText(data.avatar_id ?? data.avatarId) || "",
+    rp: asInt(data.rp) ?? 1000,
+    lastSeenAt: asText(data.last_seen_at ?? data.lastSeenAt),
+    stale: asBool(data.stale) === true,
+  };
+}
+
+/**
+ * @param {unknown} row
+ */
+export function normalizeAdminLiveMatch(row) {
+  if (!row || typeof row !== "object") return null;
+  const data = dropPrivateKeys(row);
+  const matchId = asText(data.match_id ?? data.matchId);
+  if (!matchId) return null;
+  const playerA = normalizeAdminLivePlayer(data.player_a ?? data.playerA);
+  const playerB = normalizeAdminLivePlayer(data.player_b ?? data.playerB);
+  if (!playerA || !playerB) return null;
+  return {
+    matchId,
+    rulesetId: asText(data.ruleset_id ?? data.rulesetId) || "",
+    rated: asBool(data.rated) === true,
+    matchKind: asText(data.match_kind ?? data.matchKind) || "public",
+    matchStatus: asText(data.match_status ?? data.matchStatus) || "",
+    adminStatus: asAdminStatus(data.admin_status ?? data.adminStatus),
+    createdAt: asText(data.created_at ?? data.createdAt),
+    playerA,
+    playerB,
+    scoreA: asInt(data.score_a ?? data.scoreA),
+    scoreB: asInt(data.score_b ?? data.scoreB),
+    round: asInt(data.round),
+    currentSeat: asInt(data.current_seat ?? data.currentSeat),
+    currentPlayerId: asText(data.current_player_id ?? data.currentPlayerId),
+    sessionStatus: asText(data.session_status ?? data.sessionStatus),
+    phase: asText(data.phase),
+    sessionUpdatedAt: asText(data.session_updated_at ?? data.sessionUpdatedAt),
+    handCountA: asInt(data.hand_count_a ?? data.handCountA),
+    handCountB: asInt(data.hand_count_b ?? data.handCountB),
+    reserveCount: asInt(data.reserve_count ?? data.reserveCount),
+    version: asInt(data.version),
+  };
+}
+
+/**
+ * @param {unknown} row
+ */
+export function normalizeAdminLiveMatchList(row) {
+  if (!row || typeof row !== "object") {
+    return { matches: [], total: 0, limit: ADMIN_PAGE_SIZE, offset: 0 };
+  }
+  const data = dropPrivateKeys(row);
+  const raw = Array.isArray(data.matches) ? data.matches : [];
+  const matches = raw.map(normalizeAdminLiveMatch).filter(Boolean);
+  return {
+    matches,
+    total: asInt(data.total) ?? matches.length,
+    limit: asInt(data.limit) ?? ADMIN_PAGE_SIZE,
+    offset: asInt(data.offset) ?? 0,
+  };
+}
+
+export function buildAdminLiveMatchListPayload({ limit = ADMIN_PAGE_SIZE, offset = 0 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || ADMIN_PAGE_SIZE, 1), 50);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  return {
+    p_limit: safeLimit,
+    p_offset: safeOffset,
+  };
+}
+
+export function liveMatchStatusKey(status) {
+  switch (status) {
+    case "live":
+      return "admin.statusLive";
+    case "disconnected":
+      return "admin.statusDisconnected";
+    case "forfeit":
+      return "admin.statusForfeit";
+    case "finished":
+      return "admin.statusFinished";
+    case "aborted":
+      return "admin.statusAborted";
+    default:
+      return "admin.statusWaiting";
+  }
+}
+
+export async function fetchAdminLiveMatches(query = {}, client) {
+  if (!client && !isSupabaseConfigured()) {
+    throw new AdminError(ADMIN_ERROR.UNAVAILABLE);
+  }
+  const payload = buildAdminLiveMatchListPayload(query);
+  const { data, error } = await clientOf(client).rpc("admin_list_live_matches", payload);
+  if (error) throwFromError(error);
+  return normalizeAdminLiveMatchList(data);
+}
+
+export function isAdminSpectatorEnded(status) {
+  return status === "finished" || status === "forfeit" || status === "aborted";
+}
+
+export function shouldApplySpectatorSnapshot(prev, next) {
+  if (!next) return false;
+  if (!prev) return true;
+  if (prev.version !== next.version) return true;
+  if (prev.adminStatus !== next.adminStatus) return true;
+  if (prev.sessionUpdatedAt !== next.sessionUpdatedAt) return true;
+  if (prev.matchStatus !== next.matchStatus) return true;
+  return false;
+}
+
+function hasForbiddenSpectatorKey(row) {
+  if (!row || typeof row !== "object") return false;
+  return ADMIN_SPECTATOR_STRIP_KEYS.some((key) => Object.prototype.hasOwnProperty.call(row, key));
+}
+
+/**
+ * Staff-only spectator snapshot. Board/spinner are public played tiles.
+ * Hand and boneyard identities are never copied even if a payload leaks them.
+ * @param {unknown} row
+ */
+export function normalizeAdminSpectatorView(row) {
+  if (!row || typeof row !== "object") return null;
+  const data = dropPrivateKeys(row);
+  for (const key of ADMIN_SPECTATOR_STRIP_KEYS) {
+    if (key in data) delete data[key];
+  }
+  const live = normalizeAdminLiveMatch(data);
+  if (!live) return null;
+  const winner = asInt(data.match_winner_seat ?? data.matchWinnerSeat);
+  const view = {
+    ...live,
+    finishReason: asText(data.finish_reason ?? data.finishReason),
+    board: sanitizeSpectatorBoard(data.board),
+    spinner: sanitizeSpectatorSpinner(data.spinner),
+    lastPlayPoints: asInt(data.last_play_points ?? data.lastPlayPoints),
+    lastPlayScoreTerminals: sanitizeTerminalIds(
+      data.last_play_score_terminals ?? data.lastPlayScoreTerminals
+    ),
+    matchWinnerSeat: winner === 0 || winner === 1 ? winner : null,
+  };
+  if (hasForbiddenSpectatorKey(view)) return null;
+  if ("myHand" in view || "engine_state" in view || "game_secrets" in view) return null;
+  for (const key of Object.keys(view)) {
+    if (!ADMIN_SPECTATOR_FIELDS.includes(key)) delete view[key];
+  }
+  return view;
+}
+
+export async function fetchAdminLiveMatchView(matchId, client) {
+  if (!client && !isSupabaseConfigured()) {
+    throw new AdminError(ADMIN_ERROR.UNAVAILABLE);
+  }
+  const id = asText(matchId);
+  if (!id) throw new AdminError(ADMIN_ERROR.GENERIC, "match required");
+  const { data, error } = await clientOf(client).rpc("admin_get_live_match_view", {
+    p_match_id: id,
+  });
+  if (error) throwFromError(error);
+  const view = normalizeAdminSpectatorView(data);
+  if (!view) throw new AdminError(ADMIN_ERROR.GENERIC);
+  return view;
 }
