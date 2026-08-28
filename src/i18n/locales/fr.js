@@ -215,6 +215,19 @@ export default {
     errorCredentials: "E-mail ou mot de passe incorrect.",
     errorCrypto: "Cet appareil ne peut pas sécuriser le mot de passe.",
     errorGeneric: "Une erreur s’est produite. Réessayez.",
+    deleteAccount: "Supprimer le compte",
+    deleteAccountBody:
+      "Cela supprime définitivement votre compte, profil, amis et connexion LeoDomino. Si vous êtes dans une partie en cours, elle est abandonnée. Les parties passées restent affichées comme Deleted player. Action irréversible.",
+    deleteAccountPassword: "Saisissez le mot de passe de ce compte pour confirmer.",
+    deleteAccountConfirm: "Supprimer mon compte",
+    deletionPendingTitle: "Terminez la suppression du compte",
+    deletionPendingBody:
+      "Votre compte est fermé pour le jeu. Saisissez votre mot de passe pour terminer la suppression de la connexion, ou déconnectez-vous.",
+    deletionPendingRetry: "Terminer la suppression",
+    errorDeletePassword: "Ce mot de passe est incorrect.",
+    errorDeleteFailed: "Impossible de supprimer le compte. Réessayez.",
+    errorDeletePending: "Votre profil est fermé, mais la connexion n’a pas encore été retirée. Réessayez.",
+    errorDeleteUnavailable: "La suppression du compte nécessite un compte LeoDomino en ligne.",
   },
   profile: {
     title: "Profil du joueur",

@@ -98,5 +98,6 @@ export function publicAccount(record) {
     avatarId: normalizeAvatarId(record.avatarId),
     countryCode: String(record.countryCode || ""),
     createdAt: record.createdAt,
+    deletionPending: Boolean(record.deletionPending),
   };
 }

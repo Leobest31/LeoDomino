@@ -187,6 +187,13 @@ export const authService = {
   async logout() {
     return adapter().logout();
   },
+  async deleteAccount(password) {
+    const current = adapter();
+    if (typeof current.deleteAccount !== "function") {
+      throw new AuthError(AUTH_ERROR.DELETE_UNAVAILABLE);
+    }
+    return current.deleteAccount(password);
+  },
   onAuthStateChange(handler) {
     return adapter().onAuthStateChange(handler);
   },

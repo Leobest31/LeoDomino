@@ -4,3 +4,7 @@
 [functions.online-game]
 verify_jwt = true
 entrypoint = "./functions/online-game/index.js"
+
+[functions.delete-account]
+verify_jwt = true
+entrypoint = "./functions/delete-account/index.js"

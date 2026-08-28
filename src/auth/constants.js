@@ -32,4 +32,10 @@ export const AUTH_ERROR = Object.freeze({
   COUNTRY: "country",
   GENERIC: "generic",
   CRYPTO: "crypto",
+  MATCH_ACTIVE: "matchActive",
+  INVALID_PASSWORD: "invalidPassword",
+  DELETE_FAILED: "deleteFailed",
+  DELETE_PENDING: "deletePending",
+  DELETE_UNAVAILABLE: "deleteUnavailable",
+  ACCOUNT_DELETED: "accountDeleted",
 });

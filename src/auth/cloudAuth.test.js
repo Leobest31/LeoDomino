@@ -291,6 +291,51 @@ function mockClient(handlers) {
 }
 
 {
+  const tombstoned = accountFromUser(userRecord(), {
+    username: null,
+    display_name: "Deleted player",
+    avatar_id: "marcus",
+    country_code: "",
+    deleted_at: "2026-08-28T12:00:00.000Z",
+  });
+  assert.equal(tombstoned.deletionPending, true);
+  assert.equal(tombstoned.username, "");
+  assert.equal(tombstoned.displayName, "Deleted player");
+  assert.equal(tombstoned.countryCode, "");
+}
+
+{
+  const user = userRecord();
+  const tombstoneRow = {
+    username: null,
+    display_name: "Deleted player",
+    avatar_id: "marcus",
+    country_code: "",
+    deleted_at: "2026-08-28T12:00:00.000Z",
+  };
+  const supabase = mockClient({
+    async getSession() {
+      return { data: { session: { user } }, error: null };
+    },
+    rpc() {
+      throw new Error("tombstoned session must not claim a username");
+    },
+    from() {
+      return profileBuilder({ data: tombstoneRow, error: null });
+    },
+  });
+  const auth = createCloudAuth(() => supabase);
+  const session = await auth.getSession();
+  assert.equal(session.deletionPending, true);
+  assert.equal(session.username, "");
+  assert.equal(session.displayName, "Deleted player");
+  await assert.rejects(
+    () => auth.updateProfile({ username: "leonardb", displayName: "Leonard", countryCode: "HT" }),
+    (error) => error instanceof AuthError && error.code === AUTH_ERROR.ACCOUNT_DELETED
+  );
+}
+
+{
   const source = await import("node:fs").then((fs) =>
     fs.readFileSync(new URL("./cloudAuth.js", import.meta.url), "utf8")
   );

@@ -218,6 +218,19 @@ export default {
     errorCredentials: "Imèl oswa modpas pa kòrèk.",
     errorCrypto: "Aparèy sa a pa ka sekirize modpas la.",
     errorGeneric: "Yon erè rive. Eseye ankò.",
+    deleteAccount: "Efase kont",
+    deleteAccountBody:
+      "Sa efase nèt kont, pwofil, zanmi, ak koneksyon LeoDomino ou. Si w nan yon match k ap jwe, ou abandone l. Match ki te jwe yo rete kòm Deleted player. Ou pa ka anile sa.",
+    deleteAccountPassword: "Antre modpas kont sa a pou konfime.",
+    deleteAccountConfirm: "Efase kont mwen",
+    deletionPendingTitle: "Fini efase kont lan",
+    deletionPendingBody:
+      "Kont ou fèmen pou jwe. Antre modpas ou pou fini retire koneksyon an, oswa dekonekte.",
+    deletionPendingRetry: "Fini efase",
+    errorDeletePassword: "Modpas sa a pa kòrèk.",
+    errorDeleteFailed: "Pa t kapab efase kont lan. Eseye ankò.",
+    errorDeletePending: "Pwofil ou fèmen, men retire koneksyon an poko fini. Eseye ankò.",
+    errorDeleteUnavailable: "Pou efase kont lan ou bezwen yon kont LeoDomino sou entènèt.",
   },
   profile: {
     title: "Pwofil jwè",

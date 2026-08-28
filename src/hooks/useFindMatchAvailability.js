@@ -13,7 +13,7 @@ import {
 export function useFindMatchAvailability() {
   const { session } = useAuth();
   const playerId = session?.playerId || "";
-  const onlineReady = isCloudAuth();
+  const onlineReady = isCloudAuth() && !session?.deletionPending;
   const [count, setCount] = useState(0);
 
   const refresh = useCallback(() => {

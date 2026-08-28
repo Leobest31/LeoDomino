@@ -19,7 +19,7 @@ import {
 export function useFriendMatchInvites({ onEnterMatch } = {}) {
   const { session } = useAuth();
   const playerId = session?.playerId || "";
-  const onlineReady = isCloudAuth() && Boolean(playerId);
+  const onlineReady = isCloudAuth() && Boolean(playerId) && !session?.deletionPending;
   const [incoming, setIncoming] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
   const [errorKey, setErrorKey] = useState("");

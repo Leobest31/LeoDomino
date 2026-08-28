@@ -7,6 +7,7 @@
 import { getSupabaseClient } from "../online/supabaseClient.js";
 import { AUTH_ERROR } from "./constants.js";
 import { AuthError } from "./errors.js";
+import { clearAccountLocalData, deleteMyAccount } from "../online/accountDeletion.js";
 import { normalizeAvatarId } from "./avatars.js";
 import { normalizeCountryCode } from "./countries.js";
 import {
@@ -96,20 +97,28 @@ function mapSupabaseError(error) {
 
 export function accountFromUser(user, profileRow) {
   if (!user?.id) return null;
+  const deletionPending = Boolean(profileRow?.deleted_at);
   const meta = user.user_metadata && typeof user.user_metadata === "object" ? user.user_metadata : {};
-  const username = normalizeUsername(profileRow?.username || meta.username || "");
-  const displayName = normalizeDisplayName(
-    profileRow?.display_name || meta.displayName || meta.display_name,
-    username
-  );
+  const username = deletionPending
+    ? ""
+    : normalizeUsername(profileRow?.username || meta.username || "");
+  const displayName = deletionPending
+    ? profileRow?.display_name || "Deleted player"
+    : normalizeDisplayName(
+        profileRow?.display_name || meta.displayName || meta.display_name,
+        username
+      );
   return publicAccount({
     playerId: user.id,
     email: normalizeEmail(user.email || ""),
     username,
     displayName,
-    avatarId: normalizeAvatarId(profileRow?.avatar_id || meta.avatarId),
-    countryCode: normalizeCountryCode(profileRow?.country_code || meta.countryCode),
+    avatarId: deletionPending
+      ? normalizeAvatarId(profileRow?.avatar_id)
+      : normalizeAvatarId(profileRow?.avatar_id || meta.avatarId),
+    countryCode: deletionPending ? "" : normalizeCountryCode(profileRow?.country_code || meta.countryCode),
     createdAt: user.created_at || new Date().toISOString(),
+    deletionPending,
   });
 }
 
@@ -123,16 +132,22 @@ function profileMetadata(username, displayName, avatarId, countryCode) {
 }
 
 async function readPublicProfile(client, playerId) {
-  const { data, error } = await client
+  const full = await client
     .from("profiles")
-    .select("username, display_name, avatar_id, country_code")
+    .select("username, display_name, avatar_id, country_code, deleted_at")
     .eq("id", playerId)
     .maybeSingle();
-  if (error) {
-    if (isMissingSchemaError(error)) return null;
-    return null;
+  if (!full.error) return full.data || null;
+  if (isMissingSchemaError(full.error)) {
+    const fallback = await client
+      .from("profiles")
+      .select("username, display_name, avatar_id, country_code")
+      .eq("id", playerId)
+      .maybeSingle();
+    if (fallback.error) return null;
+    return fallback.data || null;
   }
-  return data || null;
+  return null;
 }
 
 async function writePublicProfile(client, playerId, { username, displayName, avatarId, countryCode }) {
@@ -161,6 +176,7 @@ async function writePublicProfile(client, playerId, { username, displayName, ava
 }
 
 async function claimUsernameFromMetadata(client, user, profileRow) {
+  if (profileRow?.deleted_at) return profileRow;
   if (profileRow?.username) return profileRow;
   const meta = user?.user_metadata && typeof user.user_metadata === "object" ? user.user_metadata : {};
   const username = normalizeUsername(meta.username || "");
@@ -276,6 +292,7 @@ export function createCloudAuth(getClient = getSupabaseClient) {
     async updateProfile(input) {
       const current = await this.getSession();
       if (!current) fail(AUTH_ERROR.CREDENTIALS);
+      if (current.deletionPending) fail(AUTH_ERROR.ACCOUNT_DELETED);
 
       const { username, displayName } = resolvedNames({
         username: input.username ?? current.username,
@@ -307,6 +324,17 @@ export function createCloudAuth(getClient = getSupabaseClient) {
     async logout() {
       const { error } = await client().auth.signOut();
       if (error) throw mapSupabaseError(error);
+      return null;
+    },
+
+    async deleteAccount(password) {
+      await deleteMyAccount(client(), password);
+      try {
+        await client().auth.signOut();
+      } catch {
+        /* session may already be invalid after Auth delete */
+      }
+      clearAccountLocalData();
       return null;
     },
 

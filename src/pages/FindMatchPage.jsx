@@ -106,7 +106,7 @@ function FindMatchPage({ onBack, onMainMenu, onEnterMatch }) {
   const { play, unlock } = useAudio();
   const { session } = useAuth();
   const playerId = session?.playerId ?? "";
-  const onlineReady = isCloudAuth();
+  const onlineReady = isCloudAuth() && !session?.deletionPending;
   const friends = useFriendsBoard({ watchOnline: false });
 
   const [selectedId, setSelectedId] = useState(DEFAULT_GAME_STYLE_ID);

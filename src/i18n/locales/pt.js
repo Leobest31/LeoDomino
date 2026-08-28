@@ -215,6 +215,19 @@ export default {
     errorCredentials: "E-mail ou palavra-passe incorretos.",
     errorCrypto: "Este dispositivo não consegue proteger a palavra-passe.",
     errorGeneric: "Algo correu mal. Tente novamente.",
+    deleteAccount: "Eliminar conta",
+    deleteAccountBody:
+      "Isto elimina de forma permanente a sua conta, perfil, amigos e início de sessão LeoDomino. Se estiver numa partida em curso, ela é desistida. Partidas anteriores ficam como Deleted player. Não pode anular.",
+    deleteAccountPassword: "Introduza a palavra-passe desta conta para confirmar.",
+    deleteAccountConfirm: "Eliminar a minha conta",
+    deletionPendingTitle: "Conclua a eliminação da conta",
+    deletionPendingBody:
+      "A sua conta está fechada para jogar. Introduza a palavra-passe para terminar de remover o início de sessão, ou saia.",
+    deletionPendingRetry: "Concluir eliminação",
+    errorDeletePassword: "Essa palavra-passe está incorreta.",
+    errorDeleteFailed: "Não foi possível eliminar a conta. Tente novamente.",
+    errorDeletePending: "O perfil está fechado, mas a remoção do início de sessão não terminou. Tente novamente.",
+    errorDeleteUnavailable: "A eliminação da conta precisa de uma conta LeoDomino online.",
   },
   profile: {
     title: "Perfil do jogador",

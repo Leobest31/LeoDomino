@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthContext } from "./AuthContext.js";
+import { AUTH_ERROR } from "./constants.js";
 import { AuthError, authService } from "./service.js";
 import { applyPendingReferralAttribution } from "../online/referrals.js";
 
@@ -39,10 +40,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!authReady || !session?.playerId) return undefined;
+    if (!authReady || !session?.playerId || session.deletionPending) return undefined;
     void applyPendingReferralAttribution();
     return undefined;
-  }, [authReady, session?.playerId]);
+  }, [authReady, session?.playerId, session?.deletionPending]);
 
   const openLogin = useCallback(() => setAuthView("login"), []);
   const openCreate = useCallback(() => setAuthView("create"), []);
@@ -95,6 +96,30 @@ export function AuthProvider({ children }) {
     setAuthView("login");
   }, []);
 
+  const deleteAccount = useCallback(async (password) => {
+    setBusy(true);
+    try {
+      await authService.deleteAccount(password);
+      setSession(null);
+      setAuthView("login");
+    } catch (error) {
+      if (
+        error instanceof AuthError &&
+        (error.code === AUTH_ERROR.DELETE_PENDING || error.code === AUTH_ERROR.ACCOUNT_DELETED)
+      ) {
+        try {
+          const next = await authService.getSession();
+          if (next) setSession(next);
+        } catch {
+          /* keep current session so retry remains possible */
+        }
+      }
+      throw error instanceof AuthError ? error : new AuthError("generic");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       session,
@@ -109,6 +134,7 @@ export function AuthProvider({ children }) {
       login,
       updateProfile,
       logout,
+      deleteAccount,
     }),
     [
       session,
@@ -122,6 +148,7 @@ export function AuthProvider({ children }) {
       login,
       updateProfile,
       logout,
+      deleteAccount,
     ]
   );
 

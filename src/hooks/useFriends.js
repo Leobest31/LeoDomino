@@ -23,7 +23,7 @@ import {
 export function useOwnFriendsPresence() {
   const { session } = useAuth();
   const playerId = session?.playerId || "";
-  const ready = isCloudAuth() && Boolean(playerId);
+  const ready = isCloudAuth() && Boolean(playerId) && !session?.deletionPending;
 
   useEffect(() => {
     if (!ready) return undefined;
@@ -40,7 +40,7 @@ export function useOwnFriendsPresence() {
 export function useFriendsBoard({ watchOnline = true } = {}) {
   const { session } = useAuth();
   const playerId = session?.playerId || "";
-  const onlineReady = isCloudAuth();
+  const onlineReady = isCloudAuth() && !session?.deletionPending;
   const [board, setBoard] = useState({
     friends: [],
     incoming: [],

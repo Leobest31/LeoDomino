@@ -23,7 +23,7 @@ const ht = read("i18n/locales/ht.js");
 
 assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game"/);
 assert.match(app, /<ChatPage/);
-assert.match(app, /phase === "chat" && signedIn/);
+assert.match(app, /phase === "chat" && playable/);
 assert.match(app, /onChat=\{\(\) => openChat\(null, "home"\)\}/);
 assert.match(home, /data-home-cta="liveChat"/);
 assert.match(home, /onChat\?\.\(\)/);

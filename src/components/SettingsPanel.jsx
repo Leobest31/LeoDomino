@@ -9,7 +9,7 @@ import {
   winPercentage,
 } from "../persistence/index.js";
 import { LEGAL_URLS } from "../legal/urls.js";
-import { useAuth } from "../auth";
+import { AUTH_ERROR, isCloudAuth, useAuth } from "../auth";
 import { IconClose } from "./Icon";
 import LanguageSwitcher from "./LanguageSwitcher";
 import DifficultySwitcher from "./DifficultySwitcher";
@@ -27,12 +27,20 @@ function SettingsPanel({
   const { t } = useI18n();
   const { volume, muted, ambient, setVolume, setMuted, setAmbient, play } = useAudio();
   const { theme, tileSkin, vibration, setTheme, setTileSkin, setVibration } = usePrefs();
-  const { session, logout, openCreate, openLogin } = useAuth();
+  const { session, logout, openCreate, openLogin, deleteAccount, busy } = useAuth();
   const [stats, setStats] = useState(() => loadStats());
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const wasOpen = useRef(false);
 
   useEffect(() => {
     if (open) setStats(loadStats());
+    if (!open) {
+      setDeleteOpen(false);
+      setDeletePassword("");
+      setDeleteError("");
+    }
   }, [open]);
 
   useEffect(() => {
@@ -79,6 +87,32 @@ function SettingsPanel({
     fn?.();
   };
 
+  const deletionErrorKey = (code) => {
+    if (code === AUTH_ERROR.INVALID_PASSWORD || code === AUTH_ERROR.CREDENTIALS) {
+      return "auth.errorDeletePassword";
+    }
+    if (code === AUTH_ERROR.DELETE_PENDING) return "auth.errorDeletePending";
+    if (code === AUTH_ERROR.DELETE_UNAVAILABLE) return "auth.errorDeleteUnavailable";
+    return "auth.errorDeleteFailed";
+  };
+
+  const confirmDelete = async () => {
+    play("button");
+    setDeleteError("");
+    if (!deletePassword) {
+      setDeleteError("auth.errorDeletePassword");
+      return;
+    }
+    try {
+      await deleteAccount(deletePassword);
+      setDeleteOpen(false);
+      setDeletePassword("");
+      onClose();
+    } catch (error) {
+      setDeleteError(deletionErrorKey(error?.code));
+    }
+  };
+
   return (
     <>
       <button
@@ -122,6 +156,69 @@ function SettingsPanel({
                 >
                   {t("auth.logout")}
                 </button>
+                {isCloudAuth() ? (
+                  <div className="settings-panel__delete" data-account-delete="true">
+                    {!deleteOpen ? (
+                      <button
+                        type="button"
+                        className="btn btn--ghost settings-panel__account-btn settings-panel__delete-open"
+                        onClick={() => tap(() => {
+                          setDeleteError("");
+                          setDeletePassword("");
+                          setDeleteOpen(true);
+                        })}
+                      >
+                        {t("auth.deleteAccount")}
+                      </button>
+                    ) : (
+                      <form
+                        className="settings-panel__delete-confirm"
+                        data-account-delete-confirm="true"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void confirmDelete();
+                        }}
+                      >
+                        <p className="settings-panel__hint">{t("auth.deleteAccountBody")}</p>
+                        <p className="settings-panel__hint">{t("auth.deleteAccountPassword")}</p>
+                        <input
+                          className="settings-panel__select"
+                          type="password"
+                          name="delete-account-password"
+                          value={deletePassword}
+                          autoComplete="current-password"
+                          spellCheck={false}
+                          aria-label={t("auth.deleteAccountPassword")}
+                          onChange={(event) => setDeletePassword(event.target.value)}
+                        />
+                        {deleteError ? (
+                          <p className="settings-panel__delete-error" role="alert">
+                            {t(deleteError)}
+                          </p>
+                        ) : null}
+                        <button
+                          type="submit"
+                          className="btn btn--ghost settings-panel__account-btn settings-panel__delete-confirm-btn"
+                          disabled={busy || !deletePassword}
+                        >
+                          {t("auth.deleteAccountConfirm")}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--ghost settings-panel__account-btn"
+                          disabled={busy}
+                          onClick={() => tap(() => {
+                            setDeleteOpen(false);
+                            setDeletePassword("");
+                            setDeleteError("");
+                          })}
+                        >
+                          {t("common.cancel")}
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                ) : null}
               </>
             ) : (
               <>

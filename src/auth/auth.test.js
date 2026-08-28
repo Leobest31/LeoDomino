@@ -269,4 +269,11 @@ assert.equal((await authService.getSession()).avatarId, DEFAULT_AVATAR_ID);
   assert.equal(renamed.playerId, fallback.playerId);
 }
 
+{
+  await assert.rejects(
+    () => authService.deleteAccount(),
+    (error) => error instanceof AuthError && error.code === AUTH_ERROR.DELETE_UNAVAILABLE
+  );
+}
+
 console.log("  ✓ Local account foundation");

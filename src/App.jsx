@@ -3,6 +3,7 @@ import { useAuth } from "./auth";
 import SplashPage from "./pages/SplashPage";
 import HomePage from "./pages/HomePage";
 import AuthPage from "./pages/AuthPage";
+import AccountDeletionPending from "./components/AccountDeletionPending.jsx";
 import GameStylePage from "./pages/GameStylePage";
 import FindMatchPage from "./pages/FindMatchPage";
 import FriendsPage from "./pages/FriendsPage";
@@ -30,6 +31,7 @@ import "./App.css";
  */
 function App() {
   const { signedIn, authReady, authView, openLogin, session } = useAuth();
+  const playable = Boolean(signedIn && !session?.deletionPending);
   /** @type {[AppPhase, function]} */
   const [phase, setPhase] = useState("intro");
   const [splashExiting, setSplashExiting] = useState(false);
@@ -62,13 +64,13 @@ function App() {
   }, [authReady, signedIn, phase, authView, openLogin]);
 
   useEffect(() => {
-    if (!authReady || !signedIn || phase !== "home") return undefined;
+    if (!authReady || !playable || phase !== "home") return undefined;
     cleanupStaleOccupiedMatches().catch(() => 0);
     return undefined;
-  }, [authReady, signedIn, phase]);
+  }, [authReady, playable, phase]);
 
   useEffect(() => {
-    if (!authReady || !signedIn || phase !== "home") return undefined;
+    if (!authReady || !playable || phase !== "home") return undefined;
     if (recoveredOnlineRef.current) return undefined;
     const saved = readOnlineSession();
     if (!saved?.matchId) {
@@ -102,7 +104,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [authReady, signedIn, phase]);
+  }, [authReady, playable, phase]);
 
   const handleSplashFinished = () => {
     setSplashExiting(true);
@@ -198,7 +200,9 @@ function App() {
         />
       ) : null}
 
-      {phase === "home" && signedIn ? (
+      {phase !== "intro" && session?.deletionPending ? <AccountDeletionPending /> : null}
+
+      {phase === "home" && playable ? (
         <HomePage
           key={session?.playerId ?? "home"}
           onPlayVsLeoBest={() => setPhase("gameStyle")}
@@ -211,7 +215,7 @@ function App() {
         />
       ) : null}
 
-      {phase === "findMatch" && signedIn ? (
+      {phase === "findMatch" && playable ? (
         <FindMatchPage
           onBack={() => setPhase("home")}
           onMainMenu={() => setPhase("home")}
@@ -219,7 +223,7 @@ function App() {
         />
       ) : null}
 
-      {phase === "friends" && signedIn ? (
+      {phase === "friends" && playable ? (
         <FriendsPage
           onBack={() => setPhase("home")}
           onMainMenu={() => setPhase("home")}
@@ -236,7 +240,7 @@ function App() {
         />
       ) : null}
 
-      {phase === "chat" && signedIn ? (
+      {phase === "chat" && playable ? (
         <ChatPage
           focus={chatFocus}
           onFocusConsumed={() => setChatFocus(null)}
@@ -245,7 +249,7 @@ function App() {
         />
       ) : null}
 
-      {phase === "gameStyle" && signedIn ? (
+      {phase === "gameStyle" && playable ? (
         <GameStylePage
           onBack={() => {
             if (friendInvitee) {
@@ -263,7 +267,7 @@ function App() {
         />
       ) : null}
 
-      {phase === "game" && signedIn && onlineTable ? (
+      {phase === "game" && playable && onlineTable ? (
         <OnlineGamePage
           key={gameKey}
           matchOptions={matchOptions}
@@ -271,7 +275,7 @@ function App() {
         />
       ) : null}
 
-      {phase === "game" && signedIn && !onlineTable ? (
+      {phase === "game" && playable && !onlineTable ? (
         <GamePage
           key={gameKey}
           matchOptions={matchOptions}

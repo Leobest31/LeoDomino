@@ -199,6 +199,32 @@
   width: 100%;
 }
 
+.settings-panel__delete {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(180, 70, 70, 0.28);
+}
+
+.settings-panel__delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.settings-panel__delete-error {
+  margin: 0;
+  color: #f0b4b4;
+  font-size: 0.78rem;
+}
+
+.settings-panel__delete-open,
+.settings-panel__delete-confirm-btn {
+  color: #f0b4b4;
+}
+
 .settings-panel__stats {
   display: flex;
   flex-direction: column;

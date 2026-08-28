@@ -215,6 +215,19 @@ export default {
     errorCredentials: "Email or password is incorrect.",
     errorCrypto: "This device cannot secure the password.",
     errorGeneric: "Something went wrong. Try again.",
+    deleteAccount: "Delete Account",
+    deleteAccountBody:
+      "This permanently deletes your LeoDomino account, profile, friends, and login. If you are in a live match, it is forfeited. Past matches stay listed as Deleted player. You cannot undo this.",
+    deleteAccountPassword: "Enter this account's password to confirm.",
+    deleteAccountConfirm: "Delete my account",
+    deletionPendingTitle: "Finish deleting your account",
+    deletionPendingBody:
+      "Your account is closed for play. Enter your password to finish removing your login, or log out.",
+    deletionPendingRetry: "Finish deleting",
+    errorDeletePassword: "That password is incorrect.",
+    errorDeleteFailed: "Could not delete the account. Try again.",
+    errorDeletePending: "Your profile is closed, but login removal did not finish. Retry.",
+    errorDeleteUnavailable: "Account deletion needs an online LeoDomino account.",
   },
   profile: {
     title: "Player profile",

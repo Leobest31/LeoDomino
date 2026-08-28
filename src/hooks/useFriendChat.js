@@ -45,7 +45,7 @@ function mergeMessages(current, incoming) {
 export function useFriendChat() {
   const { session } = useAuth();
   const playerId = session?.playerId || "";
-  const onlineReady = isCloudAuth() && Boolean(playerId);
+  const onlineReady = isCloudAuth() && Boolean(playerId) && !session?.deletionPending;
   const [conversations, setConversations] = useState([]);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [state, setState] = useState(onlineReady ? "loading" : "unavailable");
