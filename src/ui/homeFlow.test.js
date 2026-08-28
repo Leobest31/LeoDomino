@@ -82,6 +82,13 @@ assert.match(app, /deletionPending/, "pending Auth deletion is a blocked playabl
   assert.match(authPage, /LanguageSwitcher/, "Login uses the existing language selector");
   assert.match(authPage, /authEarthNight/, "Login uses the realistic night Earth asset");
   assert.match(authPage, /CountryPicker/, "Create Account includes a country picker");
+  assert.match(authPage, /data-auth-age="true"/, "Create Account includes an age field");
+  assert.match(authPage, /auth\.ageHint/, "Create Account states the 13+ account rule");
+  assert.doesNotMatch(
+    authPage,
+    /\bdateOfBirth\b|\bbirthday\b|\bbirthYear\b|\bssn\b/i,
+    "Create Account does not collect date of birth or ID"
+  );
   assert.match(authPage, /PLAYER_AVATARS/, "Create Account includes avatar choices");
   assert.match(authPage, /auth\.usernameHint/, "Create Account explains unique username rules");
   assert.match(authPage, /name: "displayName"/, "Create Account collects display name separately");

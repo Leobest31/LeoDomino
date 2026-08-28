@@ -12,6 +12,9 @@ export const PLAYER_NAME_MAX = 40;
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 20;
 export const DISPLAY_NAME_MAX = PLAYER_NAME_MAX;
+/** General LeoDomino account eligibility. Not cash-promotion (18+) eligibility. */
+export const ACCOUNT_MIN_AGE = 13;
+export const ACCOUNT_MAX_AGE = 120;
 
 export const PBKDF2_ITERATIONS = 80_000;
 export const PBKDF2_HASH = "SHA-256";
@@ -30,6 +33,8 @@ export const AUTH_ERROR = Object.freeze({
   PASSWORD_MISMATCH: "passwordMismatch",
   CREDENTIALS: "credentials",
   COUNTRY: "country",
+  AGE: "age",
+  AGE_UNDER: "ageUnder",
   GENERIC: "generic",
   CRYPTO: "crypto",
   MATCH_ACTIVE: "matchActive",

@@ -36,6 +36,10 @@ function errorKey(code) {
       return "auth.errorEmailTaken";
     case AUTH_ERROR.COUNTRY:
       return "auth.errorCountry";
+    case AUTH_ERROR.AGE:
+      return "auth.errorAge";
+    case AUTH_ERROR.AGE_UNDER:
+      return "auth.errorAgeUnder";
     case AUTH_ERROR.PASSWORD_SHORT:
       return "auth.errorPasswordShort";
     case AUTH_ERROR.PASSWORD_WEAK:
@@ -57,6 +61,7 @@ const EMPTY = {
   displayName: "",
   avatarId: DEFAULT_AVATAR_ID,
   countryCode: "",
+  age: "",
   password: "",
   confirmPassword: "",
 };
@@ -280,6 +285,36 @@ function AuthPage() {
                             {t(errorKey(fieldError.country))}
                           </span>
                         ) : null}
+                      </label>
+                      <label className="auth__field">
+                        <span className="auth__label">{t("auth.age")}</span>
+                        <span className="auth__control">
+                          <span className="auth__icon" aria-hidden="true">
+                            <IconShield className="auth__glyph" />
+                          </span>
+                          <input
+                            className={`auth__input${fieldError.age ? " auth__input--error" : ""}`}
+                            name="age"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            maxLength={3}
+                            data-auth-age="true"
+                            value={values.age}
+                            aria-invalid={fieldError.age ? true : undefined}
+                            aria-describedby={fieldError.age ? "auth-err-age" : "auth-age-hint"}
+                            onChange={(event) => setField("age", event.target.value)}
+                          />
+                        </span>
+                        {fieldError.age ? (
+                          <span className="auth__error" id="auth-err-age" role="alert">
+                            {t(errorKey(fieldError.age))}
+                          </span>
+                        ) : (
+                          <p className="auth__hint" id="auth-age-hint">
+                            {t("auth.ageHint")}
+                          </p>
+                        )}
                       </label>
                       </>
                     ) : null}

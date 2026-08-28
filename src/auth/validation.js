@@ -1,4 +1,13 @@
-import { AUTH_ERROR, PASSWORD_MIN_LENGTH, PLAYER_NAME_MAX, PLAYER_NAME_MIN, USERNAME_MAX, USERNAME_MIN } from "./constants.js";
+import {
+  ACCOUNT_MAX_AGE,
+  ACCOUNT_MIN_AGE,
+  AUTH_ERROR,
+  PASSWORD_MIN_LENGTH,
+  PLAYER_NAME_MAX,
+  PLAYER_NAME_MIN,
+  USERNAME_MAX,
+  USERNAME_MIN,
+} from "./constants.js";
 import { normalizeAvatarId } from "./avatars.js";
 import { normalizeCountryCode } from "./countries.js";
 
@@ -86,6 +95,25 @@ export function validatePassword(value) {
 export function validatePasswordConfirm(password, confirm) {
   if (String(confirm ?? "") !== String(password ?? "")) return AUTH_ERROR.PASSWORD_MISMATCH;
   return null;
+}
+
+/**
+ * Whole-number age for the 13+ account gate. Does not accept decimals, signs, or letters.
+ * Returns the integer when eligible; otherwise an AUTH_ERROR code.
+ */
+export function parseAccountAge(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return { error: AUTH_ERROR.REQUIRED };
+  if (!/^[1-9][0-9]{0,2}$/.test(raw)) return { error: AUTH_ERROR.AGE };
+  const age = Number(raw);
+  if (!Number.isInteger(age)) return { error: AUTH_ERROR.AGE };
+  if (age < ACCOUNT_MIN_AGE) return { error: AUTH_ERROR.AGE_UNDER };
+  if (age > ACCOUNT_MAX_AGE) return { error: AUTH_ERROR.AGE };
+  return { age };
+}
+
+export function validateAccountAge(value) {
+  return parseAccountAge(value).error || null;
 }
 
 export function publicAccount(record) {

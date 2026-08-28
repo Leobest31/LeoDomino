@@ -106,6 +106,7 @@ const created = await authService.createAccount({
   password: "secret12",
   confirmPassword: "secret12",
   countryCode: "HT",
+  age: 25,
 });
 
 assert.equal(created.email, "player@leodomino.test");
@@ -121,6 +122,8 @@ assert.equal(raw.includes("secret12"), false, "plaintext password is not stored"
 assert.equal(JSON.parse(raw)[0].password.hash.length > 20, true);
 assert.equal(JSON.parse(raw)[0].password.salt.length > 8, true);
 assert.equal(JSON.parse(raw)[0].playerId, created.playerId);
+assert.equal("age" in JSON.parse(raw)[0], false, "local store does not retain numeric age");
+assert.equal("age" in created, false, "public account does not retain numeric age");
 
 const session = await authService.getSession();
 assert.equal(session.playerId, created.playerId);
@@ -137,6 +140,7 @@ const duplicateName = await authService.createAccount({
   password: "secret12",
   confirmPassword: "secret12",
   countryCode: "US",
+  age: 18,
 });
 assert.equal(duplicateName.displayName, "Leonard B Philostin");
 assert.equal(duplicateName.username, "leonard_other");
@@ -150,6 +154,7 @@ await assert.rejects(
       password: "secret12",
       confirmPassword: "secret12",
       countryCode: "HT",
+      age: 25,
     }),
   (error) => error instanceof AuthError && error.code === AUTH_ERROR.USERNAME_TAKEN,
   "username uniqueness is case-insensitive"
@@ -163,6 +168,7 @@ await assert.rejects(
       password: "secret12",
       confirmPassword: "secret12",
       countryCode: "HT",
+      age: 17,
     }),
   (error) => error instanceof AuthError && error.code === AUTH_ERROR.EMAIL_TAKEN
 );
@@ -222,6 +228,7 @@ assert.equal((await authService.getSession()).avatarId, DEFAULT_AVATAR_ID);
     password: "secret12",
     confirmPassword: "secret12",
     countryCode: "HT",
+    age: 25,
   });
   assert.equal(withAvatar.avatarId, chosen);
   assert.equal(withAvatar.playerId.startsWith("leo_"), true);
@@ -240,6 +247,7 @@ assert.equal((await authService.getSession()).avatarId, DEFAULT_AVATAR_ID);
     password: "secret12",
     confirmPassword: "secret12",
     countryCode: "BR",
+    age: 13,
   });
   assert.equal(fallback.avatarId, DEFAULT_AVATAR_ID, "unknown avatar id falls back to the default");
   assert.equal(fallback.countryCode, "BR");
@@ -267,6 +275,39 @@ assert.equal((await authService.getSession()).avatarId, DEFAULT_AVATAR_ID);
   assert.equal(renamed.avatarId, PLAYER_AVATAR_IDS[11]);
   assert.equal(renamed.countryCode, "HT");
   assert.equal(renamed.playerId, fallback.playerId);
+}
+
+{
+  const eligible = {
+    email: "agegate@leodomino.test",
+    username: "age_player",
+    password: "secret12",
+    confirmPassword: "secret12",
+    countryCode: "HT",
+  };
+  await assert.rejects(
+    () => authService.createAccount({ ...eligible, username: "age_blank", age: "" }),
+    (error) => error instanceof AuthError && error.code === AUTH_ERROR.REQUIRED && error.field === "age"
+  );
+  await assert.rejects(
+    () => authService.createAccount({ ...eligible, username: "age_twelve", age: 12 }),
+    (error) => error instanceof AuthError && error.code === AUTH_ERROR.AGE_UNDER
+  );
+  await assert.rejects(
+    () => authService.createAccount({ ...eligible, username: "age_decimal", age: "13.5" }),
+    (error) => error instanceof AuthError && error.code === AUTH_ERROR.AGE
+  );
+  await assert.rejects(
+    () => authService.createAccount({ ...eligible, username: "age_letters", age: "abc" }),
+    (error) => error instanceof AuthError && error.code === AUTH_ERROR.AGE
+  );
+  await assert.rejects(
+    () => authService.createAccount({ ...eligible, username: "age_neg", age: "-1" }),
+    (error) => error instanceof AuthError && error.code === AUTH_ERROR.AGE
+  );
+  const oldEnough = await authService.createAccount({ ...eligible, age: 25 });
+  assert.equal("age" in oldEnough, false);
+  await authService.logout();
 }
 
 {

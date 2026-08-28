@@ -14,6 +14,7 @@ import {
   normalizeDisplayName,
   normalizeEmail,
   normalizeUsername,
+  parseAccountAge,
   publicAccount,
   validateCountry,
   validateDisplayName,
@@ -77,6 +78,12 @@ function mapSupabaseError(error) {
   if (isUsernameInvalidError(error)) {
     return new AuthError(AUTH_ERROR.USERNAME, "username");
   }
+  if (message.includes("account_age_under")) {
+    return new AuthError(AUTH_ERROR.AGE_UNDER, "age");
+  }
+  if (message.includes("account_age")) {
+    return new AuthError(AUTH_ERROR.AGE, "age");
+  }
   if (
     code.includes("already") ||
     code === "user_already_exists" ||
@@ -128,6 +135,13 @@ function profileMetadata(username, displayName, avatarId, countryCode) {
     displayName,
     avatarId,
     countryCode,
+  };
+}
+
+function signupMetadata(username, displayName, avatarId, countryCode, accountAge) {
+  return {
+    ...profileMetadata(username, displayName, avatarId, countryCode),
+    accountAge: String(accountAge),
   };
 }
 
@@ -247,6 +261,8 @@ export function createCloudAuth(getClient = getSupabaseClient) {
       failIf(validatePassword(input.password), "password");
       failIf(validatePasswordConfirm(input.password, input.confirmPassword), "confirmPassword");
       failIf(validateCountry(countryCode), "country");
+      const ageParsed = parseAccountAge(input.age);
+      failIf(ageParsed.error, "age");
 
       const available = await usernameIsAvailable(client(), username);
       if (!available) fail(AUTH_ERROR.USERNAME_TAKEN, "username");
@@ -255,7 +271,7 @@ export function createCloudAuth(getClient = getSupabaseClient) {
         email,
         password: input.password,
         options: {
-          data: profileMetadata(username, displayName, avatarId, countryCode),
+          data: signupMetadata(username, displayName, avatarId, countryCode, ageParsed.age),
         },
       });
       if (error) throw mapSupabaseError(error);

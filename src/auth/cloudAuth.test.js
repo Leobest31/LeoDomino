@@ -110,6 +110,8 @@ function mockClient(handlers) {
       assert.equal(options.data.displayName, "Leonard B Philostin");
       assert.equal(options.data.avatarId, DEFAULT_AVATAR_ID);
       assert.equal(options.data.countryCode, "HT");
+      assert.equal(options.data.accountAge, "25");
+      assert.equal("age" in options.data, false, "signup metadata uses accountAge, not age");
       const user = userRecord();
       return { data: { user, session: { user, access_token: "jwt-access" } }, error: null };
     },
@@ -122,10 +124,13 @@ function mockClient(handlers) {
     password: "Secret12ab",
     confirmPassword: "Secret12ab",
     countryCode: "HT",
+    age: 25,
   });
   assert.equal(created.playerId, UUID);
   assert.equal(created.displayName, "Leonard B Philostin");
   assert.equal(created.username, "leonardb");
+  assert.equal("age" in created, false);
+  assert.equal("accountAge" in created, false);
   assert.equal(JSON.stringify(created).includes("Secret12ab"), false, "password is not stored on the public account");
 }
 
@@ -145,6 +150,7 @@ function mockClient(handlers) {
         password: "Secret12ab",
         confirmPassword: "Secret12ab",
         countryCode: "HT",
+        age: 25,
       }),
     (error) => error instanceof AuthError && error.code === AUTH_ERROR.GENERIC
   );
@@ -166,6 +172,7 @@ function mockClient(handlers) {
         password: "Secret12ab",
         confirmPassword: "Secret12ab",
         countryCode: "HT",
+        age: 25,
       }),
     (error) => error instanceof AuthError && error.code === AUTH_ERROR.EMAIL_TAKEN
   );
@@ -339,12 +346,9 @@ function mockClient(handlers) {
   const source = await import("node:fs").then((fs) =>
     fs.readFileSync(new URL("./cloudAuth.js", import.meta.url), "utf8")
   );
-  assert.match(source, /signUp/);
-  assert.match(source, /signInWithPassword/);
-  assert.match(source, /signOut/);
-  assert.match(source, /getSession/);
-  assert.match(source, /claimUsernameFromMetadata/);
-  assert.match(source, /onAuthStateChange/);
+  assert.match(source, /signupMetadata/);
+  assert.match(source, /accountAge: String\(accountAge\)/);
+  assert.match(source, /updateUser\(\{\s*data: profileMetadata/);
   assert.doesNotMatch(source, /createPlayerId/);
   assert.doesNotMatch(source, /hashPassword|PBKDF2/);
   assert.doesNotMatch(source, /saveSession/);
@@ -384,9 +388,35 @@ function mockClient(handlers) {
         password: "Secret12ab",
         confirmPassword: "Secret12ab",
         countryCode: "HT",
+        age: 25,
       }),
     (error) => error instanceof AuthError && error.code === AUTH_ERROR.USERNAME
   );
+}
+
+{
+  let signedUp = false;
+  const auth = createCloudAuth(() =>
+    mockClient({
+      async signUp() {
+        signedUp = true;
+        return { data: { user: null, session: null }, error: null };
+      },
+    })
+  );
+  await assert.rejects(
+    () =>
+      auth.createAccount({
+        email: "player@leodomino.test",
+        username: "leonard",
+        password: "Secret12ab",
+        confirmPassword: "Secret12ab",
+        countryCode: "HT",
+        age: 12,
+      }),
+    (error) => error instanceof AuthError && error.code === AUTH_ERROR.AGE_UNDER && error.field === "age"
+  );
+  assert.equal(signedUp, false, "under-13 registration never reaches Auth signUp");
 }
 
 console.log("  ✓ Cloud auth adapter");

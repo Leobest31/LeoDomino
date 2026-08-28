@@ -24,6 +24,7 @@ import {
   validatePassword,
   validatePasswordConfirm,
   validateUsername,
+  validateAccountAge,
 } from "./validation.js";
 
 export { AuthError };
@@ -70,6 +71,7 @@ export const localAuth = {
     failIf(validatePassword(input.password), "password");
     failIf(validatePasswordConfirm(input.password, input.confirmPassword), "confirmPassword");
     failIf(validateCountry(countryCode), "country");
+    failIf(validateAccountAge(input.age), "age");
 
     const accounts = loadAccounts();
     if (findAccount(accounts, { email })) fail(AUTH_ERROR.EMAIL_TAKEN, "email");

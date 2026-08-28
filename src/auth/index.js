@@ -3,6 +3,8 @@ export {
   ACCOUNTS_STORAGE_KEY,
   SESSION_STORAGE_KEY,
   PASSWORD_MIN_LENGTH,
+  ACCOUNT_MIN_AGE,
+  ACCOUNT_MAX_AGE,
 } from "./constants.js";
 export { AuthError } from "./errors.js";
 export { authService, localAuth, isCloudAuth } from "./service.js";
