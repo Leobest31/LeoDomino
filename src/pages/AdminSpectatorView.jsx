@@ -19,6 +19,12 @@ import {
   liveMatchStatusKey,
   shouldApplySpectatorSnapshot,
 } from "../online/adminDashboard.js";
+import {
+  formatTurnSeconds,
+  remainingTurnMs,
+  stampDeadlineReceipt,
+  turnTimerTone,
+} from "../online/turnTimeout.js";
 import "./GamePage.css";
 import "./AdminSpectatorView.css";
 
@@ -95,7 +101,7 @@ function AdminSpectatorView({ matchId, seed = null, onClose }) {
 
     const load = async () => {
       try {
-        const next = await fetchAdminLiveMatchView(matchId);
+        const next = stampDeadlineReceipt(await fetchAdminLiveMatchView(matchId));
         if (cancelled) return;
         setView((prev) => (shouldApplySpectatorSnapshot(prev, next) ? next : prev));
         setLoadError("");
@@ -136,12 +142,30 @@ function AdminSpectatorView({ matchId, seed = null, onClose }) {
   const boardTiles = view?.board ?? [];
   const spinner = view?.spinner || { id: null, north: [], south: [] };
   const statusKey = liveMatchStatusKey(snapshot?.adminStatus);
+  const [remainingMs, setRemainingMs] = useState(null);
+  useEffect(() => {
+    if (ended || snapshot?.phase !== "playing" || !snapshot?.turnDeadlineAt) {
+      setRemainingMs(null);
+      return undefined;
+    }
+    const tick = () => setRemainingMs(remainingTurnMs(snapshot));
+    tick();
+    const intervalId = window.setInterval(tick, 250);
+    return () => window.clearInterval(intervalId);
+  }, [ended, snapshot]);
+
+  const timerSeconds = formatTurnSeconds(remainingMs);
+  const timerTone = turnTimerTone(remainingMs);
   const tableStatus = ended
     ? t("admin.spectatorEnded")
     : !view || snapshot?.adminStatus === "waiting"
       ? t("admin.waitingForTable")
       : turnA || turnB
-        ? t("admin.whoseTurn", { name: currentSeat === 0 ? nameA : nameB })
+        ? timerSeconds == null
+          ? t("admin.whoseTurn", { name: currentSeat === 0 ? nameA : nameB })
+          : timerTone === "pending"
+            ? t("online.timeoutPending")
+            : `${t("admin.whoseTurn", { name: currentSeat === 0 ? nameA : nameB })} · ${timerSeconds}`
         : t(statusKey);
 
   const winnerName = useMemo(() => {
@@ -290,6 +314,7 @@ function AdminSpectatorView({ matchId, seed = null, onClose }) {
               playerNames={[nameA, nameB]}
               status={tableStatus}
               statusActive={Boolean(turnA || turnB) && !ended}
+              statusTone={!ended && (turnA || turnB) ? timerTone : ""}
               rulesetId={rulesetId}
               dock={
                 <div className="game-page__dock" data-admin-spectator-hand-a="true">

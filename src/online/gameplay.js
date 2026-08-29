@@ -61,6 +61,10 @@ export function advanceOnlineRound(matchId, expectedVersion, client) {
   return invoke("advance_online_round", { matchId, expectedVersion }, client);
 }
 
+export function resolveTurnTimeout(matchId, expectedVersion, client) {
+  return invoke("resolve_turn_timeout", { matchId, expectedVersion }, client);
+}
+
 export function subscribeGameSession(matchId, onEvent, client) {
   const db = clientOf(client);
   const channel = db.channel(`leo-game-session-${matchId}`);

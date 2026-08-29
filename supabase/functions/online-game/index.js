@@ -33,7 +33,7 @@ function json(body, status = 200) {
 function statusFor(code) {
   if (code === "AUTH_REQUIRED") return 401;
   if (code === "NOT_A_PLAYER" || code === "MATCH_NOT_ELIGIBLE") return 403;
-  if (code === "STALE_VERSION") return 409;
+  if (code === "STALE_VERSION" || code === "TIMEOUT_NOT_DUE") return 409;
   if (code === "MATCH_NOT_FOUND" || code === "NO_SESSION") return 404;
   return 400;
 }
@@ -125,6 +125,10 @@ function createPostgrestGameStore(supabaseUrl, { anonKey, userJwt, serviceKey })
             rulesetId: data.ruleset_id,
             version: data.version,
             status: data.status,
+            currentSeat: data.current_seat,
+            phase: data.phase,
+            turnDeadlineAt: data.turn_deadline_at ?? null,
+            timeoutStrikes: data.timeout_strikes ?? [0, 0],
           }
         : null;
     },
@@ -182,10 +186,17 @@ function createPostgrestGameStore(supabaseUrl, { anonKey, userJwt, serviceKey })
             p_match_status: matchStatus ?? null,
           },
         });
-        return { version: data?.version };
+        return {
+          version: data?.version,
+          turnDeadlineAt: data?.turnDeadlineAt ?? data?.turn_deadline_at ?? null,
+          timeoutStrikes: data?.timeoutStrikes ?? data?.timeout_strikes ?? null,
+        };
       } catch (error) {
         if (/stale expected_version/i.test(error.message || "")) {
           throw new GameplayError("STALE_VERSION", "expected_version does not match");
+        }
+        if (/timeout not due/i.test(error.message || "")) {
+          throw new GameplayError("TIMEOUT_NOT_DUE", "timeout not due");
         }
         throw error;
       }

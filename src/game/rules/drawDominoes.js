@@ -241,6 +241,24 @@ function advancePlayer(state) {
 }
 
 /**
+ * Skip the current seat without treating it as a stuck/blocked pass.
+ * Used for online turn timeout when the seat had a legal play and did not act.
+ * Does not change Classic/Haitian/American play, draw, or pass rules.
+ */
+export function skipTurn(state) {
+  if (state.phase !== PHASE.PLAYING) {
+    throw new Error("Cannot skip: round is not active");
+  }
+  return {
+    ...advancePlayer(state),
+    consecutivePasses: 0,
+    lastPlayPoints: 0,
+    lastPlayPointsSeat: null,
+    lastPlayScoreTerminals: [],
+  };
+}
+
+/**
  * @param {GameState} state
  * @param {number} winnerIndex
  * @param {string} reason

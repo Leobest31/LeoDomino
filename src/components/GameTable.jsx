@@ -23,6 +23,7 @@ function GameTable({
   playerNames = [],
   status = "",
   statusActive = false,
+  statusTone = "",
   hiddenIds = null,
   dock = null,
   children = null,
@@ -44,7 +45,10 @@ function GameTable({
             <p
               className={`game-table__status${
                 statusActive ? " game-table__status--active" : ""
+              }${statusTone === "warning" ? " game-table__status--timeout-warn" : ""}${
+                statusTone === "pending" ? " game-table__status--timeout-pending" : ""
               }`}
+              data-turn-timer-tone={statusTone || undefined}
             >
               <span className="game-table__status-dot" aria-hidden="true" />
               <span>{status}</span>

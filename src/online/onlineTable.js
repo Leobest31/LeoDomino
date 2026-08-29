@@ -6,10 +6,12 @@
  * --------------------------------
  * PUBLIC STATE (a Realtime `game_sessions` row may patch these):
  *   board, version, currentSeat, scores, phase, round, handCounts,
- *   reserveCount, spinner, lastPlay*, roundResult, matchWinnerSeat
+ *   reserveCount, spinner, lastPlay*, roundResult, matchWinnerSeat,
+ *   turnDeadlineAt, timeoutStrikes
  *
  * PRIVATE / INTERACTION STATE (only Edge viewer snapshots may set these):
- *   enterOnlineMatch / getGameView / submitGameAction / advanceOnlineRound
+ *   enterOnlineMatch / getGameView / submitGameAction / advanceOnlineRound /
+ *   resolveTurnTimeout
  *   → myHand, legalMoves, canPlay, canDraw, canPass, mustPlayTileId
  *
  * Ranking:
@@ -26,6 +28,7 @@ import { isAutoPlaceable, legalEndsForTile, resolvePlayChoice } from "../game/in
 import { destinationTileId } from "../game/destinationTarget.js";
 import { FIND_MATCH_RULESET_IDS, styleIdFromRulesetId } from "./matchmaking.js";
 import { HAITIAN_OPENING_TILE_ID } from "../game/rules/haitianStart.js";
+import { normalizeTimeoutStrikes, stampDeadlineReceipt } from "./turnTimeout.js";
 
 export const ONLINE_SESSION_KEY = "leodomino.onlineMatch";
 export const ONLINE_MODE = "online";
@@ -640,6 +643,14 @@ export function publicSessionFromRealtime(payload) {
     handCounts: asJsonArray(row.hand_counts ?? row.handCounts),
     roundResult: asJsonValue(row.round_result ?? row.roundResult),
     matchWinnerSeat: row.match_winner_seat ?? row.matchWinnerSeat,
+    turnDeadlineAt: Object.prototype.hasOwnProperty.call(row, "turn_deadline_at")
+      || Object.prototype.hasOwnProperty.call(row, "turnDeadlineAt")
+      ? row.turn_deadline_at ?? row.turnDeadlineAt ?? null
+      : undefined,
+    timeoutStrikes:
+      row.timeout_strikes != null || row.timeoutStrikes != null
+        ? normalizeTimeoutStrikes(row.timeout_strikes ?? row.timeoutStrikes)
+        : undefined,
   };
 }
 
@@ -695,6 +706,10 @@ export function mergeRealtimeSessionView(previous, payload) {
       pub.matchWinnerSeat === undefined
         ? previous.matchWinnerSeat
         : pub.matchWinnerSeat,
+    turnDeadlineAt:
+      pub.turnDeadlineAt === undefined ? previous.turnDeadlineAt : pub.turnDeadlineAt,
+    timeoutStrikes:
+      pub.timeoutStrikes === undefined ? previous.timeoutStrikes : pub.timeoutStrikes,
     myHand: roundAdvanced
       ? []
       : Array.isArray(previous.myHand)
@@ -704,6 +719,14 @@ export function mergeRealtimeSessionView(previous, payload) {
     matchId: previous.matchId,
     rulesetId: previous.rulesetId,
   };
+  const deadlineChanged = merged.turnDeadlineAt !== previous.turnDeadlineAt;
+  if (deadlineChanged) {
+    Object.assign(merged, stampDeadlineReceipt(merged));
+  } else {
+    merged.serverNow = previous.serverNow;
+    merged.deadlineReceivedAt = previous.deadlineReceivedAt;
+    merged.deadlineReceivedMono = previous.deadlineReceivedMono;
+  }
   if (!versionAdvanced) {
     merged.legalMoves = Array.isArray(previous.legalMoves) ? previous.legalMoves.slice() : [];
     merged.canPlay = previous.canPlay;
@@ -772,6 +795,7 @@ export function onlineErrorKey(error) {
     case "AUTH":
       return "online.auth";
     case "STALE_VERSION":
+    case "TIMEOUT_NOT_DUE":
       return "online.stale";
     case "WRONG_TURN":
       return "online.wrongTurn";

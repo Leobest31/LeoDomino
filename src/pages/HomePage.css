@@ -1193,8 +1193,25 @@
 }
 
 .home__card--promo {
-  min-height: var(--home-tourney-min);
-  gap: var(--home-gap);
+  appearance: none;
+  flex-shrink: 0;
+  min-height: auto;
+  height: auto;
+  overflow: visible;
+  gap: 10px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home__challenge-launch .home__promo-title {
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.home__challenge-launch .home__cta {
+  justify-self: start;
 }
 
 .home__tourney-icon {
@@ -1230,7 +1247,7 @@
 
 .home__tourney-meta {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
@@ -1255,6 +1272,39 @@
 .home__card--promo .home__eyebrow {
   font-size: 9px;
   font-weight: 700;
+}
+
+.home__challenge-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.home__challenge-facts div {
+  min-width: 0;
+}
+
+.home__challenge-facts div:nth-child(-n + 2) {
+  grid-column: 1 / -1;
+}
+
+.home__challenge-facts dt {
+  color: var(--home-muted);
+  font-size: 8px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.home__challenge-facts dd {
+  margin: 1px 0 0;
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--home-ink);
+  word-break: break-word;
 }
 
 .home__countdown {

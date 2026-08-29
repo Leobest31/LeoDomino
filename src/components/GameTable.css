@@ -186,6 +186,22 @@
   background: #7cf098;
 }
 
+.game-table__status--timeout-warn {
+  border-color: rgba(232, 90, 90, 0.55);
+  background: rgba(72, 10, 12, 0.86);
+  color: #ffe4e4;
+}
+
+.game-table__status--timeout-warn .game-table__status-dot {
+  background: #ff5a5a;
+  box-shadow: 0 0 6px rgba(255, 90, 90, 0.75);
+}
+
+.game-table__status--timeout-pending {
+  border-color: rgba(232, 90, 90, 0.35);
+  color: #ffd0d0;
+}
+
 .game-table__play-score {
   position: absolute;
   left: 50%;

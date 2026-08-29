@@ -15,10 +15,11 @@ const read = (rel) => readFileSync(join(root, rel), "utf8");
 
 const app = read("App.jsx");
 const home = read("pages/HomePage.jsx");
+const homeHook = read("hooks/usePublicChallengeSchedule.js");
 const style = read("pages/GameStylePage.jsx");
 const page = read("pages/GamePage.jsx");
 
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game" \| "admin"/, "App phases are Home-first");
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game" \| "admin" \| "challenge"/, "App phases are Home-first");
 assert.doesNotMatch(app, /GameSetupPage/, "obsolete Setup is not the live hub");
 assert.match(app, /setPhase\("home"\)/, "splash and Main Menu return to Home");
 assert.match(app, /onPlayVsLeoBest=\{\(\) => setPhase\("gameStyle"\)\}/, "Play vs LeoBest opens Game Style");
@@ -109,7 +110,38 @@ assert.match(home, /data-home-cta="inviteFriends"/, "Home has Invite Friends");
 assert.match(home, /data-referral="true"|referral=\{referral\}/, "Profile receives referral props");
 assert.match(home, /id="friend"/, "Play with a Friend card exists");
 assert.match(home, /id="private"/, "Private Table is visible as a future shell");
-assert.match(home, /id="tournaments"/, "Tournaments section is visible as a future shell");
+assert.match(home, /id="challenge"/, "Home has one LeoDomino Challenge launch card");
+assert.match(home, /data-home-card="challenge"/, "Challenge launch is a dedicated Home card");
+assert.match(home, /data-home-challenge="true"/, "Challenge card is the Home Challenge surface");
+assert.match(home, /usePublicChallengeSchedule/, "Challenge card reads the public hosted schedule");
+assert.match(homeHook, /pageshow/, "Home refetches Challenge after bfcache/pageshow");
+assert.match(homeHook, /CHALLENGE_HOME_REFRESH_MS/, "Home re-reads hosted Challenge while visible");
+assert.match(app, /phase === "home" && playable/, "returning to Home remounts the Home screen");
+assert.match(app, /phase === "challenge" && playable/, "Challenge page is gated on a playable signed-in session");
+assert.match(app, /onOpenChallenge=\{\(\) => setPhase\("challenge"\)\}/, "Home Challenge CTA opens the Challenge page");
+assert.doesNotMatch(home, /HOME_PREVIEW\.countdown/, "Challenge countdown is not a frozen preview");
+assert.match(home, /data-home-challenge-cta="true"/, "Challenge CTA stays present");
+assert.match(home, /home\.viewChallenge/, "Home CTA is View Challenge");
+assert.doesNotMatch(home, /data-home-challenge-facts/, "Home does not show Challenge metadata facts");
+assert.doesNotMatch(home, /home\.viewAll/, "Home Challenge card has no View All");
+assert.doesNotMatch(home, /home\.tournaments/, "Home has no separate Tournaments section");
+assert.doesNotMatch(home, /id="tournaments"/, "Tournaments shell is not on Home");
+{
+  const slice = home.slice(home.indexOf('data-home-card="challenge"'), home.indexOf('data-home-card="store"'));
+  assert.match(slice, /onOpenChallenge/, "Challenge card opens the dedicated page");
+  assert.doesNotMatch(slice, /showComingSoon/, "Challenge CTA is not Coming Soon");
+  assert.doesNotMatch(
+    slice,
+    /enterChallenge|playChallenge|onEnterChallenge|cpEarningEnabled: true/,
+    "Challenge card does not enter or activate gameplay"
+  );
+}
+{
+  const homeCss = read("pages/HomePage.css");
+  const promo = homeCss.slice(homeCss.indexOf(".home__card--promo"), homeCss.indexOf(".home__tourney-icon"));
+  assert.match(promo, /flex-shrink:\s*0/, "Challenge card does not flex-shrink");
+  assert.match(promo, /overflow:\s*visible/, "Challenge card does not clip its label");
+}
 assert.match(home, /id="store"/, "Store section is visible as a future shell");
 assert.match(home, /HOME_PREVIEW/, "Figma layout numbers stay presentation-only");
 assert.match(home, /home\.leoCoins/, "LeoCoins visual copy is restored");

@@ -13,6 +13,7 @@ import {
   getGameView,
   submitGameAction,
   advanceOnlineRound,
+  resolveTurnTimeout,
   subscribeGameSession,
 } from "../online/gameplay.js";
 import {
@@ -42,6 +43,7 @@ import {
   viewVersion,
 } from "../online/onlineTable.js";
 import { createOnlineMoveTrace, isOnlineMoveTraceEnabled } from "../online/onlineMoveTrace.js";
+import { isTurnDeadlineExpired } from "../online/turnTimeout.js";
 
 export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const [view, setView] = useState(null);
@@ -59,6 +61,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const refreshInFlightRef = useRef(false);
   const refreshQueuedRef = useRef(false);
   const roundAdvanceAtVersionRef = useRef(-1);
+  const timeoutInFlightRef = useRef(false);
 
   matchIdRef.current = matchId;
 
@@ -286,7 +289,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       } catch (error) {
         if (timeoutId) window.clearTimeout(timeoutId);
         if (unmountedRef.current || token !== inflightRef.current) return false;
-        if (error?.code === "STALE_VERSION") {
+        if (error?.code === "STALE_VERSION" || error?.code === "TIMEOUT_NOT_DUE") {
           try {
             await refreshView();
             trace.mark("staleRefreshed");
@@ -360,9 +363,43 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     [runAction]
   );
 
+  const resolveTimeout = useCallback(async () => {
+    const current = viewRef.current;
+    if (!current || timeoutInFlightRef.current) return false;
+    if (isMatchOverView(current) || current.phase !== "playing") return false;
+    if (!isTurnDeadlineExpired(current)) return false;
+    timeoutInFlightRef.current = true;
+    try {
+      const next = asViewerSnapshot(
+        await resolveTurnTimeout(current.matchId, current.version)
+      );
+      if (unmountedRef.current) return true;
+      applyView(next, { force: true });
+      return true;
+    } catch (error) {
+      if (
+        error?.code === "STALE_VERSION" ||
+        error?.code === "TIMEOUT_NOT_DUE" ||
+        error?.code === "MATCH_NOT_ELIGIBLE"
+      ) {
+        try {
+          await refreshView();
+        } catch {
+          /* keep last authoritative view */
+        }
+        return true;
+      }
+      if (!unmountedRef.current) setErrorKey(onlineErrorKey(error));
+      return false;
+    } finally {
+      timeoutInFlightRef.current = false;
+    }
+  }, [applyView, refreshView]);
+
   const roundPhase = view?.phase;
   const roundStatus = view?.status;
   const roundVersion = view?.version;
+  const turnDeadlineAt = view?.turnDeadlineAt;
   useEffect(() => {
     if (status !== "ready") return;
     const snap = { phase: roundPhase, status: roundStatus, version: roundVersion };
@@ -374,6 +411,26 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     roundAdvanceAtVersionRef.current = version;
     advanceRound();
   }, [advanceRound, busy, status, roundPhase, roundStatus, roundVersion]);
+
+  useEffect(() => {
+    if (status !== "ready") return undefined;
+    if (!turnDeadlineAt || roundPhase !== "playing") return undefined;
+    const tick = () => {
+      const current = viewRef.current;
+      if (!current || current.phase !== "playing") return;
+      if (isTurnDeadlineExpired(current)) void resolveTimeout();
+    };
+    tick();
+    const intervalId = window.setInterval(tick, 250);
+    const onVis = () => tick();
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
+    };
+  }, [status, turnDeadlineAt, roundPhase, roundVersion, resolveTimeout]);
 
   const setDragLock = useCallback(
     (locked) => {

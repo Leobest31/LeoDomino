@@ -12,6 +12,7 @@ import {
   enterOnlineMatch,
   getGameView,
   submitGameAction,
+  resolveTurnTimeout,
   subscribeGameSession,
 } from "./gameplay.js";
 
@@ -80,6 +81,13 @@ function mockClient(handler) {
 }
 
 {
+  const client = mockClient(async () => ({ data: { version: 3 }, error: null }));
+  await resolveTurnTimeout("match-1", 2, client);
+  assert.equal(client.captured.body.op, "resolve_turn_timeout");
+  assert.equal(client.captured.body.expectedVersion, 2);
+}
+
+{
   const client = mockClient(async () => ({ data: {}, error: null }));
   const stop = subscribeGameSession("match-1", () => {}, client);
   assert.equal(client.captured.realtime.filter.table, "game_sessions");
@@ -98,6 +106,7 @@ function mockClient(handler) {
   assert.match(onlinePage, /useOnlineMatch/);
   assert.match(hook, /enterOnlineMatch/);
   assert.match(hook, /submitGameAction/);
+  assert.match(hook, /resolveTurnTimeout/);
 }
 
 console.log("  ✓ gameplay client adapter");

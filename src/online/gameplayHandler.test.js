@@ -3,14 +3,16 @@
  * Run: node src/online/gameplayHandler.test.js
  */
 import assert from "node:assert/strict";
-import { applyOnlineForfeit, getAvailableActions, dealOnlineGame } from "./gameAuthority.js";
+import { applyOnlineForfeit, applyOnlineAction, getAvailableActions, dealOnlineGame } from "./gameAuthority.js";
 import {
   createMemoryGameStore,
   handleAdvanceOnlineRound,
   handleEnterOnlineMatch,
   handleGetGameView,
+  handleResolveTurnTimeout,
   handleSubmitGameAction,
 } from "./gameplayHandler.js";
+import { TURN_TIMEOUT_MS } from "./turnTimeout.js";
 
 const PLAYER_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const PLAYER_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -516,6 +518,306 @@ async function playUntilNotPlaying(store, startView) {
     (err) => err.code === "MATCH_NOT_ELIGIBLE"
   );
   console.log("  ✓ forfeit ends match; later gameplay is rejected");
+}
+
+function expireTurn(store) {
+  const session = store.sessions.get(MATCH_ID);
+  session.turnDeadlineAt = new Date(Date.now() - 25).toISOString();
+}
+
+{
+  const { store, view } = await seated();
+  assert.ok(view.turnDeadlineAt);
+  const remaining = Date.parse(view.turnDeadlineAt) - Date.parse(view.serverNow);
+  assert.ok(remaining > 55_000 && remaining <= TURN_TIMEOUT_MS + 50);
+  assert.deepEqual(view.timeoutStrikes, [0, 0]);
+  const actor = view.currentSeat === 0 ? PLAYER_A : PLAYER_B;
+  const move = view.legalMoves[0];
+  const shortDeadline = new Date(Date.now() + 30_000).toISOString();
+  store.sessions.get(MATCH_ID).turnDeadlineAt = shortDeadline;
+  const played = await handleSubmitGameAction({
+    userId: actor,
+    matchId: MATCH_ID,
+    expectedVersion: view.version,
+    action: { type: "play", tileId: move.tileId, end: move.end },
+    store,
+  });
+  assert.notEqual(played.currentSeat, view.currentSeat);
+  assert.notEqual(played.turnDeadlineAt, shortDeadline);
+  const afterPlayRemaining = Date.parse(played.turnDeadlineAt) - Date.parse(played.serverNow);
+  assert.ok(afterPlayRemaining > 55_000 && afterPlayRemaining <= TURN_TIMEOUT_MS + 50);
+  console.log("  ✓ turn starts with 60s deadline; legal play resets next player's deadline");
+}
+
+{
+  const { store, view } = await seated();
+  let current = view;
+  let guard = 0;
+  while (current.phase === "playing" && !current.canDraw && guard < 80) {
+    guard += 1;
+    const actor = current.currentSeat === 0 ? PLAYER_A : PLAYER_B;
+    if (current.canPlay) {
+      const move = current.legalMoves[0];
+      current = await handleSubmitGameAction({
+        userId: actor,
+        matchId: MATCH_ID,
+        expectedVersion: current.version,
+        action: { type: "play", tileId: move.tileId, end: move.end },
+        store,
+      });
+    } else if (current.canPass) {
+      current = await handleSubmitGameAction({
+        userId: actor,
+        matchId: MATCH_ID,
+        expectedVersion: current.version,
+        action: { type: "pass" },
+        store,
+      });
+    } else {
+      break;
+    }
+    current = await handleGetGameView({
+      userId: current.currentSeat === 0 ? PLAYER_A : PLAYER_B,
+      matchId: MATCH_ID,
+      store,
+    });
+  }
+  if (current.canDraw) {
+    const shortDeadline = new Date(Date.now() + 40_000).toISOString();
+    store.sessions.get(MATCH_ID).turnDeadlineAt = shortDeadline;
+    const actor = current.currentSeat === 0 ? PLAYER_A : PLAYER_B;
+    const drawn = await handleSubmitGameAction({
+      userId: actor,
+      matchId: MATCH_ID,
+      expectedVersion: current.version,
+      action: { type: "draw" },
+      store,
+    });
+    assert.equal(drawn.currentSeat, current.currentSeat);
+    assert.equal(drawn.turnDeadlineAt, shortDeadline);
+    console.log("  ✓ draw on the same seat keeps the existing deadline");
+  } else {
+    console.log("  ✓ draw on the same seat keeps the existing deadline (no draw in this deal)");
+  }
+}
+
+{
+  const { store, view } = await seated();
+  const refreshed = await handleGetGameView({ userId: PLAYER_A, matchId: MATCH_ID, store });
+  assert.equal(refreshed.turnDeadlineAt, view.turnDeadlineAt);
+  console.log("  ✓ refresh/reconnect keeps the same server deadline");
+}
+
+{
+  const { store, view } = await seated();
+  const seat = view.currentSeat;
+  async function timeoutCurrentSeat(expectedVersion) {
+    const secret = store.secrets.get(MATCH_ID);
+    secret.engineState = {
+      ...secret.engineState,
+      currentPlayer: seat,
+      phase: "playing",
+    };
+    const session = store.sessions.get(MATCH_ID);
+    session.currentSeat = seat;
+    session.phase = "playing";
+    session.status = "playing";
+    expireTurn(store);
+    return handleResolveTurnTimeout({
+      userId: PLAYER_A,
+      matchId: MATCH_ID,
+      expectedVersion,
+      store,
+    });
+  }
+  const first = await timeoutCurrentSeat(view.version);
+  assert.equal(store.actions.at(-1).actionType, "timeout");
+  assert.equal(first.roundResult.reason, "timeout_pass");
+  assert.equal(first.roundResult.timedOutSeat, seat);
+  assert.equal(first.timeoutStrikes[seat], 1);
+  const second = await timeoutCurrentSeat(first.version);
+  assert.equal(second.roundResult.reason, "timeout_pass");
+  assert.equal(second.timeoutStrikes[seat], 2);
+  const third = await timeoutCurrentSeat(second.version);
+  assert.equal(third.phase, "matchOver");
+  assert.equal(third.roundResult.reason, "timeout");
+  assert.equal(third.timeoutStrikes[seat], 3);
+  assert.equal(store.matches.get(MATCH_ID).status, "finished");
+  assert.equal(store.matches.get(MATCH_ID).finish_reason, "timeout");
+  assert.equal(third.matchWinnerSeat, seat === 0 ? 1 : 0);
+  await assert.rejects(
+    () =>
+      handleResolveTurnTimeout({
+        userId: PLAYER_A,
+        matchId: MATCH_ID,
+        expectedVersion: third.version,
+        store,
+      }),
+    (err) => err.code === "MATCH_NOT_ELIGIBLE"
+  );
+  console.log("  ✓ third timeout is an authoritative loss; completed match cannot timeout again");
+}
+
+{
+  const ratedStore = createMemoryGameStore([{ ...readyMatch(), rated: true }]);
+  const ratedView = await handleEnterOnlineMatch({
+    userId: PLAYER_A,
+    matchId: MATCH_ID,
+    store: ratedStore,
+    createSeed: () => 1001,
+  });
+  const seat = ratedView.currentSeat;
+  async function timeoutSeat(expectedVersion) {
+    const secret = ratedStore.secrets.get(MATCH_ID);
+    secret.engineState = { ...secret.engineState, currentPlayer: seat, phase: "playing" };
+    const session = ratedStore.sessions.get(MATCH_ID);
+    session.currentSeat = seat;
+    session.phase = "playing";
+    session.status = "playing";
+    expireTurn(ratedStore);
+    return handleResolveTurnTimeout({
+      userId: PLAYER_A,
+      matchId: MATCH_ID,
+      expectedVersion,
+      store: ratedStore,
+    });
+  }
+  const first = await timeoutSeat(ratedView.version);
+  const second = await timeoutSeat(first.version);
+  const current = await timeoutSeat(second.version);
+  assert.equal(current.roundResult.reason, "timeout");
+  assert.equal(ratedStore.matches.get(MATCH_ID).finish_reason, "timeout");
+  assert.equal(ratedStore.matches.get(MATCH_ID).rated, true);
+  assert.equal(
+    JSON.stringify(ratedStore.actions.at(-1).payload).includes("newRp"),
+    false
+  );
+  console.log("  ✓ rated timeout loss reuses match finish_reason; no client RP payload");
+}
+
+{
+  const friendStore = createMemoryGameStore([{ ...readyMatch(), rated: false }]);
+  const friendView = await handleEnterOnlineMatch({
+    userId: PLAYER_A,
+    matchId: MATCH_ID,
+    store: friendStore,
+    createSeed: () => 1001,
+  });
+  const seat = friendView.currentSeat;
+  async function timeoutSeat(expectedVersion) {
+    const secret = friendStore.secrets.get(MATCH_ID);
+    secret.engineState = { ...secret.engineState, currentPlayer: seat, phase: "playing" };
+    const session = friendStore.sessions.get(MATCH_ID);
+    session.currentSeat = seat;
+    session.phase = "playing";
+    session.status = "playing";
+    expireTurn(friendStore);
+    return handleResolveTurnTimeout({
+      userId: PLAYER_B,
+      matchId: MATCH_ID,
+      expectedVersion,
+      store: friendStore,
+    });
+  }
+  const first = await timeoutSeat(friendView.version);
+  const second = await timeoutSeat(first.version);
+  await timeoutSeat(second.version);
+  assert.equal(friendStore.matches.get(MATCH_ID).rated, false);
+  assert.equal(friendStore.matches.get(MATCH_ID).finish_reason, "timeout");
+  console.log("  ✓ unrated/friend timeout loss does not invent an RP path");
+}
+
+{
+  const { store, view } = await seated();
+  expireTurn(store);
+  store.enableCommitYield();
+  const results = await Promise.allSettled([
+    handleResolveTurnTimeout({
+      userId: PLAYER_A,
+      matchId: MATCH_ID,
+      expectedVersion: view.version,
+      store,
+    }),
+    handleResolveTurnTimeout({
+      userId: PLAYER_B,
+      matchId: MATCH_ID,
+      expectedVersion: view.version,
+      store,
+    }),
+  ]);
+  const ok = results.filter((row) => row.status === "fulfilled");
+  const rejected = results.filter((row) => row.status === "rejected");
+  assert.equal(ok.length, 1);
+  assert.equal(rejected.length, 1);
+  assert.equal(rejected[0].reason.code, "STALE_VERSION");
+  assert.equal(store.actions.filter((row) => row.actionType === "timeout").length, 1);
+  await assert.rejects(
+    () =>
+      handleResolveTurnTimeout({
+        userId: PLAYER_A,
+        matchId: MATCH_ID,
+        expectedVersion: view.version,
+        store,
+      }),
+    (err) => err.code === "STALE_VERSION"
+  );
+  console.log("  ✓ simultaneous timeout requests are idempotent; stale duplicate is rejected");
+}
+
+{
+  const { store, view } = await seated();
+  await assert.rejects(
+    () =>
+      handleResolveTurnTimeout({
+        userId: PLAYER_A,
+        matchId: MATCH_ID,
+        expectedVersion: view.version,
+        store,
+      }),
+    (err) => err.code === "TIMEOUT_NOT_DUE"
+  );
+  console.log("  ✓ timeout before the server deadline is a no-op");
+}
+
+{
+  const { store, view } = await seated();
+  const secret = store.secrets.get(MATCH_ID);
+  const move = getAvailableActions(secret.engineState).legalMoves[0];
+  let state = applyOnlineAction(secret.engineState, {
+    seat: secret.engineState.currentPlayer,
+    action: { type: "play", tileId: move.tileId, end: move.end },
+  }).state;
+  const seat = state.currentPlayer;
+  const candidates = ["0-0", "0-1", "0-2", "1-1", "1-2", "2-2"];
+  let blocked = null;
+  for (const tileId of candidates) {
+    const next = {
+      ...state,
+      mustPlayTileId: null,
+      reserve: [],
+      players: state.players.map((player, index) =>
+        index === seat ? { ...player, hand: [tileId] } : player
+      ),
+    };
+    if (!getAvailableActions(next).canPlay) {
+      blocked = next;
+      break;
+    }
+  }
+  assert.ok(blocked, "expected an unplayable constructed hand");
+  secret.engineState = blocked;
+  store.sessions.get(MATCH_ID).currentSeat = seat;
+  store.sessions.get(MATCH_ID).phase = "playing";
+  expireTurn(store);
+  const resolved = await handleResolveTurnTimeout({
+    userId: PLAYER_A,
+    matchId: MATCH_ID,
+    expectedVersion: view.version,
+    store,
+  });
+  assert.deepEqual(resolved.timeoutStrikes, [0, 0]);
+  assert.notEqual(resolved.roundResult?.reason, "timeout_pass");
+  console.log("  ✓ no legal move timeout does not add a strike");
 }
 
 console.log("  ✓ gameplayHandler");

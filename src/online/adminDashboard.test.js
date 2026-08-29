@@ -7,6 +7,9 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "url";
 import {
+  adminAccountStatus,
+  adminPresenceI18nKey,
+  adminPresenceState,
   ADMIN_ERROR,
   ADMIN_LIVE_MATCH_FIELDS,
   ADMIN_LIVE_PLAYER_FIELDS,
@@ -127,6 +130,22 @@ assert.equal(ADMIN_PAGE_SIZE, 25);
   const online = cards.find((card) => card.id === "globalOnlineUsers");
   assert.equal(online.value, null);
   assert.equal(online.unsupported, true);
+  {
+    const counted = overviewCardsFromPayload(
+      normalizeAdminOverview({
+        total_active_accounts: 12,
+        total_deleted_accounts: 1,
+        accounts_created_today: 2,
+        accounts_created_7d: 5,
+        accounts_created_30d: 9,
+        active_match_player_count: 4,
+        active_match_count: 2,
+        global_online_user_count: 7,
+      })
+    ).find((card) => card.id === "globalOnlineUsers");
+    assert.equal(counted.value, 7);
+    assert.equal(counted.unsupported, false);
+  }
   assert.deepEqual(overviewCardsFromPayload(null), []);
   assert.deepEqual(
     overviewCardsFromPayload({
@@ -179,6 +198,134 @@ assert.equal(ADMIN_PAGE_SIZE, 25);
   assert.equal("phone" in leaked, false);
   assert.equal("access_token" in leaked, false);
   assert.equal("raw_user_meta_data" in leaked, false);
+}
+
+{
+  const now = Date.parse("2026-08-29T07:00:00.000Z");
+  assert.equal(adminAccountStatus({ deletedAt: null }), "active");
+  assert.equal(adminAccountStatus({ deletedAt: "2026-08-28T12:00:00.000Z" }), "deleted");
+  assert.equal(
+    adminPresenceState({ inActiveMatch: false, deletedAt: null }, now),
+    "offline",
+    "an active account is not online"
+  );
+  assert.equal(
+    adminPresenceState(
+      {
+        deletedAt: "2026-08-28T12:00:00.000Z",
+        inActiveMatch: true,
+        presenceLastSeenAt: "2026-08-29T06:59:50.000Z",
+      },
+      now
+    ),
+    "offline",
+    "deleted accounts are Offline"
+  );
+  assert.equal(
+    adminPresenceState({ inActiveMatch: true }, now),
+    "offline",
+    "occupancy without a fresh heartbeat is Offline"
+  );
+  assert.equal(
+    adminPresenceState(
+      {
+        inActiveMatch: true,
+        matchLastSeenAt: "2026-08-29T06:59:00.000Z",
+      },
+      now
+    ),
+    "offline",
+    "occupancy last_seen without a signed-in heartbeat is Offline"
+  );
+  assert.equal(
+    adminPresenceState(
+      { inActiveMatch: true, presenceLastSeenAt: "2026-08-29T06:59:50.000Z" },
+      now
+    ),
+    "in_match",
+    "occupancy EXISTS plus a fresh heartbeat is In Match"
+  );
+  assert.equal(
+    adminPresenceState(
+      {
+        inActiveMatch: true,
+        matchLastSeenAt: "2026-08-29T06:58:00.000Z",
+        presenceLastSeenAt: "2026-08-29T06:59:50.000Z",
+      },
+      now
+    ),
+    "in_match",
+    "fresh heartbeat plus occupancy is In Match"
+  );
+  assert.equal(
+    adminPresenceState(
+      {
+        inActiveMatch: true,
+        matchLastSeenAt: "2026-08-29T06:50:00.000Z",
+        presenceLastSeenAt: "2026-08-29T06:59:50.000Z",
+      },
+      now
+    ),
+    "online",
+    "stale occupancy with a fresh heartbeat is Online, not In Match"
+  );
+  assert.equal(
+    adminPresenceState(
+      {
+        inActiveMatch: true,
+        matchLastSeenAt: "2026-08-29T07:01:00.000Z",
+        presenceLastSeenAt: "2026-08-29T06:59:50.000Z",
+      },
+      now
+    ),
+    "online",
+    "future occupancy last_seen with a fresh heartbeat is Online"
+  );
+  assert.equal(
+    adminPresenceState(
+      {
+        inActiveMatch: true,
+        presenceLastSeenAt: "2026-08-29T06:58:00.000Z",
+      },
+      now
+    ),
+    "offline",
+    "stale heartbeat with occupancy is Offline"
+  );
+  assert.equal(
+    adminPresenceState(
+      { inActiveMatch: false, presenceLastSeenAt: "2026-08-29T06:59:20.000Z" },
+      now
+    ),
+    "online"
+  );
+  assert.equal(
+    adminPresenceState(
+      { inActiveMatch: false, presenceLastSeenAt: "2026-08-29T06:58:00.000Z" },
+      now
+    ),
+    "offline",
+    "stale signed-in heartbeat is Offline"
+  );
+  assert.equal(
+    adminPresenceState(
+      { inActiveMatch: false, presenceLastSeenAt: "2026-08-29T07:01:00.000Z" },
+      now
+    ),
+    "offline",
+    "future signed-in heartbeat fails safe to Offline"
+  );
+  assert.equal(
+    adminPresenceState(
+      { inActiveMatch: false, presenceLastSeenAt: "not-a-timestamp" },
+      now
+    ),
+    "offline",
+    "unparseable heartbeat fails safe to Offline"
+  );
+  assert.equal(adminPresenceI18nKey("in_match"), "admin.presenceInMatch");
+  assert.equal(adminPresenceI18nKey("offline"), "admin.presenceOffline");
+  assert.equal(adminPresenceI18nKey("online"), "admin.presenceOnline");
 }
 
 {

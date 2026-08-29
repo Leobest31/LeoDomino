@@ -107,6 +107,13 @@ export default defineConfig({
         // Keep public legal pages out of the SPA shell fallback.
         navigateFallbackDenylist: [/^\/privacy(?:\/|$)/, /^\/terms(?:\/|$)/, /^\/support(?:\/|$)/],
         cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.hostname.endsWith("supabase.co") || url.pathname.includes("/rest/v1/rpc/"),
+            handler: "NetworkOnly",
+          },
+        ],
       },
       devOptions: {
         enabled: false,

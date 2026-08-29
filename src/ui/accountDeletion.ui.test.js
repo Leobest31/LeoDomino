@@ -34,6 +34,7 @@ assert.match(app, /phase === "home" && playable/);
 assert.match(app, /phase === "findMatch" && playable/);
 assert.match(app, /phase === "friends" && playable/);
 assert.match(app, /phase === "chat" && playable/);
+assert.match(app, /phase === "challenge" && playable/);
 
 assert.match(pending, /data-account-deletion-pending="true"/);
 assert.match(pending, /deleteAccount\(password\)/);

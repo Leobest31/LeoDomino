@@ -19,12 +19,14 @@ import {
 import { capturePendingReferralFromWindow } from "./online/referrals.js";
 import { ONLINE_MODE, lockedRulesetId, readOnlineSession, clearOnlineSession } from "./online/onlineTable.js";
 import { useOwnFriendsPresence } from "./hooks/useFriends.js";
+import { usePlayerPresence } from "./hooks/usePlayerPresence.js";
 import { probeAmIStaff } from "./online/adminDashboard.js";
 import { enterAdminLocation, goBackFromAdmin, isAdminLocation, leaveAdminLocation } from "./online/adminRoute.js";
 import AdminPage from "./pages/AdminPage.jsx";
+import ChallengePage from "./pages/ChallengePage.jsx";
 import "./App.css";
 
-/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "friends" | "chat" | "game" | "admin"} AppPhase */
+/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "friends" | "chat" | "game" | "admin" | "challenge"} AppPhase */
 
 /**
  * Startup: brand intro → Login (or Home if signed in) → Game Style → table.
@@ -48,6 +50,7 @@ function App() {
   const friendInviteBusyRef = useRef(false);
   const [staffRole, setStaffRole] = useState(null);
   useOwnFriendsPresence();
+  usePlayerPresence();
 
   useEffect(() => {
     capturePendingReferralFromWindow();
@@ -66,7 +69,8 @@ function App() {
       phase === "findMatch" ||
       phase === "friends" ||
       phase === "chat" ||
-      phase === "admin"
+      phase === "admin" ||
+      phase === "challenge"
     ) {
       setMatchOptions(null);
       if (phase === "admin") leaveAdminLocation();
@@ -249,7 +253,8 @@ function App() {
     phase === "findMatch" ||
     phase === "friends" ||
     phase === "chat" ||
-    phase === "admin";
+    phase === "admin" ||
+    phase === "challenge";
   const showAuth = Boolean(authView) || (phase !== "intro" && authReady && !signedIn);
   const onlineTable = matchOptions?.mode === ONLINE_MODE;
 
@@ -274,6 +279,7 @@ function App() {
           onChat={() => openChat(null, "home")}
           onOpenChat={(focus) => openChat(focus, "home")}
           onEnterMatch={handleEnterOnlineMatch}
+          onOpenChallenge={() => setPhase("challenge")}
           onResume={handleResume}
           showAdmin={typeof staffRole === "string"}
           onOpenAdmin={openAdmin}
@@ -334,6 +340,13 @@ function App() {
 
       {phase === "admin" && playable ? (
         <AdminPage onBack={handleAdminBack} />
+      ) : null}
+
+      {phase === "challenge" && playable ? (
+        <ChallengePage
+          onBack={() => setPhase("home")}
+          onMainMenu={() => setPhase("home")}
+        />
       ) : null}
 
       {phase === "game" && playable && onlineTable ? (

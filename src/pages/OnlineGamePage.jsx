@@ -11,7 +11,7 @@ import DragGhost from "../components/DragGhost";
 import GameBanner from "../components/GameBanner";
 import MatchOverModal from "../components/MatchOverModal";
 import AbandonMatchDialog from "../components/AbandonMatchDialog";
-import { isForfeitView } from "../online/gameAuthority.js";
+import { isForfeitView, isTimeoutView } from "../online/gameAuthority.js";
 import {
   fetchSettledMatchRpResult,
   isOnlineMatchAborted,
@@ -67,8 +67,37 @@ import {
   hasCoherentInteraction,
 } from "../online/onlineTable.js";
 import { createOnlineMoveTrace } from "../online/onlineMoveTrace.js";
+import {
+  TIMEOUT_STRIKE_LIMIT,
+  formatTurnSeconds,
+  isTimeoutMatchOver,
+  remainingTurnMs,
+  turnTimerTone,
+} from "../online/turnTimeout.js";
 import { gameStyleForRulesetId } from "../data/gameStyles.js";
 import "./GamePage.css";
+
+function useTurnCountdown(view) {
+  const [remainingMs, setRemainingMs] = useState(() => remainingTurnMs(view));
+  useEffect(() => {
+    if (view?.phase !== PHASE.PLAYING || !view?.turnDeadlineAt) {
+      setRemainingMs(null);
+      return undefined;
+    }
+    const tick = () => setRemainingMs(remainingTurnMs(view));
+    tick();
+    const intervalId = window.setInterval(tick, 250);
+    const onVis = () => tick();
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
+    };
+  }, [view]);
+  return remainingMs;
+}
 
 function useGameplayLayout(layoutOptions = {}) {
   const pageRef = useRef(null);
@@ -210,6 +239,9 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   const matchOver = view?.phase === PHASE.MATCH_OVER || view?.status === "match_over";
   const roundOver = view?.phase === PHASE.ROUND_OVER || view?.status === "round_over";
   const matchAborted = isOnlineMatchAborted(view);
+  const remainingMs = useTurnCountdown(matchOver || roundOver ? null : view);
+  const timerSeconds = formatTurnSeconds(remainingMs);
+  const timerTone = turnTimerTone(remainingMs);
 
   useEffect(() => {
     if (!matchOver || !matchId) {
@@ -577,6 +609,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
 
   useEffect(() => {
     if (!roundOver || !view?.roundResult) return;
+    if (isTimeoutView({ roundResult: view.roundResult })) return;
     const identity = `${view.matchId}:${view.round}:${view.version}`;
     setRoundBanner((prev) => {
       if (prev?.identity === identity) return prev;
@@ -606,6 +639,29 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   ]);
 
   useEffect(() => {
+    const reason = view?.roundResult?.reason;
+    if (reason !== "timeout_pass" && reason !== "timeout") return;
+    const identity = `${view.matchId}:${view.version}:${reason}:${view.roundResult?.strike ?? ""}`;
+    setRoundBanner((prev) => {
+      if (prev?.identity === identity) return prev;
+      if (reason === "timeout") {
+        const humanWon = view.matchWinnerSeat === viewerSeat;
+        return {
+          identity,
+          variant: "match",
+          title: humanWon ? t("online.opponentLostTimeout") : t("online.youLostTimeout"),
+        };
+      }
+      const n = Number(view.roundResult?.strike) || 1;
+      return {
+        identity,
+        variant: "round",
+        title: t("online.timeoutStrike", { n, limit: TIMEOUT_STRIKE_LIMIT }),
+      };
+    });
+  }, [t, view?.matchId, view?.matchWinnerSeat, view?.roundResult, view?.version, viewerSeat]);
+
+  useEffect(() => {
     if (!roundBanner?.identity) return undefined;
     const timer = window.setTimeout(() => setRoundBanner(null), 2200);
     return () => window.clearTimeout(timer);
@@ -633,6 +689,11 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     if (isHumanTurn) return t("game.yourTurn");
     if (awaitingInteraction) return t("game.waiting");
     return t("online.opponentTurn", { name: rivalName });
+  })();
+  const tableStatus = (() => {
+    if (matchOver || roundOver || timerSeconds == null) return humanStatus;
+    if (timerTone === "pending") return t("online.timeoutPending");
+    return `${humanStatus} · ${timerSeconds}`;
   })();
   const rivalTurn = view?.currentSeat === rivalSeat && view?.phase === PHASE.PLAYING;
   const showReservePicker = isHumanTurn && actions.canDraw && !drag && !matchOver && !roundOver;
@@ -799,8 +860,9 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
             playScore={view.lastPlayPoints > 0 ? view.lastPlayPoints : null}
             scoreHighlights={view.lastPlayScoreTerminals ?? []}
             playerNames={playerNames}
-            status={humanStatus}
+            status={tableStatus}
             statusActive={isHumanTurn}
+            statusTone={matchOver || roundOver ? "" : timerTone}
             rulesetId={rulesetId}
             dock={
               <div className="game-page__dock" data-hand-dock>
@@ -871,7 +933,11 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         scores={scores}
         roundsPlayed={view.round}
         title={
-          isForfeitView(view)
+          isTimeoutMatchOver(view)
+            ? humanWonMatch
+              ? t("online.matchWonTimeout")
+              : t("online.matchLostTimeout")
+            : isForfeitView(view)
             ? humanWonMatch
               ? t("online.matchWonForfeit")
               : t("online.matchLostForfeit")

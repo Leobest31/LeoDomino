@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
+import { usePublicChallengeSchedule } from "../hooks/usePublicChallengeSchedule.js";
 import { useAudio } from "../audio";
 import {
   homeAvatarLion,
@@ -64,23 +65,18 @@ const HOME_PREVIEW = Object.freeze({
   lp: "1,250",
   levelFill: 75,
   leagueFill: 75,
-  countdown: [
-    { value: "02", labelKey: "home.countdownDays" },
-    { value: "14", labelKey: "home.countdownHrs" },
-    { value: "35", labelKey: "home.countdownMin" },
-    { value: "48", labelKey: "home.countdownSec" },
-  ],
 });
 
 /**
  * Premium Home dashboard — Figma visual shell, existing Home only.
  * PLAY VS LEOBEST is the only live gameplay path.
  */
-function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, onOpenChat, onEnterMatch, showAdmin, onOpenAdmin }) {
+function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, onOpenChat, onEnterMatch, onOpenChallenge, showAdmin, onOpenAdmin }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
   const { session, openLogin } = useAuth();
   const findMatchAvailability = useFindMatchAvailability();
+  const challenge = usePublicChallengeSchedule();
   const referral = useReferralInvite({ enabled: Boolean(session) });
   const friends = useFriendsBoard({ watchOnline: false });
   const invites = useFriendMatchInvites({ onEnterMatch });
@@ -449,39 +445,29 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, o
           {t("referral.inviteFriends")}
         </button>
 
-        <article className="home__card home__card--promo" id="tournaments" data-home-card="tournaments">
-          <div className="home__tourney">
+        <button
+          type="button"
+          className="home__card home__card--promo home__challenge-launch"
+          id="challenge"
+          data-home-card="challenge"
+          data-home-challenge="true"
+          data-home-challenge-cta="true"
+          onClick={() => tap(() => onOpenChallenge?.())}
+        >
+          <span className="home__tourney">
             <span className="home__tourney-icon">
               <HomeGlyph src={homeIconTrophy} size={24} />
             </span>
-            <div className="home__tourney-copy">
-              <h2 className="home__promo-title">{t("home.tournaments")}</h2>
-              <p className="home__card-sub">{t("home.tournamentsLead")}</p>
-            </div>
-          </div>
-          <div className="home__tourney-rule" aria-hidden="true" />
-          <div className="home__tourney-meta">
-            <div>
-              <span className="home__eyebrow">{t("home.nextTournament")}</span>
-              <p className="home__tourney-name">{t("home.leoDominoCup")}</p>
-            </div>
-            <div className="home__countdown" aria-hidden="true">
-              {HOME_PREVIEW.countdown.map((slot) => (
-                <span key={slot.labelKey} className="home__count">
-                  <span className="home__count-value">{slot.value}</span>
-                  <span className="home__count-label">{t(slot.labelKey)}</span>
-                </span>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="home__cta home__cta--gold-outline home__cta--mini home__cta--view-all home__cta--chevron"
-              onClick={showComingSoon}
-            >
-              {t("home.viewAll")}
-            </button>
-          </div>
-        </article>
+            <span className="home__promo-title">{t("home.challengeName")}</span>
+          </span>
+          <span className="home__cta home__cta--gold-outline home__cta--mini home__cta--chevron">
+            {challenge.loading
+              ? t("home.challengeLoading")
+              : challenge.failed
+                ? t("home.challengeUnavailable")
+                : t("home.viewChallenge")}
+          </span>
+        </button>
 
         <article className="home__card home__card--store" id="store" data-home-card="store">
           <button type="button" className="home__promo home__promo--store" onClick={showComingSoon}>

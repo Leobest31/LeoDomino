@@ -7,6 +7,11 @@ import {
   ADMIN_ERROR,
   ADMIN_LIVE_POLL_MS,
   ADMIN_PAGE_SIZE,
+  ADMIN_PRESENCE_POLL_MS,
+  adminAccountStatus,
+  adminAccountStatusI18nKey,
+  adminPresenceI18nKey,
+  adminPresenceState,
   fetchAdminLiveMatches,
   fetchAdminOverview,
   fetchAdminPlayerRpHistory,
@@ -16,10 +21,12 @@ import {
   overviewCardsFromPayload,
   probeAmIStaff,
 } from "../online/adminDashboard.js";
+import { ADMIN_V1_NAV, fetchAdminUserDetail } from "../online/adminV1.js";
 import AdminSpectatorView from "./AdminSpectatorView.jsx";
+import { AdminV1Panels } from "./AdminV1Panels.jsx";
 import "./AdminPage.css";
 
-const NAV = Object.freeze(["overview", "users", "liveMatches", "globalRp"]);
+const NAV = ADMIN_V1_NAV;
 
 function errorMessageKey(error) {
   if (error?.code === ADMIN_ERROR.AUTH) return "admin.signInRequired";
@@ -79,6 +86,7 @@ function AdminPage({ onBack }) {
   const [rpHistoryError, setRpHistoryError] = useState("");
   const [rpHistoryLoading, setRpHistoryLoading] = useState(false);
   const [rpHistoryOffset, setRpHistoryOffset] = useState(0);
+  const [userDetail, setUserDetail] = useState(null);
 
   const checkAccess = useCallback(async () => {
     setGate("checking");
@@ -103,30 +111,40 @@ function AdminPage({ onBack }) {
     void checkAccess();
   }, [checkAccess]);
 
-  const loadOverview = useCallback(async () => {
-    setOverviewLoading(true);
-    setOverviewError("");
+  const loadOverview = useCallback(async (silent = false) => {
+    if (!silent) {
+      setOverviewLoading(true);
+      setOverviewError("");
+    }
     try {
       setOverview(await fetchAdminOverview());
+      if (silent) setOverviewError("");
     } catch (error) {
-      setOverview(null);
-      setOverviewError(errorMessageKey(error));
+      if (!silent) {
+        setOverview(null);
+        setOverviewError(errorMessageKey(error));
+      }
     } finally {
-      setOverviewLoading(false);
+      if (!silent) setOverviewLoading(false);
     }
   }, []);
 
-  const loadUsers = useCallback(async (query) => {
-    setUsersLoading(true);
-    setUsersError("");
+  const loadUsers = useCallback(async (query, silent = false) => {
+    if (!silent) {
+      setUsersLoading(true);
+      setUsersError("");
+    }
     try {
       const page = await fetchAdminUsers(query);
       setUserPage(page);
+      if (silent) setUsersError("");
     } catch (error) {
-      setUserPage({ users: [], total: 0, limit: ADMIN_PAGE_SIZE, offset: query.offset || 0 });
-      setUsersError(errorMessageKey(error));
+      if (!silent) {
+        setUserPage({ users: [], total: 0, limit: ADMIN_PAGE_SIZE, offset: query.offset || 0 });
+        setUsersError(errorMessageKey(error));
+      }
     } finally {
-      setUsersLoading(false);
+      if (!silent) setUsersLoading(false);
     }
   }, []);
 
@@ -186,7 +204,10 @@ function AdminPage({ onBack }) {
   useEffect(() => {
     if (gate !== "ok" || section !== "overview") return undefined;
     void loadOverview();
-    return undefined;
+    const handle = window.setInterval(() => {
+      void loadOverview(true);
+    }, ADMIN_PRESENCE_POLL_MS);
+    return () => window.clearInterval(handle);
   }, [gate, section, loadOverview]);
 
   useEffect(() => {
@@ -203,8 +224,34 @@ function AdminPage({ onBack }) {
   useEffect(() => {
     if (gate !== "ok" || section !== "users") return undefined;
     void loadUsers({ search, offset, limit: ADMIN_PAGE_SIZE });
-    return undefined;
+    const handle = window.setInterval(() => {
+      void loadUsers({ search, offset, limit: ADMIN_PAGE_SIZE }, true);
+    }, ADMIN_PRESENCE_POLL_MS);
+    return () => window.clearInterval(handle);
   }, [gate, section, search, offset, loadUsers]);
+
+  useEffect(() => {
+    if (gate !== "ok" || !selected?.playerId) {
+      setUserDetail(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const load = () => {
+      void fetchAdminUserDetail(selected.playerId)
+        .then((detail) => {
+          if (!cancelled) setUserDetail(detail);
+        })
+        .catch(() => {
+          /* keep last successful detail */
+        });
+    };
+    load();
+    const handle = window.setInterval(load, ADMIN_PRESENCE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(handle);
+    };
+  }, [gate, selected?.playerId]);
 
   useEffect(() => {
     if (gate !== "ok" || section !== "liveMatches") return undefined;
@@ -231,6 +278,15 @@ function AdminPage({ onBack }) {
   const pageCount = Math.max(1, Math.ceil((userPage.total || 0) / (userPage.limit || ADMIN_PAGE_SIZE)));
   const pageNumber = Math.floor((userPage.offset || 0) / (userPage.limit || ADMIN_PAGE_SIZE)) + 1;
   const canPrev = (userPage.offset || 0) > 0;
+  const selectedAccount = selected ? adminAccountStatus(selected) : "active";
+  const selectedPresence = selected
+    ? adminPresenceState({
+        deletedAt: selected.deletedAt,
+        inActiveMatch: userDetail?.player?.inActiveMatch ?? selected.inActiveMatch,
+        matchLastSeenAt: userDetail?.player?.matchLastSeenAt ?? selected.matchLastSeenAt,
+        presenceLastSeenAt: userDetail?.player?.presenceLastSeenAt ?? selected.presenceLastSeenAt,
+      })
+    : "offline";
   const canNext = (userPage.offset || 0) + userPage.users.length < (userPage.total || 0);
   const livePageCount = Math.max(1, Math.ceil((livePage.total || 0) / (livePage.limit || ADMIN_PAGE_SIZE)));
   const livePageNumber = Math.floor((livePage.offset || 0) / (livePage.limit || ADMIN_PAGE_SIZE)) + 1;
@@ -277,6 +333,12 @@ function AdminPage({ onBack }) {
     if (status === "disconnected") return "is-deleted";
     if (status === "waiting") return "is-ok";
     return "";
+  };
+
+  const presencePillClass = (presence) => {
+    if (presence === "online") return "is-presence-online";
+    if (presence === "in_match") return "is-presence-in-match";
+    return "is-presence-offline";
   };
 
   return (
@@ -374,6 +436,11 @@ function AdminPage({ onBack }) {
                         <p className={`admin-page__card-value${unavailable ? " is-unavailable" : ""}`}>
                           {unavailable ? t("admin.metricUnavailable") : formatNumber(card.value)}
                         </p>
+                        {card.id === "globalOnlineUsers" ? (
+                          <p className="admin-page__card-hint">
+                            {unavailable ? t("admin.onlineUnavailableHint") : t("admin.onlineCountHint")}
+                          </p>
+                        ) : null}
                       </article>
                     );
                   })}
@@ -386,6 +453,7 @@ function AdminPage({ onBack }) {
                 <header className="admin-page__header">
                   <h2>{t("admin.users")}</h2>
                 </header>
+                <p className="admin-page__hint">{t("admin.presenceHint")}</p>
                 <label className="admin-page__search">
                   <span className="sr-only">{t("admin.searchUsers")}</span>
                   <input
@@ -413,11 +481,15 @@ function AdminPage({ onBack }) {
                         <th>{t("admin.losses")}</th>
                         <th>{t("admin.ratedMatches")}</th>
                         <th>{t("admin.created")}</th>
-                        <th>{t("admin.status")}</th>
+                        <th>{t("admin.accountStatus")}</th>
+                        <th>{t("admin.presence")}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {userPage.users.map((user) => (
+                      {userPage.users.map((user) => {
+                        const account = adminAccountStatus(user);
+                        const presence = adminPresenceState(user);
+                        return (
                         <tr
                           key={user.playerId}
                           data-admin-user={user.playerId}
@@ -433,17 +505,23 @@ function AdminPage({ onBack }) {
                           <td>{formatWhen(user.createdAt)}</td>
                           <td>
                             <span
-                              className={`admin-page__pill${user.deletedAt ? " is-deleted" : user.inActiveMatch ? " is-live" : " is-ok"}`}
+                              className={`admin-page__pill${account === "deleted" ? " is-deleted" : " is-ok"}`}
+                              data-admin-account={account}
                             >
-                              {user.deletedAt
-                                ? t("admin.deleted")
-                                : user.inActiveMatch
-                                  ? t("admin.inMatch")
-                                  : t("admin.active")}
+                              {t(adminAccountStatusI18nKey(account))}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className={`admin-page__pill ${presencePillClass(presence)}`}
+                              data-admin-presence={presence}
+                            >
+                              {t(adminPresenceI18nKey(presence))}
                             </span>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -670,6 +748,14 @@ function AdminPage({ onBack }) {
                 </div>
               </div>
             ) : null}
+
+            <AdminV1Panels
+              section={section}
+              role={role}
+              t={t}
+              formatNumber={formatNumber}
+              formatWhen={formatWhen}
+            />
           </section>
         </div>
       ) : null}
@@ -728,16 +814,54 @@ function AdminPage({ onBack }) {
                 <dd>{formatWhen(selected.createdAt)}</dd>
               </div>
               <div>
-                <dt>{t("admin.status")}</dt>
+                <dt>{t("admin.accountStatus")}</dt>
                 <dd>
-                  {selected.deletedAt
-                    ? t("admin.deleted")
-                    : selected.inActiveMatch
-                      ? t("admin.inMatch")
-                      : t("admin.active")}
+                  <span
+                    className={`admin-page__pill${selectedAccount === "deleted" ? " is-deleted" : " is-ok"}`}
+                    data-admin-account={selectedAccount}
+                  >
+                    {t(adminAccountStatusI18nKey(selectedAccount))}
+                  </span>
                 </dd>
               </div>
+              <div>
+                <dt>{t("admin.presence")}</dt>
+                <dd>
+                  <span
+                    className={`admin-page__pill ${presencePillClass(selectedPresence)}`}
+                    data-admin-presence={selectedPresence}
+                  >
+                    {t(adminPresenceI18nKey(selectedPresence))}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>{t("admin.friendCount")}</dt>
+                <dd>{formatNumber(userDetail?.player?.friendCount ?? 0)}</dd>
+              </div>
+              <div>
+                <dt>{t("admin.matchLastSeen")}</dt>
+                <dd>{formatWhen(userDetail?.player?.matchLastSeenAt)}</dd>
+              </div>
+              <div>
+                <dt>{t("admin.playerId")}</dt>
+                <dd className="admin-page__mono">{selected.playerId}</dd>
+              </div>
             </dl>
+            {(userDetail?.recentRatedMatches || []).length ? (
+              <ol className="admin-page__rp-history" data-admin-user-recent="true">
+                {userDetail.recentRatedMatches.map((event) => (
+                  <li key={event.matchId} className="admin-page__rp-event">
+                    <div className="admin-page__rp-event-top">
+                      <span className={`admin-page__pill ${event.result === "win" ? "is-ok" : "is-deleted"}`}>
+                        {event.result === "win" ? t("admin.rpWin") : t("admin.rpLoss")}
+                      </span>
+                      <time dateTime={event.settledAt}>{formatWhen(event.settledAt)}</time>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
           </aside>
         </div>
       ) : null}

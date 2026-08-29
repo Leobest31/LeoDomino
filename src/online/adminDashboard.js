@@ -1,11 +1,14 @@
 /**
  * Admin Dashboard V1 client — staff RPCs only. Never uses a service-role key.
  */
+import { STALE_MATCH_GRACE_MS } from "./matchmaking.js";
+import { PRESENCE_ONLINE_GRACE_MS } from "./playerPresence.js";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient.js";
 
 export const ADMIN_PAGE_SIZE = 25;
 export const ADMIN_SEARCH_MAX = 64;
 export const ADMIN_LIVE_POLL_MS = 8000;
+export const ADMIN_PRESENCE_POLL_MS = 20000;
 export const ADMIN_SPECTATOR_POLL_MS = 1500;
 
 export const ADMIN_LIVE_STATUSES = Object.freeze([
@@ -48,7 +51,12 @@ export const ADMIN_USER_FIELDS = Object.freeze([
   "losses",
   "matchesPlayed",
   "inActiveMatch",
+  "matchLastSeenAt",
+  "presenceLastSeenAt",
 ]);
+
+export const ADMIN_ACCOUNT_STATUSES = Object.freeze(["active", "deleted"]);
+export const ADMIN_PRESENCE_STATES = Object.freeze(["online", "in_match", "offline"]);
 
 export const ADMIN_LIVE_PLAYER_FIELDS = Object.freeze([
   "playerId",
@@ -113,6 +121,8 @@ export const ADMIN_SPECTATOR_FIELDS = Object.freeze([
   "lastPlayPoints",
   "lastPlayScoreTerminals",
   "matchWinnerSeat",
+  "turnDeadlineAt",
+  "serverNow",
 ]);
 
 export const OVERVIEW_CARD_IDS = Object.freeze([
@@ -333,7 +343,68 @@ export function normalizeAdminUser(row) {
     losses: asInt(data.losses) ?? 0,
     matchesPlayed: matchesPlayed ?? 0,
     inActiveMatch: asBool(data.in_active_match ?? data.inActiveMatch) === true,
+    matchLastSeenAt: (() => {
+      const seen = data.match_last_seen_at ?? data.matchLastSeenAt ?? null;
+      return seen ? asText(seen) : null;
+    })(),
+    presenceLastSeenAt: (() => {
+      const seen = data.presence_last_seen_at ?? data.presenceLastSeenAt ?? null;
+      return seen ? asText(seen) : null;
+    })(),
   };
+}
+
+/**
+ * Account status is the profile tombstone, never occupancy or heartbeat.
+ */
+export function adminAccountStatus(user) {
+  return user?.deletedAt ? "deleted" : "active";
+}
+
+export function adminAccountStatusI18nKey(status) {
+  return status === "deleted" ? "admin.deleted" : "admin.active";
+}
+
+function ageMs(iso, nowMs) {
+  const seenMs = Date.parse(iso || "");
+  if (!Number.isFinite(seenMs)) return null;
+  const age = nowMs - seenMs;
+  if (!Number.isFinite(age)) return null;
+  return age;
+}
+
+function isFreshOccupancy(user, nowMs) {
+  if (!user?.inActiveMatch) return false;
+  const age = ageMs(user.matchLastSeenAt, nowMs);
+  if (age == null) return true;
+  if (age < 0 || age > STALE_MATCH_GRACE_MS) return false;
+  return true;
+}
+
+function isFreshSignedIn(user, nowMs) {
+  const age = ageMs(user.presenceLastSeenAt, nowMs);
+  if (age == null || age < 0 || age > PRESENCE_ONLINE_GRACE_MS) return false;
+  return true;
+}
+
+/**
+ * Presence:
+ * 1. Deleted => Offline
+ * 2. Stale/missing signed-in heartbeat => Offline (occupancy is not enough)
+ * 3. Fresh heartbeat + fresh occupancy => In Match
+ * 4. Fresh heartbeat => Online
+ */
+export function adminPresenceState(user, nowMs = Date.now()) {
+  if (user?.deletedAt) return "offline";
+  if (!isFreshSignedIn(user, nowMs)) return "offline";
+  if (isFreshOccupancy(user, nowMs)) return "in_match";
+  return "online";
+}
+
+export function adminPresenceI18nKey(presence) {
+  if (presence === "in_match") return "admin.presenceInMatch";
+  if (presence === "online") return "admin.presenceOnline";
+  return "admin.presenceOffline";
 }
 
 /**
@@ -523,6 +594,7 @@ export function shouldApplySpectatorSnapshot(prev, next) {
   if (prev.adminStatus !== next.adminStatus) return true;
   if (prev.sessionUpdatedAt !== next.sessionUpdatedAt) return true;
   if (prev.matchStatus !== next.matchStatus) return true;
+  if (prev.turnDeadlineAt !== next.turnDeadlineAt) return true;
   return false;
 }
 
@@ -555,6 +627,8 @@ export function normalizeAdminSpectatorView(row) {
       data.last_play_score_terminals ?? data.lastPlayScoreTerminals
     ),
     matchWinnerSeat: winner === 0 || winner === 1 ? winner : null,
+    turnDeadlineAt: asText(data.turn_deadline_at ?? data.turnDeadlineAt) || null,
+    serverNow: asText(data.server_now ?? data.serverNow) || null,
   };
   if (hasForbiddenSpectatorKey(view)) return null;
   if ("myHand" in view || "engine_state" in view || "game_secrets" in view) return null;

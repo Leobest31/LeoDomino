@@ -1196,4 +1196,35 @@ function findDrawState(rulesetId) {
   assert.equal(occupancyTouchMissed({ ok: true }), false);
 }
 
+{
+  const { state } = dealOnlineGame({
+    rulesetId: "legacy",
+    playerAId: PLAYER_A,
+    playerBId: PLAYER_B,
+    seed: 1001,
+  });
+  const previous = {
+    ...viewerOf(state, 0, 0),
+    turnDeadlineAt: "2026-08-29T12:01:00.000Z",
+    timeoutStrikes: [1, 0],
+    serverNow: "2026-08-29T12:00:20.000Z",
+    deadlineReceivedAt: "2026-08-29T12:00:20.000Z",
+    deadlineReceivedMono: 9,
+  };
+  const merged = mergeRealtimeSessionView(previous, {
+    table: "game_sessions",
+    new: {
+      version: 0,
+      current_seat: previous.currentSeat,
+      phase: "playing",
+      turn_deadline_at: previous.turnDeadlineAt,
+      timeout_strikes: [1, 0],
+    },
+  });
+  assert.equal(merged.turnDeadlineAt, previous.turnDeadlineAt);
+  assert.deepEqual(merged.timeoutStrikes, [1, 0]);
+  assert.equal(merged.deadlineReceivedMono, 9);
+  console.log("  ✓ realtime merge keeps the server deadline");
+}
+
 console.log("  ✓ online table helpers");

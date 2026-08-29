@@ -168,6 +168,21 @@
   justify-content: space-between;
   gap: var(--space-md);
   margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.admin-page__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.admin-page__copied {
+  margin: 0;
+  color: var(--color-success);
+  font-size: 0.85rem;
 }
 
 .admin-page__header h2 {
@@ -210,8 +225,36 @@
   color: var(--color-text-muted);
 }
 
-.admin-page__card.is-unavailable {
-  border-color: rgba(169, 183, 175, 0.18);
+.admin-page__card-hint {
+  margin: 0.45rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.admin-page__search select,
+.admin-page__search textarea {
+  width: 100%;
+  max-width: 28rem;
+  min-height: 44px;
+  margin: 0.35rem 0 0.85rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  background: rgba(4, 8, 16, 0.9);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+}
+
+.admin-page__search textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.admin-page__search span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
 }
 
 .admin-page__search input {
@@ -223,6 +266,21 @@
   border-radius: 10px;
   border: 1px solid rgba(201, 162, 39, 0.28);
   background: rgba(4, 8, 16, 0.9);
+  color: var(--color-text);
+}
+
+.admin-page__search input[type="checkbox"] {
+  width: auto;
+  min-height: 1.25rem;
+  margin: 0.2rem 0 0;
+}
+
+.admin-page__search label:has(input[type="checkbox"]) {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  max-width: 36rem;
+  margin-bottom: var(--space-md);
   color: var(--color-text);
 }
 
@@ -284,6 +342,33 @@
   background: rgba(196, 92, 74, 0.16);
 }
 
+.admin-page__pill.is-offline {
+  color: var(--color-muted, #9aa3b5);
+  background: rgba(154, 163, 181, 0.14);
+}
+
+.admin-page__pill.is-presence-online {
+  color: #9af0c0;
+  background: rgba(22, 128, 72, 0.34);
+}
+
+.admin-page__pill.is-presence-offline {
+  color: #ffc4b8;
+  background: rgba(168, 42, 36, 0.38);
+}
+
+.admin-page__pill.is-presence-in-match {
+  color: #ffe399;
+  background: rgba(176, 118, 12, 0.4);
+}
+
+.admin-page__hint {
+  margin: 0 0 var(--space-sm);
+  color: var(--color-muted, #9aa3b5);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .admin-page__pager {
   display: flex;
   align-items: center;
@@ -318,6 +403,14 @@
 
 .admin-page__error {
   color: #e08b7a;
+}
+
+.admin-page__error-code {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-word;
 }
 
 .admin-page__drawer-wrap {
@@ -434,6 +527,7 @@
 
 .admin-page__match-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;

@@ -21,18 +21,21 @@ import {
   getAvailableActions,
   passTurn,
   playTile,
+  skipTurn,
   startMatch,
   startNextRound,
 } from "../game/rules/drawDominoes.js";
 import { PHASE } from "../game/rules/constants.js";
 import { HAITIAN_OPENING_TILE_ID } from "../game/rules/haitianStart.js";
 import { resolveRuleset } from "../game/rulesets/index.js";
+import { TIMEOUT_STRIKE_LIMIT, normalizeTimeoutStrikes } from "./turnTimeout.js";
 
 export const ONLINE_RULESET_IDS = Object.freeze(["legacy", "haitian", "american"]);
 export const ONLINE_ACTION_PLAY = "play";
 export const ONLINE_ACTION_DRAW = "draw";
 export const ONLINE_ACTION_PASS = "pass";
 export const ONLINE_ACTION_ADVANCE_ROUND = "advance_round";
+export const ONLINE_ACTION_TIMEOUT = "timeout";
 export const PLAYER_A_SEAT = 0;
 export const PLAYER_B_SEAT = 1;
 
@@ -156,6 +159,8 @@ export function projectPublicSession(state, meta = {}) {
     ),
     roundResult: sanitizeRoundResult(state.roundResult),
     matchWinnerSeat: state.matchWinner ?? null,
+    timeoutStrikes: normalizeTimeoutStrikes(meta.timeoutStrikes),
+    resetTurnDeadline: meta.resetTurnDeadline === true,
   };
 }
 
@@ -246,6 +251,9 @@ export function applyOnlineAction(state, input) {
   if (type === ONLINE_ACTION_PLAY) return applyPlay(state, action);
   if (type === ONLINE_ACTION_DRAW) return applyDrawAction(state, action);
   if (type === ONLINE_ACTION_PASS) return applyPass(state);
+  if (type === ONLINE_ACTION_TIMEOUT) {
+    throw new GameplayError("UNKNOWN_ACTION", "Timeout must use resolveTurnTimeout");
+  }
   throw new GameplayError("UNKNOWN_ACTION", `Unsupported action type: ${type}`);
 }
 
@@ -334,6 +342,156 @@ export function applyAdvanceRound(state, options = {}) {
 
 export function matchStatusForEngine(state) {
   return state.phase === PHASE.MATCH_OVER ? "finished" : "playing";
+}
+
+function applyTimeoutLoss(state, timeoutSeat) {
+  const seat = timeoutSeat === PLAYER_B_SEAT ? PLAYER_B_SEAT : PLAYER_A_SEAT;
+  const winnerSeat = seat === PLAYER_A_SEAT ? PLAYER_B_SEAT : PLAYER_A_SEAT;
+  return {
+    ...state,
+    phase: PHASE.MATCH_OVER,
+    matchWinner: winnerSeat,
+    roundResult: {
+      reason: "timeout",
+      timeoutSeat: seat,
+      winnerIndex: winnerSeat,
+      strike: TIMEOUT_STRIKE_LIMIT,
+      strikeLimit: TIMEOUT_STRIKE_LIMIT,
+    },
+  };
+}
+
+/**
+ * Authoritative timeout resolution. Does not trust a client timestamp.
+ * Legal-move expiry: one strike and skip. Third strike: timeout loss.
+ * No legal move: existing draw/pass path, no strike.
+ */
+export function applyTimeoutResolution(state, options = {}) {
+  if (!state) {
+    throw new GameplayError("MATCH_NOT_FOUND", "Match not found");
+  }
+  if (state.phase === PHASE.MATCH_OVER) {
+    return {
+      state,
+      actionType: ONLINE_ACTION_TIMEOUT,
+      safePayload: { idempotent: true },
+      finishReason: null,
+      resetTurnDeadline: false,
+      timeoutStrikes: normalizeTimeoutStrikes(options.timeoutStrikes),
+      idempotent: true,
+    };
+  }
+  if (state.phase !== PHASE.PLAYING) {
+    throw new GameplayError("ROUND_NOT_ACTIVE", "Round is not active");
+  }
+
+  const seat = state.currentPlayer === PLAYER_B_SEAT ? PLAYER_B_SEAT : PLAYER_A_SEAT;
+  const strikes = normalizeTimeoutStrikes(options.timeoutStrikes);
+  const available = getAvailableActions(state);
+
+  if (!available.canPlay) {
+    let next = state;
+    let draws = 0;
+    let autoPass = false;
+    for (let i = 0; i < 28; i += 1) {
+      const actions = getAvailableActions(next);
+      if (actions.canPlay) break;
+      if (actions.canDraw) {
+        next = drawTile(next);
+        draws += 1;
+        continue;
+      }
+      if (actions.canPass) {
+        next = passTurn(next);
+        autoPass = true;
+        break;
+      }
+      next = skipTurn(next);
+      autoPass = true;
+      break;
+    }
+    const after = getAvailableActions(next);
+    const resetTurnDeadline = next.phase === PHASE.PLAYING && next.currentPlayer === seat && after.canPlay;
+    return {
+      state: {
+        ...next,
+        roundResult:
+          next.phase === PHASE.PLAYING
+            ? {
+                reason: "timeout_auto",
+                timedOutSeat: seat,
+                strike: strikes[seat],
+                strikeLimit: TIMEOUT_STRIKE_LIMIT,
+                autoDraw: draws,
+                autoPass,
+              }
+            : next.roundResult,
+      },
+      actionType: ONLINE_ACTION_TIMEOUT,
+      safePayload: {
+        timedOutSeat: seat,
+        strike: 0,
+        strikes,
+        autoDraw: draws,
+        autoPass,
+        matchOver: next.phase === PHASE.MATCH_OVER,
+      },
+      finishReason: next.phase === PHASE.MATCH_OVER ? "completed" : null,
+      resetTurnDeadline,
+      timeoutStrikes: strikes,
+      idempotent: false,
+    };
+  }
+
+  const nextStrikes = strikes.slice();
+  nextStrikes[seat] += 1;
+  if (nextStrikes[seat] >= TIMEOUT_STRIKE_LIMIT) {
+    const lost = applyTimeoutLoss(state, seat);
+    return {
+      state: lost,
+      actionType: ONLINE_ACTION_TIMEOUT,
+      safePayload: {
+        timedOutSeat: seat,
+        strike: nextStrikes[seat],
+        strikes: nextStrikes,
+        matchOver: true,
+      },
+      finishReason: "timeout",
+      resetTurnDeadline: false,
+      timeoutStrikes: nextStrikes,
+      idempotent: false,
+    };
+  }
+
+  const skipped = skipTurn(state);
+  return {
+    state: {
+      ...skipped,
+      roundResult: {
+        reason: "timeout_pass",
+        timedOutSeat: seat,
+        strike: nextStrikes[seat],
+        strikeLimit: TIMEOUT_STRIKE_LIMIT,
+      },
+    },
+    actionType: ONLINE_ACTION_TIMEOUT,
+    safePayload: {
+      timedOutSeat: seat,
+      strike: nextStrikes[seat],
+      strikes: nextStrikes,
+      autoPass: true,
+      matchOver: false,
+    },
+    finishReason: null,
+    resetTurnDeadline: false,
+    timeoutStrikes: nextStrikes,
+    idempotent: false,
+  };
+}
+
+export function isTimeoutView(view) {
+  const reason = view?.roundResult?.reason;
+  return reason === "timeout" || reason === "timeout_pass" || reason === "timeout_auto";
 }
 
 /**

@@ -3,6 +3,7 @@
  * Run: node src/online/gameAuthority.test.js
  */
 import assert from "node:assert/strict";
+import { skipTurn } from "../game/rules/drawDominoes.js";
 import {
   HAITIAN_OPENING_TILE_ID,
   ONLINE_ACTION_DRAW,
@@ -14,6 +15,7 @@ import {
   applyOnlineAction,
   applyAdvanceRound,
   applyOnlineForfeit,
+  applyTimeoutResolution,
   assertViewHidesOpponent,
   createServerSeed,
   dealOnlineGame,
@@ -369,6 +371,78 @@ function view(state, seat, version = 0) {
   assert.equal(isForfeitView(viewB), true);
   assert.equal(viewB.matchWinnerSeat, PLAYER_B_SEAT);
   console.log("  ✓ forfeit awards opponent and is idempotent");
+}
+
+{
+  const { state } = deal("legacy");
+  const before = state.currentPlayer;
+  const skipped = skipTurn(state);
+  assert.equal(skipped.consecutivePasses, 0);
+  assert.notEqual(skipped.currentPlayer, before);
+  assert.equal(skipped.phase, "playing");
+  console.log("  ✓ skipTurn advances seat without a blocked-round pass");
+}
+
+{
+  const { state } = deal("legacy");
+  const seat = state.currentPlayer;
+  assert.equal(getAvailableActions(state).canPlay, true);
+  const first = applyTimeoutResolution(state, { timeoutStrikes: [0, 0] });
+  assert.equal(first.timeoutStrikes[seat], 1);
+  assert.equal(first.state.roundResult.reason, "timeout_pass");
+  assert.equal(first.finishReason, null);
+  assert.notEqual(first.state.currentPlayer, seat);
+
+  const secondState = { ...first.state, currentPlayer: seat, phase: "playing" };
+  const second = applyTimeoutResolution(secondState, { timeoutStrikes: first.timeoutStrikes });
+  assert.equal(second.timeoutStrikes[seat], 2);
+  assert.equal(second.state.roundResult.reason, "timeout_pass");
+
+  const thirdState = { ...second.state, currentPlayer: seat, phase: "playing" };
+  const third = applyTimeoutResolution(thirdState, { timeoutStrikes: second.timeoutStrikes });
+  assert.equal(third.timeoutStrikes[seat], 3);
+  assert.equal(third.finishReason, "timeout");
+  assert.equal(third.state.phase, "matchOver");
+  assert.equal(third.state.matchWinner, seat === 0 ? 1 : 0);
+  assert.equal(third.state.roundResult.reason, "timeout");
+
+  const again = applyTimeoutResolution(third.state, { timeoutStrikes: third.timeoutStrikes });
+  assert.equal(again.idempotent, true);
+  console.log("  ✓ timeout strikes then authoritative timeout loss");
+}
+
+{
+  const { state } = deal("legacy");
+  const move = getAvailableActions(state).legalMoves[0];
+  const afterPlay = applyOnlineAction(state, {
+    seat: state.currentPlayer,
+    action: { type: "play", tileId: move.tileId, end: move.end },
+  }).state;
+  const seat = afterPlay.currentPlayer;
+  const candidates = ["0-0", "0-1", "0-2", "1-1", "1-2", "2-2"];
+  let blocked = null;
+  for (const tileId of candidates) {
+    const next = {
+      ...afterPlay,
+      mustPlayTileId: null,
+      reserve: [],
+      players: afterPlay.players.map((player, index) =>
+        index === seat ? { ...player, hand: [tileId] } : player
+      ),
+    };
+    const available = getAvailableActions(next);
+    if (!available.canPlay) {
+      blocked = next;
+      break;
+    }
+  }
+  assert.ok(blocked, "expected an unplayable constructed hand");
+  const strikesBefore = [1, 2];
+  const resolved = applyTimeoutResolution(blocked, { timeoutStrikes: strikesBefore });
+  assert.deepEqual(resolved.timeoutStrikes, strikesBefore);
+  assert.equal(resolved.safePayload.strike, 0);
+  assert.notEqual(resolved.state.roundResult?.reason, "timeout_pass");
+  console.log("  ✓ no legal move does not add a timeout strike");
 }
 
 console.log("  ✓ gameAuthority");
