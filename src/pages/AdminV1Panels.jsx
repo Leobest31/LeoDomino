@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconClose } from "../components/Icon";
-import { ADMIN_ERROR, ADMIN_PAGE_SIZE } from "../online/adminDashboard.js";
+import { ADMIN_PAGE_SIZE, adminErrorI18nKey } from "../online/adminDashboard.js";
 import {
   ADMIN_CHALLENGE_STATUSES,
   ADMIN_REPORT_STATUSES,
@@ -25,9 +25,8 @@ function postgresErrorCode(error) {
 }
 
 function errorMessageKey(error, fallback = "admin.loadError") {
-  if (error?.code === ADMIN_ERROR.AUTH) return "admin.signInRequired";
-  if (error?.code === ADMIN_ERROR.FORBIDDEN) return "admin.accessDeniedBody";
-  if (error?.code === ADMIN_ERROR.UNAVAILABLE) return "admin.unavailable";
+  const mapped = adminErrorI18nKey(error, "");
+  if (mapped) return mapped;
   const pg = postgresErrorCode(error);
   const msg = String(error?.message || "");
   if (pg === "22023" || /reason required|invalid challenge status/i.test(msg)) {

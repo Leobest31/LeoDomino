@@ -181,6 +181,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     view,
     viewRef,
     busy,
+    serviceOutage,
     playTile,
     draw,
     pass,
@@ -234,7 +235,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   }, [matchId]);
 
   const legalMoves = useMemo(() => view?.legalMoves ?? [], [view]);
-  const isHumanTurn = isInteractableTurn(view);
+  const isHumanTurn = !serviceOutage && isInteractableTurn(view);
   const awaitingInteraction = isViewerTurn(view) && !hasCoherentInteraction(view);
   const matchOver = view?.phase === PHASE.MATCH_OVER || view?.status === "match_over";
   const roundOver = view?.phase === PHASE.ROUND_OVER || view?.status === "round_over";
@@ -691,6 +692,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     return t("online.opponentTurn", { name: rivalName });
   })();
   const tableStatus = (() => {
+    if (serviceOutage) return t("online.serviceUnavailable");
     if (matchOver || roundOver || timerSeconds == null) return humanStatus;
     if (timerTone === "pending") return t("online.timeoutPending");
     return `${humanStatus} · ${timerSeconds}`;
@@ -732,6 +734,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         matchOver ? " game-page--match-over" : ""
       }`}
       data-online-table="true"
+      data-online-outage={serviceOutage ? "true" : "false"}
       data-online-match-id={view.matchId}
       data-online-ruleset={rulesetId}
       data-online-version={view.version}
@@ -837,7 +840,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
           />
         </div>
 
-        {errorKey ? (
+        {errorKey && !serviceOutage ? (
           <p className="game-table__status" data-online-error={errorKey}>
             {t(errorKey)}
           </p>
@@ -862,7 +865,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
             playerNames={playerNames}
             status={tableStatus}
             statusActive={isHumanTurn}
-            statusTone={matchOver || roundOver ? "" : timerTone}
+            statusTone={matchOver || roundOver || serviceOutage ? "" : timerTone}
             rulesetId={rulesetId}
             dock={
               <div className="game-page__dock" data-hand-dock>

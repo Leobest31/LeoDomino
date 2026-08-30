@@ -4,10 +4,10 @@ import { resolvePlayerAvatar } from "../auth/avatars.media.js";
 import { IconClose } from "../components/Icon";
 import { gameStyleForRulesetId } from "../game/rulesets/registry.js";
 import {
-  ADMIN_ERROR,
   ADMIN_LIVE_POLL_MS,
   ADMIN_PAGE_SIZE,
   ADMIN_PRESENCE_POLL_MS,
+  adminErrorI18nKey,
   adminAccountStatus,
   adminAccountStatusI18nKey,
   adminPresenceI18nKey,
@@ -29,10 +29,7 @@ import "./AdminPage.css";
 const NAV = ADMIN_V1_NAV;
 
 function errorMessageKey(error) {
-  if (error?.code === ADMIN_ERROR.AUTH) return "admin.signInRequired";
-  if (error?.code === ADMIN_ERROR.FORBIDDEN) return "admin.accessDeniedBody";
-  if (error?.code === ADMIN_ERROR.UNAVAILABLE) return "admin.unavailable";
-  return "admin.loadError";
+  return adminErrorI18nKey(error);
 }
 
 function AdminBackBar({ onBack }) {

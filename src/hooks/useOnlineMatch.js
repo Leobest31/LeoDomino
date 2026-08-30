@@ -44,12 +44,24 @@ import {
 } from "../online/onlineTable.js";
 import { createOnlineMoveTrace, isOnlineMoveTraceEnabled } from "../online/onlineMoveTrace.js";
 import { isTurnDeadlineExpired } from "../online/turnTimeout.js";
+import { planTimeoutTick } from "../online/timeoutFreeze.js";
+import {
+  emptyServiceHealthState,
+  noteServiceFailure,
+  noteServiceSuccess,
+  planOutageHealthTick,
+  SERVICE_OUTAGE_I18N_KEY,
+  shouldDisableGameplayActions,
+  shouldSuppressTimeoutResolve,
+  stampOutageRetry,
+} from "../online/serviceHealth.js";
 
 export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const [view, setView] = useState(null);
   const [status, setStatus] = useState(matchId ? "loading" : "error");
   const [errorKey, setErrorKey] = useState(matchId ? "" : "online.notFound");
   const [busy, setBusy] = useState(false);
+  const [serviceOutage, setServiceOutage] = useState(false);
   const viewRef = useRef(null);
   const matchIdRef = useRef(matchId);
   const inflightRef = useRef(0);
@@ -62,6 +74,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const refreshQueuedRef = useRef(false);
   const roundAdvanceAtVersionRef = useRef(-1);
   const timeoutInFlightRef = useRef(false);
+  const serviceHealthRef = useRef(emptyServiceHealthState());
 
   matchIdRef.current = matchId;
 
@@ -92,6 +105,18 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     return kept;
   }, [rulesetId]);
 
+  const markServiceResult = useCallback((error) => {
+    const current = serviceHealthRef.current;
+    const next = error ? noteServiceFailure(current, error) : noteServiceSuccess(current);
+    serviceHealthRef.current = next;
+    if (next.outage !== current.outage) setServiceOutage(next.outage);
+    if (next.outage && !unmountedRef.current) setErrorKey(SERVICE_OUTAGE_I18N_KEY);
+    if (!next.outage && !error && !unmountedRef.current) {
+      setErrorKey((key) => (key === SERVICE_OUTAGE_I18N_KEY ? "" : key));
+    }
+    return next;
+  }, []);
+
   const refreshView = useCallback(async () => {
     const id = matchIdRef.current;
     if (!id) return null;
@@ -105,10 +130,14 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       do {
         refreshQueuedRef.current = false;
         last = asViewerSnapshot(await getGameView(id));
+        markServiceResult(null);
         if (unmountedRef.current) return last;
         applyView(last, { force: isMatchOverView(last) });
       } while (refreshQueuedRef.current && !unmountedRef.current);
       return last;
+    } catch (error) {
+      markServiceResult(error);
+      throw error;
     } finally {
       refreshInFlightRef.current = false;
       if (refreshQueuedRef.current && !unmountedRef.current) {
@@ -117,7 +146,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         });
       }
     }
-  }, [applyView]);
+  }, [applyView, markServiceResult]);
 
   const boot = useCallback(async () => {
     const id = matchIdRef.current;
@@ -136,6 +165,8 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     refreshInFlightRef.current = false;
     refreshQueuedRef.current = false;
     roundAdvanceAtVersionRef.current = -1;
+    serviceHealthRef.current = emptyServiceHealthState();
+    setServiceOutage(false);
     try {
       let next;
       try {
@@ -153,13 +184,17 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       }
       if (unmountedRef.current) return;
       applyView(next, { force: isMatchOverView(next) });
+      markServiceResult(null);
       setStatus("ready");
     } catch (error) {
       if (unmountedRef.current) return;
-      setStatus("error");
-      setErrorKey(onlineErrorKey(error));
+      markServiceResult(error);
+      setStatus(viewRef.current ? "ready" : "error");
+      setErrorKey(
+        serviceHealthRef.current.outage ? SERVICE_OUTAGE_I18N_KEY : onlineErrorKey(error)
+      );
     }
-  }, [applyView]);
+  }, [applyView, markServiceResult]);
 
   useEffect(() => {
     unmountedRef.current = false;
@@ -175,6 +210,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     let cancelled = false;
     const beat = () => {
       if (cancelled || isMatchOverView(viewRef.current)) return;
+      if (shouldDisableGameplayActions(serviceHealthRef.current)) return;
       touchMyMatchPresence(matchId)
         .then((result) => {
           if (cancelled || isMatchOverView(viewRef.current)) return;
@@ -184,8 +220,8 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
             });
           }
         })
-        .catch(() => {
-          /* presence is best-effort until the stale-occupancy RPC exists */
+        .catch((error) => {
+          markServiceResult(error);
         });
     };
     beat();
@@ -199,7 +235,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [matchId, refreshView, status]);
+  }, [matchId, refreshView, status, markServiceResult]);
 
   useEffect(() => {
     if (!matchId || status !== "ready") return undefined;
@@ -216,6 +252,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         /* still consider refresh */
       }
       if (
+        serviceHealthRef.current.outage ||
         !shouldRefreshViewerAfterRealtime(previous, merged, {
           busy: busyRef.current,
           inFlightBaseVersion: inFlightBaseVersionRef.current,
@@ -241,7 +278,9 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const runAction = useCallback(
     async (submit, traceKind = "action") => {
       const current = viewRef.current;
+      const health = serviceHealthRef.current;
       if (!current?.matchId || busyRef.current) return false;
+      if (shouldDisableGameplayActions(health)) return false;
       const token = ++inflightRef.current;
       busyRef.current = true;
       inFlightBaseVersionRef.current = viewVersion(current);
@@ -264,7 +303,10 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         if (unmountedRef.current || token !== inflightRef.current) return false;
         if (timed?.timeout) {
           trace.mark("timeout");
-          setErrorKey("online.error");
+          markServiceResult({ name: "TimeoutError", timeout: true, message: "timeout" });
+          setErrorKey(
+            serviceHealthRef.current.outage ? SERVICE_OUTAGE_I18N_KEY : "online.error"
+          );
           try {
             await refreshView();
           } catch {
@@ -279,6 +321,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
           Object.assign(trace.marks, timed.payload._timings);
         }
         applyView(next, { force: true });
+        markServiceResult(null);
         trace.mark("viewApplied");
         trace.finish({
           outcome: "ok",
@@ -299,7 +342,10 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
             /* fall through */
           }
         }
-        setErrorKey(onlineErrorKey(error));
+        markServiceResult(error);
+        setErrorKey(
+          serviceHealthRef.current.outage ? SERVICE_OUTAGE_I18N_KEY : onlineErrorKey(error)
+        );
         try {
           await refreshView();
         } catch {
@@ -315,7 +361,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         }
       }
     },
-    [applyView, refreshView]
+    [applyView, refreshView, markServiceResult]
   );
 
   const playTile = useCallback(
@@ -366,6 +412,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const resolveTimeout = useCallback(async () => {
     const current = viewRef.current;
     if (!current || timeoutInFlightRef.current) return false;
+    if (shouldSuppressTimeoutResolve(serviceHealthRef.current)) return false;
     if (isMatchOverView(current) || current.phase !== "playing") return false;
     if (!isTurnDeadlineExpired(current)) return false;
     timeoutInFlightRef.current = true;
@@ -389,12 +436,17 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         }
         return true;
       }
+      markServiceResult(error);
+      if (serviceHealthRef.current.outage) {
+        if (!unmountedRef.current) setErrorKey(SERVICE_OUTAGE_I18N_KEY);
+        return false;
+      }
       if (!unmountedRef.current) setErrorKey(onlineErrorKey(error));
       return false;
     } finally {
       timeoutInFlightRef.current = false;
     }
-  }, [applyView, refreshView]);
+  }, [applyView, refreshView, markServiceResult]);
 
   const roundPhase = view?.phase;
   const roundStatus = view?.status;
@@ -417,8 +469,12 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     if (!turnDeadlineAt || roundPhase !== "playing") return undefined;
     const tick = () => {
       const current = viewRef.current;
-      if (!current || current.phase !== "playing") return;
-      if (isTurnDeadlineExpired(current)) void resolveTimeout();
+      const planned = planTimeoutTick(current, {
+        inFlight: timeoutInFlightRef.current,
+        nowMs: Date.now(),
+        serviceOutage: shouldSuppressTimeoutResolve(serviceHealthRef.current),
+      });
+      if (planned.action === "resolve") void resolveTimeout();
     };
     tick();
     const intervalId = window.setInterval(tick, 250);
@@ -431,6 +487,21 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       window.removeEventListener("focus", onVis);
     };
   }, [status, turnDeadlineAt, roundPhase, roundVersion, resolveTimeout]);
+
+  useEffect(() => {
+    if (status !== "ready" || !serviceOutage) return undefined;
+    const tick = () => {
+      const planned = planOutageHealthTick(serviceHealthRef.current, Date.now());
+      if (planned.action !== "refresh") return;
+      serviceHealthRef.current = stampOutageRetry(serviceHealthRef.current, Date.now());
+      void refreshView().catch(() => {
+        /* keep last authoritative view */
+      });
+    };
+    tick();
+    const intervalId = window.setInterval(tick, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [status, serviceOutage, refreshView]);
 
   const setDragLock = useCallback(
     (locked) => {
@@ -511,6 +582,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     view,
     viewRef,
     busy,
+    serviceOutage,
     playTile,
     draw,
     pass,

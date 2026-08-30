@@ -794,6 +794,8 @@ export function onlineErrorKey(error) {
     case "AUTH_REQUIRED":
     case "AUTH":
       return "online.auth";
+    case "SERVICE_UNAVAILABLE":
+      return "online.serviceUnavailable";
     case "STALE_VERSION":
     case "TIMEOUT_NOT_DUE":
       return "online.stale";

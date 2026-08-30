@@ -20,7 +20,10 @@ function clientOf(client) {
 
 function throwFromFunctions(error, fallback) {
   const code = error?.context?.code || error?.code || fallback;
-  throw new GameplayClientError(code, error?.message || fallback, error);
+  const wrapped = new GameplayClientError(code, error?.message || fallback, error);
+  const status = Number(error?.context?.status || error?.status || error?.cause?.status);
+  if (Number.isInteger(status) && status >= 100) wrapped.status = status;
+  throw wrapped;
 }
 
 async function invoke(op, payload, client) {

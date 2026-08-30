@@ -3,6 +3,7 @@
  */
 import { STALE_MATCH_GRACE_MS } from "./matchmaking.js";
 import { PRESENCE_ONLINE_GRACE_MS } from "./playerPresence.js";
+import { isInfrastructureOutageError } from "./serviceHealth.js";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient.js";
 
 export const ADMIN_PAGE_SIZE = 25;
@@ -24,6 +25,7 @@ export const ADMIN_ERROR = Object.freeze({
   UNAVAILABLE: "unavailable",
   AUTH: "auth",
   FORBIDDEN: "forbidden",
+  BACKEND: "backend",
   GENERIC: "generic",
 });
 
@@ -198,7 +200,18 @@ function throwFromError(error) {
   if (/does not exist|42883|PGRST202/i.test(`${msg} ${code}`)) {
     throw new AdminError(ADMIN_ERROR.UNAVAILABLE, msg, error);
   }
+  if (isInfrastructureOutageError(error) || code === "PGRST003") {
+    throw new AdminError(ADMIN_ERROR.BACKEND, msg, error);
+  }
   throw new AdminError(ADMIN_ERROR.GENERIC, msg, error);
+}
+
+export function adminErrorI18nKey(error, fallback = "admin.loadError") {
+  if (error?.code === ADMIN_ERROR.AUTH) return "admin.signInRequired";
+  if (error?.code === ADMIN_ERROR.FORBIDDEN) return "admin.accessDeniedBody";
+  if (error?.code === ADMIN_ERROR.UNAVAILABLE) return "admin.unavailable";
+  if (error?.code === ADMIN_ERROR.BACKEND) return "admin.backendUnavailable";
+  return fallback;
 }
 
 function pipValue(value) {

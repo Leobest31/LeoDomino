@@ -2,6 +2,7 @@
  * Admin Dashboard V1 remaining staff RPCs. Never uses a service-role key.
  */
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient.js";
+import { isInfrastructureOutageError } from "./serviceHealth.js";
 import {
   ADMIN_ERROR,
   ADMIN_PAGE_SIZE,
@@ -87,6 +88,9 @@ function throwFromError(error) {
   }
   if (/does not exist|42883|PGRST202/i.test(`${msg} ${code}`)) {
     throw new AdminError(ADMIN_ERROR.UNAVAILABLE, msg, error);
+  }
+  if (isInfrastructureOutageError(error) || code === "PGRST003") {
+    throw new AdminError(ADMIN_ERROR.BACKEND, msg, error);
   }
   throw new AdminError(ADMIN_ERROR.GENERIC, msg, error);
 }

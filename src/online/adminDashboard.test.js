@@ -22,6 +22,7 @@ import {
   ADMIN_RP_EVENT_FIELDS,
   ADMIN_USER_FIELDS,
   AdminError,
+  adminErrorI18nKey,
   buildAdminLiveMatchListPayload,
   buildAdminRpHistoryPayload,
   buildAdminTopRpPayload,
@@ -616,6 +617,39 @@ assert.equal(ADMIN_PAGE_SIZE, 25);
     },
   };
   await assert.rejects(() => fetchAdminOverview(client), (error) => error.code === ADMIN_ERROR.UNAVAILABLE);
+}
+
+{
+  const client = {
+    async rpc() {
+      return {
+        data: null,
+        error: {
+          status: 504,
+          code: "PGRST003",
+          message: "Timed out acquiring connection from connection pool.",
+        },
+      };
+    },
+  };
+  await assert.rejects(() => fetchAdminOverview(client), (error) => error.code === ADMIN_ERROR.BACKEND);
+}
+
+{
+  const client = {
+    async rpc() {
+      return { data: null, error: { status: 503, message: "upstream connect error" } };
+    },
+  };
+  await assert.rejects(() => fetchAdminOverview(client), (error) => error.code === ADMIN_ERROR.BACKEND);
+}
+
+{
+  assert.equal(adminErrorI18nKey({ code: ADMIN_ERROR.BACKEND }), "admin.backendUnavailable");
+  assert.equal(adminErrorI18nKey({ code: ADMIN_ERROR.AUTH }), "admin.signInRequired");
+  assert.equal(adminErrorI18nKey({ code: ADMIN_ERROR.FORBIDDEN }), "admin.accessDeniedBody");
+  assert.equal(adminErrorI18nKey({ code: ADMIN_ERROR.UNAVAILABLE }), "admin.unavailable");
+  assert.equal(adminErrorI18nKey({ code: ADMIN_ERROR.GENERIC }), "admin.loadError");
 }
 
 {

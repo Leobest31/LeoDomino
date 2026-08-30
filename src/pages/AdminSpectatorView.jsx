@@ -12,8 +12,8 @@ import {
   resolveGameplayLayout,
 } from "../ui/gameplayLayout.js";
 import {
-  ADMIN_ERROR,
   ADMIN_SPECTATOR_POLL_MS,
+  adminErrorI18nKey,
   fetchAdminLiveMatchView,
   isAdminSpectatorEnded,
   liveMatchStatusKey,
@@ -76,10 +76,7 @@ function useGameplayLayout(layoutOptions = {}) {
 }
 
 function errorMessageKey(error) {
-  if (error?.code === ADMIN_ERROR.AUTH) return "admin.signInRequired";
-  if (error?.code === ADMIN_ERROR.FORBIDDEN) return "admin.accessDeniedBody";
-  if (error?.code === ADMIN_ERROR.UNAVAILABLE) return "admin.unavailable";
-  return "admin.loadError";
+  return adminErrorI18nKey(error);
 }
 
 function playerLabel(player) {
