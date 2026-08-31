@@ -4,7 +4,7 @@
  * The server remains the match authority.
  */
 
-export const SERVICE_OUTAGE_HTTP = Object.freeze([502, 503, 504, 525]);
+export const SERVICE_OUTAGE_HTTP = Object.freeze([502, 503, 504, 521, 525]);
 export const SERVICE_OUTAGE_CODE = "PGRST003";
 export const SERVICE_UNAVAILABLE_CODE = "SERVICE_UNAVAILABLE";
 export const SERVICE_OUTAGE_I18N_KEY = "online.serviceUnavailable";
@@ -56,7 +56,7 @@ export function httpStatusFromError(error) {
     if (Number.isInteger(n) && n >= 100) return n;
   }
   const msg = `${asText(error?.message)} ${asText(error?.cause?.message)} ${asText(error?.code)}`;
-  const match = msg.match(/\b(502|503|504|525)\b/);
+  const match = msg.match(/\b(502|503|504|521|525)\b/);
   return match ? Number(match[1]) : 0;
 }
 

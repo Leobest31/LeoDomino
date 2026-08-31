@@ -18,11 +18,15 @@ import {
   cancelMatchRequest,
   createMatchRequest,
   getMatchWithPlayers,
+  getMyActiveMatch,
   isOwnMatchRequest,
   isStaleMatchAcceptError,
   loadFindMatchBoard,
   subscribeMatchRequests,
 } from "../online/matchmaking.js";
+import { canRecoverMatch, decideMatchRecovery } from "../online/matchRecovery.js";
+import { isNotedTerminalMatch } from "../online/terminalMatchMemory.js";
+import { isReservedNotStarted } from "../online/joinTimeout.js";
 import { useFriendsBoard } from "../hooks/useFriends.js";
 import FriendButton from "../components/FriendButton";
 import "./FindMatchPage.css";
@@ -138,37 +142,66 @@ function FindMatchPage({ onBack, onMainMenu, onEnterMatch }) {
     fn?.();
   };
 
+  const applyMatched = (match) => {
+    if (!canRecoverMatch(match)) return false;
+    matchedRef.current = match;
+    setMatched(match);
+    markEnteredOnline(match.id);
+    return true;
+  };
+
+  const clearMatched = () => {
+    matchedRef.current = null;
+    setMatched(null);
+  };
+
   const refresh = useCallback(async () => {
     if (!onlineReady) {
       setState("unavailable");
       return;
     }
     try {
-      const board = await loadFindMatchBoard(playerId);
+      let occupancyUnknown = false;
+      let occupancyMatch = null;
+      const [board] = await Promise.all([
+        loadFindMatchBoard(playerId),
+        getMyActiveMatch()
+          .then((match) => {
+            occupancyMatch = match;
+          })
+          .catch(() => {
+            occupancyUnknown = true;
+          }),
+      ]);
       const nextOwn = withSessionIdentity(board.own, session);
       const nextOpen = (board.open ?? []).map((row) => withSessionIdentity(row, session));
+      const acceptedMatchId = nextOwn?.status === "accepted" ? nextOwn.matchId : null;
+      let hydratedAcceptedMatch;
       if (
-        ownStatusRef.current === "open" &&
-        nextOwn?.status === "accepted" &&
-        nextOwn.matchId &&
-        !matchedRef.current
+        occupancyUnknown &&
+        !canRecoverMatch(matchedRef.current) &&
+        acceptedMatchId &&
+        !isNotedTerminalMatch(acceptedMatchId)
       ) {
         try {
-          const match = await getMatchWithPlayers(nextOwn.matchId);
-          matchedRef.current = match;
-          setMatched(match);
-          markEnteredOnline(match?.id || nextOwn.matchId);
+          hydratedAcceptedMatch = await getMatchWithPlayers(acceptedMatchId);
         } catch {
-          const fallback = {
-            id: nextOwn.matchId,
-            styleId: nextOwn.styleId,
-            rulesetId: nextOwn.rulesetId,
-            host: nextOwn.creator,
-          };
-          matchedRef.current = fallback;
-          setMatched(fallback);
-          markEnteredOnline(fallback.id);
+          hydratedAcceptedMatch = undefined;
         }
+      }
+      const wasWaiting = isReservedNotStarted(matchedRef.current);
+      const decision = decideMatchRecovery({
+        occupancyUnknown,
+        occupancyMatch,
+        lastKnown: matchedRef.current,
+        acceptedMatchId,
+        hydratedAcceptedMatch,
+      });
+      if (decision.kind === "resume" || decision.kind === "keep") {
+        if (decision.match) applyMatched(decision.match);
+      } else {
+        clearMatched();
+        if (wasWaiting) setNotice("joinTimeout");
       }
       ownStatusRef.current = nextOwn?.status ?? null;
       setOwn(nextOwn);
@@ -256,8 +289,10 @@ function FindMatchPage({ onBack, onMainMenu, onEnterMatch }) {
           playerId,
           creatorId: request.creatorId,
         });
-        matchedRef.current = match;
-        setMatched(match);
+        if (!applyMatched(match)) {
+          setState("list");
+          return;
+        }
         setState("matched");
         addSafeBreadcrumb("accepted request", {
           screen: "findMatch",
@@ -303,7 +338,7 @@ function FindMatchPage({ onBack, onMainMenu, onEnterMatch }) {
   };
 
   const handleEnterTable = () => {
-    if (!matched?.id || busy) return;
+    if (!canRecoverMatch(matched) || busy) return;
     tap(() => {
       addSafeBreadcrumb("enter live table", {
         screen: "findMatch",

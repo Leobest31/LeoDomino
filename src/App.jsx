@@ -12,10 +12,13 @@ import GamePage from "./pages/GamePage";
 import OnlineGamePage from "./pages/OnlineGamePage";
 import {
   cleanupStaleOccupiedMatches,
-  getMatchWithPlayers,
+  getMyActiveMatch,
   sendFriendMatchInvite,
   friendInviteErrorKey,
 } from "./online/matchmaking.js";
+import { canRecoverMatch, decideHomeSessionRecovery } from "./online/matchRecovery.js";
+import { isNotedTerminalMatch } from "./online/terminalMatchMemory.js";
+import { useActiveOnlineMatch } from "./hooks/useActiveOnlineMatch.js";
 import { capturePendingReferralFromWindow } from "./online/referrals.js";
 import { ONLINE_MODE, lockedRulesetId, readOnlineSession, clearOnlineSession } from "./online/onlineTable.js";
 import { useOwnFriendsPresence } from "./hooks/useFriends.js";
@@ -49,6 +52,7 @@ function App() {
   const recoveredOnlineRef = useRef(false);
   const friendInviteBusyRef = useRef(false);
   const [staffRole, setStaffRole] = useState(null);
+  const activeOnline = useActiveOnlineMatch({ enabled: playable });
   useOwnFriendsPresence();
   usePlayerPresence();
 
@@ -135,27 +139,37 @@ function App() {
     }
     recoveredOnlineRef.current = true;
     let cancelled = false;
-    cleanupStaleOccupiedMatches()
-      .catch(() => 0)
-      .then(() => getMatchWithPlayers(saved.matchId))
+    if (isNotedTerminalMatch(saved.matchId)) {
+      clearOnlineSession();
+      return undefined;
+    }
+    getMyActiveMatch()
       .then((match) => {
-        if (cancelled || !match?.id) return;
-        if (match.status === "aborted") {
-          clearOnlineSession();
-          return;
-        }
+        if (cancelled) return;
+        const decision = decideHomeSessionRecovery({
+          savedMatchId: saved.matchId,
+          occupancyUnknown: false,
+          occupancyMatch: match,
+        });
+        if (decision.clearSession) clearOnlineSession();
+        if (!decision.enter || !decision.match) return;
         setMatchOptions({
           mode: ONLINE_MODE,
-          matchId: match.id,
-          rulesetId: lockedRulesetId(match.rulesetId),
-          host: match.host,
-          opponent: match.opponent,
+          matchId: decision.match.id,
+          rulesetId: lockedRulesetId(decision.match.rulesetId),
+          host: decision.match.host,
+          opponent: decision.match.opponent,
         });
         setGameKey((key) => key + 1);
         setPhase("game");
       })
       .catch(() => {
-        /* stay on Home if the stored match cannot be resolved */
+        const decision = decideHomeSessionRecovery({
+          savedMatchId: saved.matchId,
+          occupancyUnknown: true,
+          occupancyMatch: null,
+        });
+        if (decision.clearSession) clearOnlineSession();
       });
     return () => {
       cancelled = true;
@@ -211,6 +225,7 @@ function App() {
   const handleEnterOnlineMatch = (match) => {
     const matchId = match?.matchId || match?.id;
     if (!matchId) return;
+    if (match?.status && !canRecoverMatch({ ...match, id: matchId })) return;
     setMatchOptions({
       mode: ONLINE_MODE,
       matchId,
@@ -279,6 +294,7 @@ function App() {
           onChat={() => openChat(null, "home")}
           onOpenChat={(focus) => openChat(focus, "home")}
           onEnterMatch={handleEnterOnlineMatch}
+          activeOnlineMatch={activeOnline.match}
           onOpenChallenge={() => setPhase("challenge")}
           onResume={handleResume}
           showAdmin={typeof staffRole === "string"}

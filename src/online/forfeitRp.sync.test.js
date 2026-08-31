@@ -109,11 +109,12 @@ const PLAYER_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
   assert.match(leave, /getGameView\(id\)/);
   assert.match(leave, /applyForfeitTerminalFields/);
   assert.match(leave, /applyView\(next, \{ force: true \}\)/);
-  assert.doesNotMatch(
+  assert.match(
     afterSettle,
     /clearOnlineSession\(\)/,
-    "forfeiter stays on the table for the result report"
+    "successful forfeit drops session restore so Home cannot resume the terminal match"
   );
+  assert.match(afterSettle, /noteTerminalMatch\(id\)/);
   assert.match(hook, /occupancyTouchMissed\(result\)/);
   assert.match(hook, /force: isMatchOverView\(merged\)/);
   assert.match(hook, /force: isMatchOverView\(last\)/);
@@ -138,12 +139,8 @@ const PLAYER_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 }
 
 {
-  assert.match(app, /match.status === "aborted"/);
-  assert.doesNotMatch(
-    app,
-    /match.status === "aborted" \|\| match.status === "finished"/,
-    "finished forfeit matches restore so both clients can still see the report"
-  );
+  assert.match(app, /canRecoverMatch/);
+  assert.doesNotMatch(app, /match.status === "aborted"/);
 }
 
 console.log("  ✓ forfeit RP sync (both clients, rated/unrated display, occupancy miss)");

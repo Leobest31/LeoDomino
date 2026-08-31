@@ -47,6 +47,7 @@ import { useFriendsBoard } from "../hooks/useFriends.js";
 import { useFriendMatchInvites } from "../hooks/useFriendMatchInvites.js";
 import { useFriendChat } from "../hooks/useFriendChat.js";
 import { formatInboxBadge, inboxBadgeCount } from "../online/friendChat.js";
+import { canRecoverMatch } from "../online/matchRecovery.js";
 import { useReferralInvite } from "../hooks/useReferralInvite.js";
 import { loadMatch } from "../persistence/index.js";
 import { readStorage, writeStorage } from "../utils/storage.js";
@@ -71,11 +72,12 @@ const HOME_PREVIEW = Object.freeze({
  * Premium Home dashboard — Figma visual shell, existing Home only.
  * PLAY VS LEOBEST is the only live gameplay path.
  */
-function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, onOpenChat, onEnterMatch, onOpenChallenge, showAdmin, onOpenAdmin }) {
+function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, onOpenChat, onEnterMatch, activeOnlineMatch, onOpenChallenge, showAdmin, onOpenAdmin }) {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
   const { session, openLogin } = useAuth();
   const findMatchAvailability = useFindMatchAvailability();
+  const resumeOnline = canRecoverMatch(activeOnlineMatch) ? activeOnlineMatch : null;
   const challenge = usePublicChallengeSchedule();
   const referral = useReferralInvite({ enabled: Boolean(session) });
   const friends = useFriendsBoard({ watchOnline: false });
@@ -170,7 +172,13 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, o
    * Find Match: choose Classic / Haitian / American, then create or join a public request.
    */
   const handlePlayOnline = () => {
-    tap(() => onFindMatch?.());
+    tap(() => {
+      if (resumeOnline) {
+        onEnterMatch?.(resumeOnline);
+        return;
+      }
+      onFindMatch?.();
+    });
   };
 
   const inboxCount = inboxBadgeCount({
@@ -400,10 +408,12 @@ function HomePage({ onPlayVsLeoBest, onResume, onFindMatch, onFriends, onChat, o
             icon={<HomeGlyph src={homeEarthGlobe} size={40} className="home-mode__earth" />}
             title={t("home.playOnline")}
             subtitle={t("home.playOnlineSub")}
-            action={t("home.findMatch")}
+            action={resumeOnline ? t("setup.resumeMatch") : t("home.findMatch")}
             onPress={handlePlayOnline}
             availability={findMatchAvailability}
-            availableLabel={t("home.findMatchAvailable")}
+            availableLabel={
+              resumeOnline ? t("findMatch.matchReady") : t("home.findMatchAvailable")
+            }
             unavailableLabel={t("home.findMatchUnavailable")}
           />
           <ModeCard

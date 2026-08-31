@@ -76,8 +76,8 @@ assert.match(hook, /touchMyMatchPresence/);
 assert.match(hook, /MATCH_PRESENCE_HEARTBEAT_MS/);
 assert.match(hook, /visibilitychange/);
 assert.doesNotMatch(hook, /beforeunload/);
-assert.match(app, /match.status === "aborted"/);
-assert.doesNotMatch(app, /match.status === "aborted" \|\| match.status === "finished"/);
+assert.match(app, /canRecoverMatch/);
+assert.doesNotMatch(app, /match.status === "aborted"/);
 assert.match(app, /cleanupStaleOccupiedMatches/);
 assert.match(app, /clearOnlineSession/);
 

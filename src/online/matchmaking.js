@@ -7,7 +7,16 @@ import {
   gameStyleForRulesetId,
   gameStyleToRulesetId,
 } from "../data/gameStyles.js";
+import {
+  ACTIVE_MATCH_STATUSES,
+  isResumableMatch,
+  isTerminalMatch,
+  joinDeadlineFromIso,
+} from "./joinTimeout.js";
+import { isMissingActiveMatchRow } from "./matchRecovery.js";
+import { isImmediateInfrastructureOutage } from "./serviceHealth.js";
 import { getSupabaseClient } from "./supabaseClient.js";
+import { noteTerminalMatch } from "./terminalMatchMemory.js";
 
 export const FIND_MATCH_STYLE_IDS = V1_GAME_STYLE_IDS;
 export const FIND_MATCH_RULESET_IDS = Object.freeze(["legacy", "haitian", "american"]);
@@ -24,6 +33,22 @@ export const FRIEND_MATCH_INVITE_SELECT =
 /** Must match SQL interval '5 minutes' in stale occupancy cleanup. */
 export const STALE_MATCH_GRACE_MS = 5 * 60 * 1000;
 export const MATCH_PRESENCE_HEARTBEAT_MS = 20 * 1000;
+export {
+  JOIN_GRACE_MS,
+  ACTIVE_MATCH_STATUSES,
+  isGameplayStarted,
+  isReservedNotStarted,
+  isResumableMatch,
+  joinDeadlineFromIso,
+} from "./joinTimeout.js";
+
+function isMissingRpcError(error) {
+  if (isImmediateInfrastructureOutage(error)) return false;
+  const code = String(error?.code || "");
+  const msg = String(error?.message || error?.details || "");
+  if (/PGRST002|PGRST003/i.test(`${msg} ${code}`)) return false;
+  return /does not exist|42883|PGRST202/i.test(`${msg} ${code}`);
+}
 
 function isMissingInviteColumnError(error) {
   const msg = String(error?.message || error?.details || "");
@@ -279,6 +304,13 @@ export function throwFromPostgrest(error, fallbackCode = "RPC") {
   throw new MatchmakingError(fallbackCode, msg || "request failed", error);
 }
 
+export function isActiveMatchLockError(error) {
+  return (
+    error instanceof MatchmakingError &&
+    (error.code === "PLAYER_BUSY" || error.code === "ACTIVE_MATCH_EXISTS")
+  );
+}
+
 /** Stale/busy accept must not enter a table. Refresh the list instead. */
 export function isStaleMatchAcceptError(error) {
   return (
@@ -412,7 +444,7 @@ export async function getMatchWithPlayers(matchId, client) {
   const db = clientOf(client);
   const { data: match, error } = await db
     .from("matches")
-    .select("id, request_id, ruleset_id, player_a, player_b, status, created_at")
+    .select("id, request_id, ruleset_id, player_a, player_b, status, created_at, finish_reason, finished_at")
     .eq("id", matchId)
     .single();
   if (error) throwFromPostgrest(error, "MATCH_FAILED");
@@ -433,15 +465,143 @@ export async function getMatchWithPlayers(matchId, client) {
       countryCode: row?.country_code || "",
     };
   };
-  return {
+  let sessionStatus = null;
+  let phase = null;
+  let hasGameSession = false;
+  try {
+    const { data: session, error: sessionError } = await db
+      .from("game_sessions")
+      .select("match_id, status, phase")
+      .eq("match_id", match.id)
+      .maybeSingle();
+    if (!sessionError && session?.match_id) {
+      hasGameSession = true;
+      sessionStatus = session.status ?? null;
+      phase = session.phase ?? null;
+    }
+  } catch {
+    /* public session row is optional; lobby recovery still uses matches.status */
+  }
+  const hydrated = {
     id: match.id,
     requestId: match.request_id,
     rulesetId: match.ruleset_id,
     styleId: styleIdFromRulesetId(match.ruleset_id),
     status: match.status,
     createdAt: match.created_at,
+    finishReason: match.finish_reason ?? null,
+    finishedAt: match.finished_at ?? null,
     host: toPlayer(match.player_a, "host"),
     opponent: toPlayer(match.player_b, "opponent"),
+    hasGameSession,
+    sessionStatus,
+    phase,
+  };
+  if (isTerminalMatch(hydrated)) noteTerminalMatch(hydrated.id);
+  return hydrated;
+}
+
+function rpcActiveMatchId(data) {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") return null;
+  return row.match_id || row.id || null;
+}
+
+/**
+ * Discover this signed-in player's reserved/active match.
+ * RLS on matches (player_a/player_b = auth.uid()) is the authority.
+ * Prefers get_my_active_match RPC when hosted; falls back to SELECT.
+ * @param {object} [client]
+ */
+export async function getMyActiveMatch(client) {
+  const db = clientOf(client);
+  const discovered = await discoverMyActiveMatch(db);
+  if (!discovered?.id) return null;
+  let match;
+  try {
+    match = await getMatchWithPlayers(discovered.id, db);
+  } catch (error) {
+    if (isMissingActiveMatchRow(error)) return null;
+    throw error;
+  }
+  if (!match?.id) return null;
+  if (!isResumableMatch(match)) {
+    if (isTerminalMatch(match)) noteTerminalMatch(match.id);
+    return null;
+  }
+  return attachActiveMatchMeta(match, discovered, db);
+}
+
+async function discoverMyActiveMatch(db) {
+  if (typeof db.rpc === "function") {
+    const { data, error } = await db.rpc("get_my_active_match");
+    if (!error) {
+      const id = rpcActiveMatchId(data);
+      if (!id) return null;
+      return { id, meta: Array.isArray(data) ? data[0] : data, source: "rpc" };
+    }
+    if (!isMissingRpcError(error)) throwFromPostgrest(error, "MATCH_FAILED");
+  }
+  const { data, error } = await db
+    .from("matches")
+    .select("id, request_id, status, created_at, rated")
+    .in("status", [...ACTIVE_MATCH_STATUSES])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throwFromPostgrest(error, "MATCH_FAILED");
+  if (!data?.id) return null;
+  return { id: data.id, meta: data, source: "select" };
+}
+
+async function attachActiveMatchMeta(match, discovered, db) {
+  const meta = discovered.meta && typeof discovered.meta === "object" ? discovered.meta : {};
+  let hasGameSession = meta.has_game_session;
+  if (hasGameSession == null) hasGameSession = match.hasGameSession;
+  if (hasGameSession == null && typeof db.from === "function") {
+    try {
+      const { data, error } = await db
+        .from("game_sessions")
+        .select("match_id")
+        .eq("match_id", match.id)
+        .maybeSingle();
+      if (!error) hasGameSession = Boolean(data?.match_id);
+    } catch {
+      hasGameSession = undefined;
+    }
+  }
+  if (hasGameSession == null) {
+    hasGameSession = match.status === "playing";
+  }
+  let acceptedAt = meta.accepted_at ?? null;
+  if (!acceptedAt && match.requestId && typeof db.from === "function") {
+    try {
+      const { data } = await db
+        .from("match_requests")
+        .select("accepted_at")
+        .eq("id", match.requestId)
+        .maybeSingle();
+      acceptedAt = data?.accepted_at ?? null;
+    } catch {
+      acceptedAt = null;
+    }
+  }
+  const reservedAt = acceptedAt || match.createdAt;
+  const joinDeadlineAt = meta.join_deadline_at || joinDeadlineFromIso(reservedAt);
+  const gameplayStarted =
+    meta.gameplay_started != null ? Boolean(meta.gameplay_started) : Boolean(hasGameSession);
+  return {
+    ...match,
+    rated: meta.rated ?? null,
+    acceptedAt,
+    hasGameSession: Boolean(hasGameSession),
+    gameplayStarted,
+    reservedNotStarted: !gameplayStarted,
+    joinDeadlineAt,
+    selfJoined: meta.self_joined ?? null,
+    opponentJoined: meta.opponent_joined ?? null,
+    waitingToJoin: meta.waiting_to_join ?? !gameplayStarted,
+    source: discovered.source,
   };
 }
 

@@ -15,6 +15,7 @@ import {
   normalizeMatchRequest,
   subscribeMatchRequests,
 } from "../online/matchmaking.js";
+import { canRecoverMatch } from "../online/matchRecovery.js";
 
 export function useFriendMatchInvites({ onEnterMatch } = {}) {
   const { session } = useAuth();
@@ -32,7 +33,11 @@ export function useFriendMatchInvites({ onEnterMatch } = {}) {
       enteredRef.current = matchId;
       try {
         const match = await getMatchWithPlayers(matchId);
-        onEnterMatch?.(match?.id ? match : { id: matchId });
+        if (!canRecoverMatch(match)) {
+          enteredRef.current = "";
+          return;
+        }
+        onEnterMatch?.(match);
       } catch {
         enteredRef.current = "";
         setErrorKey("findMatch.enterError");

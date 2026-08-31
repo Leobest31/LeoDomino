@@ -23,6 +23,7 @@ import {
   touchMyMatchPresence,
 } from "../online/matchmaking.js";
 import { addSafeBreadcrumb, reportError } from "../monitoring";
+import { noteTerminalMatch } from "../online/terminalMatchMemory.js";
 import {
   asViewerSnapshot,
   clearOnlineSession,
@@ -98,10 +99,15 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     if (kept === viewRef.current) return kept;
     viewRef.current = kept;
     setView(kept);
-    persistOnlineSession({
-      matchId: kept.matchId,
-      rulesetId: kept.rulesetId || lockedRulesetId(rulesetId),
-    });
+    if (isMatchOverView(kept)) {
+      if (kept.matchId) noteTerminalMatch(kept.matchId);
+      clearOnlineSession();
+    } else {
+      persistOnlineSession({
+        matchId: kept.matchId,
+        rulesetId: kept.rulesetId || lockedRulesetId(rulesetId),
+      });
+    }
     return kept;
   }, [rulesetId]);
 
@@ -518,6 +524,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     const id = matchIdRef.current;
     const over = isMatchOverView(viewRef.current);
     if (over || !id) {
+      if (id) noteTerminalMatch(id);
       clearOnlineSession();
       return true;
     }
@@ -556,6 +563,8 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
           });
         }
       }
+      clearOnlineSession();
+      noteTerminalMatch(id);
       return true;
     } catch (error) {
       if (timeoutId) window.clearTimeout(timeoutId);
