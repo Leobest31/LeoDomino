@@ -376,11 +376,58 @@ function view(state, seat, version = 0) {
 {
   const { state } = deal("legacy");
   const before = state.currentPlayer;
+  assert.ok(state.mustPlayTileId);
   const skipped = skipTurn(state);
   assert.equal(skipped.consecutivePasses, 0);
   assert.notEqual(skipped.currentPlayer, before);
   assert.equal(skipped.phase, "playing");
+  assert.equal(skipped.mustPlayTileId, null);
+  assert.ok(state.mustPlayTileId, "skipTurn must not mutate the live opening state");
   console.log("  ✓ skipTurn advances seat without a blocked-round pass");
+}
+
+{
+  const ONLINE_RULESETS = ["legacy", "haitian", "american"];
+  for (const rulesetId of ONLINE_RULESETS) {
+    const { state } = deal(rulesetId);
+    const seat = state.currentPlayer;
+    const forced = state.mustPlayTileId;
+    assert.ok(forced, `${rulesetId} round 1 has an opening lock`);
+    assert.equal(getAvailableActions(state).canPlay, true);
+    assert.ok(state.players[seat].hand.includes(forced));
+
+    const first = applyTimeoutResolution(state, { timeoutStrikes: [0, 0] });
+    assert.equal(first.state.roundResult.reason, "timeout_pass");
+    assert.equal(first.resetTurnDeadline, true, `${rulesetId} timeout skip stamps a new deadline`);
+    assert.notEqual(first.state.currentPlayer, seat);
+    assert.equal(first.state.mustPlayTileId, null, `${rulesetId} opener lock does not follow the next seat`);
+    assert.equal(state.mustPlayTileId, forced, `${rulesetId} timeout must not rewrite the uncommitted opening state`);
+
+    const nextSeat = first.state.currentPlayer;
+    const nextActions = getAvailableActions(first.state);
+    assert.equal(nextActions.canPlay, true, `${rulesetId} next player can play after opener timeout`);
+    assert.ok(nextActions.legalMoves.length > 0);
+
+    const nextView = view(first.state, nextSeat, 1);
+    assert.equal(nextView.currentSeat, nextSeat);
+    assert.equal(nextView.mustPlayTileId, null);
+    assert.equal(nextView.canPlay, true);
+    assert.ok(nextView.legalMoves.length > 0);
+
+    const move = nextView.legalMoves[0];
+    const played = applyOnlineAction(first.state, {
+      seat: nextSeat,
+      action: { type: ONLINE_ACTION_PLAY, tileId: move.tileId, end: move.end },
+    });
+    assert.equal(played.actionType, ONLINE_ACTION_PLAY);
+    assert.ok(played.state.board.length > 0);
+
+    const again = applyTimeoutResolution(first.state, { timeoutStrikes: first.timeoutStrikes });
+    assert.equal(again.state.roundResult.reason, "timeout_pass");
+    assert.notEqual(again.state.currentPlayer, nextSeat);
+    assert.equal(again.state.mustPlayTileId, null);
+  }
+  console.log("  ✓ starter timeout clears mustPlayTileId; next player can play immediately (legacy/haitian/american)");
 }
 
 {
@@ -442,7 +489,87 @@ function view(state, seat, version = 0) {
   assert.deepEqual(resolved.timeoutStrikes, strikesBefore);
   assert.equal(resolved.safePayload.strike, 0);
   assert.notEqual(resolved.state.roundResult?.reason, "timeout_pass");
+  assert.ok(
+    resolved.state.phase !== "playing" ||
+      getAvailableActions(resolved.state).canPass ||
+      getAvailableActions(resolved.state).canPlay ||
+      getAvailableActions(resolved.state).canDraw
+  );
   console.log("  ✓ no legal move does not add a timeout strike");
+}
+
+{
+  const { state } = deal("haitian");
+  const starter = state.currentPlayer;
+  const other = starter === 0 ? 1 : 0;
+  assert.equal(state.mustPlayTileId, HAITIAN_OPENING_TILE_ID);
+  const lockedOnWaiter = {
+    ...state,
+    currentPlayer: other,
+  };
+  assert.equal(getAvailableActions(lockedOnWaiter).canPlay, false);
+  assert.equal(getAvailableActions(lockedOnWaiter).canDraw, false);
+  assert.equal(getAvailableActions(lockedOnWaiter).canPass, false);
+
+  const resolved = applyTimeoutResolution(lockedOnWaiter, { timeoutStrikes: [0, 0] });
+  assert.equal(resolved.state.mustPlayTileId, null);
+  assert.notEqual(resolved.state.roundResult?.reason, "timeout_pass");
+  const after = getAvailableActions(resolved.state);
+  assert.ok(
+    resolved.state.phase !== "playing" || after.canPlay || after.canDraw || after.canPass,
+    "locked-open timeout must not leave a dead action set"
+  );
+  assert.notEqual(resolved.state.currentPlayer, other);
+
+  const second = applyTimeoutResolution(resolved.state, { timeoutStrikes: resolved.timeoutStrikes });
+  assert.ok(
+    second.state.roundResult?.reason === "timeout_pass" ||
+      second.state.phase !== "playing" ||
+      getAvailableActions(second.state).canPlay,
+    "locked-open timeout cannot ping-pong a dead opener lock"
+  );
+  console.log("  ✓ locked-open timeout cannot ping-pong forever");
+}
+
+{
+  const { state } = deal("legacy");
+  const move = getAvailableActions(state).legalMoves[0];
+  const afterPlay = applyOnlineAction(state, {
+    seat: state.currentPlayer,
+    action: { type: "play", tileId: move.tileId, end: move.end },
+  }).state;
+  const deadTile = ["0-0", "1-1", "2-2", "3-3", "4-4", "5-5"].find((tileId) => {
+    const trial = {
+      ...afterPlay,
+      mustPlayTileId: null,
+      reserve: [],
+      players: afterPlay.players.map((player) => ({ ...player, hand: [tileId] })),
+    };
+    return (
+      !getAvailableActions(trial).canPlay &&
+      afterPlay.players.every((_, index) => {
+        const seatTrial = { ...trial, currentPlayer: index };
+        return !getAvailableActions(seatTrial).canPlay;
+      })
+    );
+  });
+  assert.ok(deadTile, "expected a tile that matches neither hand against the board");
+  const blockedTable = {
+    ...afterPlay,
+    mustPlayTileId: null,
+    reserve: [],
+    players: afterPlay.players.map((player) => ({ ...player, hand: [deadTile] })),
+  };
+  const resolved = applyTimeoutResolution(blockedTable, { timeoutStrikes: [0, 0] });
+  assert.equal(resolved.safePayload.strike, 0);
+  assert.notEqual(resolved.state.roundResult?.reason, "timeout_pass");
+  assert.ok(
+    resolved.state.phase === "roundOver" ||
+      resolved.state.phase === "matchOver" ||
+      getAvailableActions(resolved.state).canPass,
+    "true blocked timeout uses pass/round-end, not skip ping-pong"
+  );
+  console.log("  ✓ true blocked position still resolves normally");
 }
 
 console.log("  ✓ gameAuthority");

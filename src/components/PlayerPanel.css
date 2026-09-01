@@ -154,6 +154,15 @@
   touch-action: pan-x;
 }
 
+.player-panel .domino--playable,
+.player-panel .leo-domino-premium.is-playable {
+  z-index: 3;
+}
+
+.player-panel .leo-domino-premium.is-playable:not(.is-flat):not(.is-hidden) {
+  transform: translateY(-8px);
+}
+
 .player-panel .domino--selected {
   filter: drop-shadow(0 2.5px 3.5px rgba(40, 30, 15, 0.26));
 }

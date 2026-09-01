@@ -24,6 +24,7 @@ function GameTable({
   status = "",
   statusActive = false,
   statusTone = "",
+  openingTileId = null,
   hiddenIds = null,
   dock = null,
   children = null,
@@ -49,6 +50,7 @@ function GameTable({
                 statusTone === "pending" ? " game-table__status--timeout-pending" : ""
               }`}
               data-turn-timer-tone={statusTone || undefined}
+              data-opening-must-play={openingTileId || undefined}
             >
               <span className="game-table__status-dot" aria-hidden="true" />
               <span>{status}</span>

@@ -49,6 +49,7 @@ import {
   shouldDeferHandDrag,
   watchHandScrollOrDrag,
 } from "../ui/handTilePointer.js";
+import { forcedOpeningTileId, openingTurnStatus } from "../ui/openingTurn.js";
 import PlayerAvatar from "../components/PlayerAvatar";
 import OpponentPanel from "../components/OpponentPanel";
 import { addSafeBreadcrumb } from "../monitoring";
@@ -240,6 +241,10 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
 
   const legalMoves = useMemo(() => view?.legalMoves ?? [], [view]);
   const isHumanTurn = !serviceOutage && isInteractableTurn(view);
+  const mustPlayTileId = forcedOpeningTileId({
+    isTurn: isHumanTurn,
+    mustPlayTileId: view?.mustPlayTileId,
+  });
   const awaitingInteraction = isViewerTurn(view) && !hasCoherentInteraction(view);
   const matchOver = view?.phase === PHASE.MATCH_OVER || view?.status === "match_over";
   const roundOver = view?.phase === PHASE.ROUND_OVER || view?.status === "round_over";
@@ -688,7 +693,11 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     if (matchOver) return t("rules.matchWon", { name: winnerName || t("game.rival") });
     if (roundOver) return t("dialog.roundOver");
     if (drag || needsEndChoice) return t("game.dragToEnd");
-    if (isHumanTurn) return t("game.yourTurn");
+    if (isHumanTurn) {
+      return (
+        openingTurnStatus(t, { isTurn: true, mustPlayTileId }) ?? t("game.yourTurn")
+      );
+    }
     if (awaitingInteraction) return t("game.waiting");
     return t("online.opponentTurn", { name: rivalName });
   })();
@@ -739,6 +748,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
       data-online-match-id={view.matchId}
       data-online-ruleset={rulesetId}
       data-online-version={view.version}
+      data-opening-must-play={mustPlayTileId || undefined}
     >
       <div className="game-page__shell">
         <div className="game-page__chrome" {...(matchOver ? { inert: true } : {})}>
@@ -867,6 +877,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
             status={tableStatus}
             statusActive={isHumanTurn}
             statusTone={matchOver || roundOver || serviceOutage ? "" : timerTone}
+            openingTileId={mustPlayTileId}
             rulesetId={rulesetId}
             dock={
               <div className="game-page__dock" data-hand-dock>
@@ -885,6 +896,8 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
                     draggingId={drag?.tileId ?? null}
                     hiddenIds={hiddenIds}
                     isTurn={isHumanTurn}
+                    mustPlayTileId={mustPlayTileId}
+                    legalMoves={actions.legalMoves}
                     tilesOnly
                   />
                 </BottomBar>

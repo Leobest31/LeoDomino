@@ -46,6 +46,7 @@ import {
   shouldDeferHandDrag,
   watchHandScrollOrDrag,
 } from "../ui/handTilePointer.js";
+import { forcedOpeningTileId, openingTurnStatus } from "../ui/openingTurn.js";
 import {
   hudScoresDuringHold,
   shouldShowPlayScorePopup,
@@ -917,6 +918,11 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       ? ""
       : playerNames[state.matchWinner] ?? t("game.rival");
 
+  const mustPlayTileId = forcedOpeningTileId({
+    isTurn: isHumanTurn,
+    mustPlayTileId: state.mustPlayTileId,
+  });
+
   const humanStatus = (() => {
     if (matchOver) {
       return t("rules.matchWon", { name: winnerName || t("game.rival") });
@@ -924,7 +930,11 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     if (state.phase === PHASE.ROUND_OVER) return t("dialog.roundOver");
     if (pendingAiDraw) return t("game.leoBestDrawing");
     if (drag || needsEndChoice) return t("game.dragToEnd");
-    if (isHumanTurn) return t("game.yourTurn");
+    if (isHumanTurn) {
+      return (
+        openingTurnStatus(t, { isTurn: true, mustPlayTileId }) ?? t("game.yourTurn")
+      );
+    }
     return t("game.waiting");
   })();
 
@@ -1012,6 +1022,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       }${matchOver ? " game-page--match-over" : ""}${
         summaryActive ? " game-page--round-summary" : ""
       }`}
+      data-opening-must-play={mustPlayTileId || undefined}
     >
       <div className="game-page__shell">
         <div className="game-page__chrome" {...(matchOver ? { inert: true } : {})}>
@@ -1115,6 +1126,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
             playerNames={playerNames}
             status={humanStatus}
             statusActive={isHumanTurn}
+            openingTileId={mustPlayTileId}
             hiddenIds={hiddenIds}
             rulesetId={state.rulesetId}
             dock={
@@ -1137,6 +1149,8 @@ function GamePage({ onMainMenu, matchOptions = null }) {
                     onTilePointerDown={isHumanTurn ? handleTilePointerDown : undefined}
                     draggingId={drag?.tileId ?? null}
                     isTurn={isHumanTurn}
+                    mustPlayTileId={mustPlayTileId}
+                    legalMoves={actions.legalMoves}
                     hiddenIds={hiddenIds}
                     enteringIds={enteringIds}
                     tilesOnly

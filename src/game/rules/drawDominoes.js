@@ -243,7 +243,8 @@ function advancePlayer(state) {
 /**
  * Skip the current seat without treating it as a stuck/blocked pass.
  * Used for online turn timeout when the seat had a legal play and did not act.
- * Does not change Classic/Haitian/American play, draw, or pass rules.
+ * Clears mustPlayTileId so a skipped opener's lock does not follow the next seat.
+ * Does not change Classic/Haitian/American play, draw, or pass on a live opening turn.
  */
 export function skipTurn(state) {
   if (state.phase !== PHASE.PLAYING) {
@@ -255,6 +256,7 @@ export function skipTurn(state) {
     lastPlayPoints: 0,
     lastPlayPointsSeat: null,
     lastPlayScoreTerminals: [],
+    mustPlayTileId: null,
   };
 }
 

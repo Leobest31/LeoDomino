@@ -274,6 +274,14 @@
   touch-action: none;
 }
 
+.domino--playable:not(.domino--hidden):not(.domino--dragging) {
+  transform: translateY(-8px);
+  filter:
+    drop-shadow(0 0 8px rgba(229, 190, 100, 0.8))
+    drop-shadow(0 1px 0.75px rgba(0, 0, 0, 0.72));
+  z-index: 3;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .domino--interactive:hover {
     transform: translateY(-6px);

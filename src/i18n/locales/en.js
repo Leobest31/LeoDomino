@@ -482,6 +482,7 @@ export default {
     playerCountHint: "Takes effect on New Match",
     playersN: "{{n}} players",
     yourTurn: "Your turn",
+    playToOpenRound: "Play {{tile}} to open the round.",
     dragToEnd: "Drag to the left or right end",
     waiting: "Waiting",
     thinking: "Thinking…",

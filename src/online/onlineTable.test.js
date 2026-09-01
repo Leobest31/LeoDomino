@@ -18,6 +18,7 @@ import {
   equivalentPlayEnd,
   handTilesFromView,
   hasCoherentInteraction,
+  hasPlayableAction,
   INTERACTION_SOURCE_PUBLIC,
   INTERACTION_SOURCE_VIEWER,
   isInteractableTurn,
@@ -54,6 +55,7 @@ import {
   projectPublicSession,
   applyOnlineAction,
   applyAdvanceRound,
+  applyTimeoutResolution,
   getAvailableActions,
   ONLINE_ACTION_PLAY,
   ONLINE_ACTION_DRAW,
@@ -1291,6 +1293,72 @@ function findDrawState(rulesetId) {
     60_000
   );
   console.log("  ✓ asViewerSnapshot restamps browser monotonic origin (Edge mono cannot poison remaining)");
+}
+
+{
+  const dead = asViewerSnapshot({
+    matchId: "match-1",
+    viewerSeat: 0,
+    currentSeat: 0,
+    phase: "playing",
+    status: "playing",
+    version: 3,
+    myHand: ["0-1", "2-3"],
+    handCounts: [2, 7],
+    legalMoves: [],
+    canPlay: false,
+    canDraw: false,
+    canPass: false,
+  });
+  assert.equal(isViewerTurn(dead), true);
+  assert.equal(hasCoherentInteraction(dead), true);
+  assert.equal(hasPlayableAction(dead), false);
+  assert.equal(isInteractableTurn(dead), false);
+  assert.equal(
+    onlineDragGate({
+      isHumanTurn: isInteractableTurn(dead),
+      busy: false,
+      legalMoves: dead.legalMoves,
+      tileId: "0-1",
+    }),
+    "not_turn"
+  );
+  console.log("  ✓ dead action set is not an interactable Your turn");
+}
+
+{
+  const { state } = dealOnlineGame({
+    rulesetId: "legacy",
+    playerAId: PLAYER_A,
+    playerBId: PLAYER_B,
+    seed: 2001,
+  });
+  const starter = state.currentPlayer;
+  const waiter = starter === 0 ? 1 : 0;
+  const waiting = viewerOf(state, waiter, 0);
+  const timed = applyTimeoutResolution(state, { timeoutStrikes: [0, 0] });
+  assert.equal(timed.state.mustPlayTileId, null);
+  const merged = mergeRealtimeSessionView(waiting, realtimeRow(timed.state, 1));
+  assert.equal(merged.currentSeat, timed.state.currentPlayer);
+  assert.equal(isInteractableTurn(merged), false);
+  const recovered = keepAuthoritativeView(
+    merged,
+    viewerOf(timed.state, waiter, 1)
+  );
+  assert.equal(recovered.currentSeat, waiter);
+  assert.equal(recovered.mustPlayTileId, null);
+  assert.equal(isInteractableTurn(recovered), true);
+  assert.ok(recovered.legalMoves.length > 0);
+  assert.equal(
+    onlineDragGate({
+      isHumanTurn: isInteractableTurn(recovered),
+      busy: false,
+      legalMoves: recovered.legalMoves,
+      tileId: recovered.legalMoves[0].tileId,
+    }),
+    "ok"
+  );
+  console.log("  ✓ two clients converge: waiter realtime + viewer after opener timeout");
 }
 
 console.log("  ✓ online table helpers");

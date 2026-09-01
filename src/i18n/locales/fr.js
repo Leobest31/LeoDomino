@@ -482,6 +482,7 @@ export default {
     playerCountHint: "Prend effet au prochain match",
     playersN: "{{n}} joueurs",
     yourTurn: "À vous",
+    playToOpenRound: "Jouez {{tile}} pour ouvrir la manche.",
     dragToEnd: "Glissez vers l’extrémité gauche ou droite",
     waiting: "En attente",
     thinking: "Réflexion…",

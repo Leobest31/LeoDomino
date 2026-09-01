@@ -485,6 +485,7 @@ export default {
     playerCountHint: "Ap plike sou Nouvo match",
     playersN: "{{n}} jwè",
     yourTurn: "Se tou ou",
+    playToOpenRound: "Jwe {{tile}} pou louvri wo a.",
     dragToEnd: "Trennen nan bò goch oswa dwat",
     waiting: "Ap tann",
     thinking: "Ap reflechi…",

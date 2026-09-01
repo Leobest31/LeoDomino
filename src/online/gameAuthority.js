@@ -363,8 +363,10 @@ function applyTimeoutLoss(state, timeoutSeat) {
 
 /**
  * Authoritative timeout resolution. Does not trust a client timestamp.
- * Legal-move expiry: one strike and skip. Third strike: timeout loss.
- * No legal move: existing draw/pass path, no strike.
+ * Legal-move expiry: one strike and skipTurn (clears mustPlayTileId).
+ * Third strike: timeout loss.
+ * No legal move: existing draw/pass path, no strike. skipTurn is last resort
+ * so a locked opener cannot ping-pong; a genuinely blocked table uses passTurn.
  */
 export function applyTimeoutResolution(state, options = {}) {
   if (!state) {
@@ -411,7 +413,8 @@ export function applyTimeoutResolution(state, options = {}) {
       break;
     }
     const after = getAvailableActions(next);
-    const resetTurnDeadline = next.phase === PHASE.PLAYING && next.currentPlayer === seat && after.canPlay;
+    const resetTurnDeadline =
+      next.phase === PHASE.PLAYING && (next.currentPlayer !== seat || after.canPlay);
     return {
       state: {
         ...next,
@@ -483,7 +486,7 @@ export function applyTimeoutResolution(state, options = {}) {
       matchOver: false,
     },
     finishReason: null,
-    resetTurnDeadline: false,
+    resetTurnDeadline: skipped.phase === PHASE.PLAYING && skipped.currentPlayer !== seat,
     timeoutStrikes: nextStrikes,
     idempotent: false,
   };

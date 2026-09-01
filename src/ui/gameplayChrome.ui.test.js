@@ -61,6 +61,8 @@ assert.match(gamePage, /data-hud-zone="human"/, "human score is its own HUD zone
 assert.match(gamePage, /data-hud-zone="match-points"/, "MATCH POINTS is the center HUD zone");
 assert.match(gamePage, /data-hud-zone="rival"/, "LeoBest score is its own HUD zone");
 assert.match(gamePage, /status=\{humanStatus\}/, "status pill lives on the felt");
+assert.match(gamePage, /openingTurnStatus/, "forced opening replaces Your turn");
+assert.match(gamePage, /mustPlayTileId=\{mustPlayTileId\}/, "only the required opener is marked");
 assert.doesNotMatch(gamePage, /playerLabel=/, "name is not a full-width table banner");
 assert.match(gamePage, /hideSeatNames/, "scoreboard does not repeat the full player name");
 assert.match(gamePage, /<PlayerAvatar/, "HUD uses the selected player avatar");

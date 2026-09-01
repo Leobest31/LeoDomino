@@ -483,12 +483,18 @@ export function hasCoherentInteraction(view) {
   return viewerHandMatchesCounts(view);
 }
 
+/** Server said this viewer may play, draw, or pass. Empty action sets are not a turn. */
+export function hasPlayableAction(view) {
+  return Boolean(view?.canPlay || view?.canDraw || view?.canPass);
+}
+
 /**
  * Safe to enable drag / draw / pass / "Your turn".
  * Public-only Realtime must not claim a turn while legalMoves/canDraw/canPass are stale.
+ * A coherent viewer snapshot with no available action is also not interactable.
  */
 export function isInteractableTurn(view) {
-  return isViewerTurn(view) && hasCoherentInteraction(view);
+  return isViewerTurn(view) && hasCoherentInteraction(view) && hasPlayableAction(view);
 }
 
 export function publicPlayedTileIds(view) {

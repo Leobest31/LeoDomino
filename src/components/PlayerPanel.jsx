@@ -2,6 +2,7 @@ import { useI18n } from "../i18n";
 import DominoTile from "./DominoTile";
 import Avatar from "./Avatar";
 import { useFlipGroup } from "../hooks/useFlipGroup";
+import { handTileIsInteractable } from "../ui/openingTurn.js";
 import "./PlayerPanel.css";
 
 function PlayerPanel({
@@ -13,6 +14,8 @@ function PlayerPanel({
   onTilePointerDown,
   draggingId = null,
   isTurn = false,
+  mustPlayTileId = null,
+  legalMoves = null,
   hiddenIds,
   enteringIds,
   tilesOnly = false,
@@ -66,6 +69,13 @@ function PlayerPanel({
         <ul className="player-panel__hand" ref={handRef} data-hand-root="player">
           {tiles.map((tile, index) => {
             const entering = enteringIds?.has(tile.id);
+            const interactable = handTileIsInteractable({
+              isTurn: Boolean(onSelectTile || onTilePointerDown),
+              mustPlayTileId,
+              tileId: tile.id,
+              legalMoves,
+            });
+            const playable = Boolean(mustPlayTileId && tile.id === mustPlayTileId);
             return (
               <li
                 key={tile.id}
@@ -75,6 +85,8 @@ function PlayerPanel({
                     : "player-panel__tile"
                 }
                 data-flip-id={tile.id}
+                data-hand-interactable={interactable ? "true" : "false"}
+                data-must-play={playable ? "true" : undefined}
                 style={
                   entering
                     ? { animationDelay: `${Math.min(index, 10) * 35}ms` }
@@ -87,9 +99,10 @@ function PlayerPanel({
                   orientation="vertical"
                   selected={selectedId === tile.id}
                   dragging={draggingId === tile.id}
-                  onClick={onSelectTile ? () => onSelectTile(tile.id) : undefined}
+                  playable={playable}
+                  onClick={interactable && onSelectTile ? () => onSelectTile(tile.id) : undefined}
                   onPointerDown={
-                    onTilePointerDown
+                    interactable && onTilePointerDown
                       ? (event) => onTilePointerDown(event, tile.id)
                       : undefined
                   }

@@ -820,4 +820,58 @@ function expireTurn(store) {
   console.log("  ✓ no legal move timeout does not add a strike");
 }
 
+{
+  const ONLINE_RULESETS = ["legacy", "haitian", "american"];
+  for (const rulesetId of ONLINE_RULESETS) {
+    const { store, view } = await seated(rulesetId);
+    const starterSeat = view.currentSeat;
+    const starterId = starterSeat === 0 ? PLAYER_A : PLAYER_B;
+    const nextSeat = starterSeat === 0 ? 1 : 0;
+    const nextId = nextSeat === 0 ? PLAYER_A : PLAYER_B;
+    assert.ok(store.secrets.get(MATCH_ID).engineState.mustPlayTileId);
+    expireTurn(store);
+    const timed = await handleResolveTurnTimeout({
+      userId: starterId,
+      matchId: MATCH_ID,
+      expectedVersion: view.version,
+      store,
+    });
+    assert.equal(timed.roundResult.reason, "timeout_pass");
+    assert.equal(timed.currentSeat, nextSeat);
+    assert.equal(timed.mustPlayTileId, null);
+    assert.ok(Date.parse(timed.turnDeadlineAt) > Date.parse(timed.serverNow));
+    const remaining = Date.parse(timed.turnDeadlineAt) - Date.parse(timed.serverNow);
+    assert.ok(remaining > 55_000 && remaining <= TURN_TIMEOUT_MS + 50);
+
+    const viewA = await handleGetGameView({ userId: PLAYER_A, matchId: MATCH_ID, store });
+    const viewB = await handleGetGameView({ userId: PLAYER_B, matchId: MATCH_ID, store });
+    assert.equal(viewA.version, timed.version);
+    assert.equal(viewB.version, timed.version);
+    assert.equal(viewA.currentSeat, nextSeat);
+    assert.equal(viewB.currentSeat, nextSeat);
+    assert.equal(store.secrets.get(MATCH_ID).engineState.mustPlayTileId, null);
+
+    const nextView = nextSeat === 0 ? viewA : viewB;
+    const waiterView = nextSeat === 0 ? viewB : viewA;
+    assert.equal(nextView.mustPlayTileId, null);
+    assert.equal(nextView.canPlay, true);
+    assert.ok(nextView.legalMoves.length > 0);
+    assert.equal(waiterView.canPlay, false);
+    assert.deepEqual(waiterView.legalMoves, []);
+
+    const move = nextView.legalMoves[0];
+    const played = await handleSubmitGameAction({
+      userId: nextId,
+      matchId: MATCH_ID,
+      expectedVersion: timed.version,
+      action: { type: "play", tileId: move.tileId, end: move.end },
+      store,
+    });
+    assert.equal(played.version, timed.version + 1);
+    assert.ok(played.board.length > 0);
+    assert.notEqual(store.actions.at(-1).actionType, "timeout");
+  }
+  console.log("  ✓ opener timeout → next seat playable; getGameView converges; legal play accepted");
+}
+
 console.log("  ✓ gameplayHandler");

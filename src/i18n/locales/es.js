@@ -482,6 +482,7 @@ export default {
     playerCountHint: "Se aplica al iniciar una nueva partida",
     playersN: "{{n}} jugadores",
     yourTurn: "Tu turno",
+    playToOpenRound: "Juega {{tile}} para abrir la ronda.",
     dragToEnd: "Arrastra al extremo izquierdo o derecho",
     waiting: "Esperando",
     thinking: "Pensando…",
