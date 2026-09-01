@@ -484,6 +484,10 @@ export default {
     yourTurn: "Tu turno",
     playToOpenRound: "Juega {{tile}} para abrir la ronda.",
     dragToEnd: "Arrastra al extremo izquierdo o derecho",
+    chooseLeftEnd: "Extremo izquierdo",
+    chooseRightEnd: "Extremo derecho",
+    chooseNorthEnd: "Extremo superior",
+    chooseSouthEnd: "Extremo inferior",
     waiting: "Esperando",
     thinking: "Pensando…",
     tilesCount: {

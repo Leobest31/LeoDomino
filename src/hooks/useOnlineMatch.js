@@ -62,6 +62,12 @@ import {
   shouldSuppressTimeoutResolve,
   stampOutageRetry,
 } from "../online/serviceHealth.js";
+import {
+  documentIsVisible,
+  isUnhealthyRealtimeStatus,
+  shouldBypassDragLock,
+  shouldRefreshAuthoritativeViewOnResume,
+} from "../online/interactionRecovery.js";
 
 export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const [view, setView] = useState(null);
@@ -94,13 +100,19 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       preferIncoming: Boolean(options.force),
     });
     if (!kept) return null;
-    if (dragLockRef.current && !options.force) {
+    if (
+      dragLockRef.current &&
+      !options.force &&
+      !shouldBypassDragLock(viewRef.current, kept)
+    ) {
       if (shouldFlushPendingView(pendingViewRef.current, kept)) {
         pendingViewRef.current = kept;
       }
       return viewRef.current;
     }
-    if (options.force) pendingViewRef.current = null;
+    if (options.force || shouldBypassDragLock(viewRef.current, kept)) {
+      pendingViewRef.current = null;
+    }
     if (shouldReleaseBusy(inFlightBaseVersionRef.current, kept)) {
       busyRef.current = false;
       inFlightBaseVersionRef.current = -1;
@@ -133,7 +145,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     return next;
   }, []);
 
-  const refreshView = useCallback(async () => {
+  const refreshView = useCallback(async (options = {}) => {
     const id = matchIdRef.current;
     if (!id) return null;
     if (refreshInFlightRef.current) {
@@ -148,7 +160,9 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         last = asViewerSnapshot(await getGameView(id));
         markServiceResult(null);
         if (unmountedRef.current) return last;
-        applyView(last, { force: isMatchOverView(last) });
+        applyView(last, {
+          force: isMatchOverView(last) || Boolean(options.force),
+        });
       } while (refreshQueuedRef.current && !unmountedRef.current);
       return last;
     } catch (error) {
@@ -157,7 +171,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     } finally {
       refreshInFlightRef.current = false;
       if (refreshQueuedRef.current && !unmountedRef.current) {
-        void refreshView().catch(() => {
+        void refreshView(options).catch(() => {
           /* keep last authoritative view */
         });
       }
@@ -260,6 +274,26 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
 
   useEffect(() => {
     if (!matchId || status !== "ready") return undefined;
+    const refreshIfPlaying = () => {
+      if (!documentIsVisible()) return;
+      if (!shouldRefreshAuthoritativeViewOnResume(viewRef.current)) return;
+      void refreshView({ force: true }).catch(() => {
+        /* keep last authoritative view */
+      });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshIfPlaying();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", refreshIfPlaying);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", refreshIfPlaying);
+    };
+  }, [matchId, status, refreshView]);
+
+  useEffect(() => {
+    if (!matchId || status !== "ready") return undefined;
     let cancelled = false;
     let stop = () => {};
     const onEvent = (payload) => {
@@ -285,8 +319,16 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         /* keep last authoritative view */
       });
     };
+    const onStatus = (channelStatus) => {
+      if (cancelled) return;
+      if (!isUnhealthyRealtimeStatus(channelStatus)) return;
+      if (!documentIsVisible()) return;
+      void refreshView({ force: true }).catch(() => {
+        /* keep last authoritative view */
+      });
+    };
     try {
-      stop = subscribeGameSession(matchId, onEvent);
+      stop = subscribeGameSession(matchId, onEvent, undefined, onStatus);
     } catch {
       stop = () => {};
     }

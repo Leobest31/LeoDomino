@@ -46,6 +46,7 @@ import {
 import { usesAmericanBoardLayout } from "../board/index.js";
 import {
   attachCapturedPointerTracking,
+  pointerStillDown,
   shouldDeferHandDrag,
   watchHandScrollOrDrag,
 } from "../ui/handTilePointer.js";
@@ -70,6 +71,12 @@ import {
   hasCoherentInteraction,
 } from "../online/onlineTable.js";
 import { createOnlineMoveTrace } from "../online/onlineMoveTrace.js";
+import {
+  endChoiceI18nKey,
+  hasUsableDomTargets,
+  resolvePlayWithoutDomTargets,
+  shouldClearLocalInteraction,
+} from "../online/interactionRecovery.js";
 import {
   TIMEOUT_STRIKE_LIMIT,
   formatTurnSeconds,
@@ -230,6 +237,8 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   const dragRef = useRef(null);
   const captureTargetRef = useRef(null);
   const skipClickRef = useRef(false);
+  const dragTrackingStopRef = useRef(null);
+  const dragFinishFnRef = useRef(null);
 
   useEffect(() => {
     addSafeBreadcrumb("entered live online table", {
@@ -318,7 +327,10 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     return ids.length ? new Set(ids) : null;
   }, [drag, pendingPlay, roundIdentity]);
   const dragLegalEnds = drag ? legalEndsForTile(legalMoves, drag.tileId) : [];
-  const highlightByEnd = destinationHighlightMap(dragLegalEnds, destLayout);
+  const selectedLegalEnds =
+    selectedId && !drag ? legalEndsForTile(legalMoves, selectedId) : [];
+  const highlightLegalEnds = dragLegalEnds.length ? dragLegalEnds : selectedLegalEnds;
+  const highlightByEnd = destinationHighlightMap(highlightLegalEnds, destLayout);
   const targetTileId = hotEnd ? highlightByEnd[hotEnd] ?? null : null;
 
   const placeTile = useCallback(
@@ -384,6 +396,84 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     setSelectedId(tileId);
   };
 
+  const stopDragTracking = useCallback(() => {
+    dragTrackingStopRef.current?.();
+    dragTrackingStopRef.current = null;
+  }, []);
+
+  const clearDragVisuals = useCallback(() => {
+    stopDragTracking();
+    const target = captureTargetRef.current;
+    const pointerId = dragRef.current?.pointerId;
+    dragRef.current = null;
+    captureTargetRef.current = null;
+    try {
+      if (target && pointerId != null) target.releasePointerCapture?.(pointerId);
+    } catch {
+      /* already released */
+    }
+    setDrag(null);
+    setHotEnd(null);
+    setDragLock(false);
+  }, [setDragLock, stopDragTracking]);
+
+  const handleEndpointActivate = (end) => {
+    if (!isHumanTurn || busy || !end) return;
+    const tileId = selectedId || dragRef.current?.tileId;
+    if (!tileId) return;
+    const snap = viewRef.current;
+    const moves = snap?.legalMoves ?? legalMoves;
+    const chosen = resolvePlayChoice(moves, tileId, end);
+    if (!chosen) {
+      play("error");
+      return;
+    }
+    skipClickRef.current = true;
+    clearDragVisuals();
+    void placeTile(tileId, end);
+  };
+
+  const bindDragPointerTracking = useCallback(
+    (pointerId) => {
+      stopDragTracking();
+      const onMove = (event) => {
+        if (pointerId != null && event.pointerId !== pointerId) return;
+        event.preventDefault();
+        setDrag((prev) =>
+          prev ? { ...prev, x: event.clientX, y: event.clientY } : null
+        );
+        const current = dragRef.current;
+        const snap = viewRef.current;
+        if (!current || !snap) return;
+        const layout = layoutFromView(snap);
+        setHotEnd(
+          pickTargetDestination(
+            event.clientX,
+            event.clientY,
+            collectDestinationTargets(
+              legalEndsForTile(snap.legalMoves, current.tileId),
+              layout
+            )
+          )
+        );
+      };
+      const onUp = (event) => {
+        if (pointerId != null && event.pointerId !== pointerId) return;
+        void dragFinishFnRef.current?.(event.clientX, event.clientY);
+      };
+      const onCancel = () => {
+        skipClickRef.current = true;
+        clearDragVisuals();
+      };
+      dragTrackingStopRef.current = attachCapturedPointerTracking(captureTargetRef.current, {
+        onMove,
+        onUp,
+        onCancel,
+      });
+    },
+    [clearDragVisuals, stopDragTracking, viewRef]
+  );
+
   const handleTilePointerDown = (event, tileId) => {
     if (event.button != null && event.button !== 0) return;
     if (onlineDragGate({ isHumanTurn, busy, legalMoves: viewRef.current?.legalMoves ?? legalMoves, tileId }) !== "ok") {
@@ -395,6 +485,9 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     const startDrag = (pointerEvent) => {
       const target = pointerEvent.currentTarget;
       if (!target) return;
+      if (!pointerStillDown(pointerEvent) && pointerEvent.pointerType !== "touch") {
+        return;
+      }
       const rect = target.getBoundingClientRect();
       pointerEvent.preventDefault?.();
       try {
@@ -416,7 +509,18 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         originY: pointerEvent.originY ?? pointerEvent.clientY,
       };
       dragRef.current = nextDrag;
+      setDragLock(true);
       setDrag(nextDrag);
+      bindDragPointerTracking(pointerEvent.pointerId);
+      const buttons = Number(pointerEvent.buttons);
+      const alreadyUp = Number.isFinite(buttons) && buttons === 0;
+      const captureHeld =
+        typeof target.hasPointerCapture !== "function" ||
+        target.hasPointerCapture(pointerEvent.pointerId);
+      if (!captureHeld && alreadyUp) {
+        skipClickRef.current = true;
+        clearDragVisuals();
+      }
     };
 
     if (shouldDeferHandDrag(event)) {
@@ -429,31 +533,46 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   const finishDrag = useCallback(
     async (clientX, clientY) => {
       const current = dragRef.current;
-      if (!current) return;
-      dragRef.current = null;
-      captureTargetRef.current = null;
+      if (!current) {
+        clearDragVisuals();
+        return;
+      }
       const snap = viewRef.current;
       const moves = snap?.legalMoves ?? [];
       const layout = layoutFromView(snap);
       const legalEnds = legalEndsForTile(moves, current.tileId);
-      const end = pickTargetDestination(
-        clientX,
-        clientY,
-        collectDestinationTargets(legalEnds, layout)
-      );
+      const targets = collectDestinationTargets(legalEnds, layout);
+      const end = pickTargetDestination(clientX, clientY, targets);
       const fromTravel = Math.hypot(
         clientX - (Number.isFinite(current.originX) ? current.originX : current.x),
         clientY - (Number.isFinite(current.originY) ? current.originY : current.y)
       );
-      setDrag(null);
-      setHotEnd(null);
       skipClickRef.current = true;
-      setDragLock(false);
+      clearDragVisuals();
       if (end) {
         await placeTile(current.tileId, end);
         return;
       }
       const equivalent = equivalentPlayEnd(moves, current.tileId, layout);
+      const autoEnd = isAutoPlaceable(moves, current.tileId)
+        ? resolvePlayChoice(moves, current.tileId)?.end
+        : null;
+      if (!hasUsableDomTargets(targets) && legalEnds.length) {
+        const resolved = resolvePlayWithoutDomTargets({
+          legalEnds,
+          equivalent,
+          autoEnd,
+        });
+        if (resolved.action === "place") {
+          await placeTile(current.tileId, resolved.end);
+          return;
+        }
+        if (resolved.action === "choose") {
+          setSelectedId(current.tileId);
+          return;
+        }
+        return;
+      }
       if (
         equivalent &&
         (fromTravel <= DESTINATION_TAP_SLOP_PX ||
@@ -471,8 +590,9 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         if (move) await placeTile(current.tileId, move.end);
       }
     },
-    [placeTile, setDragLock, viewRef]
+    [clearDragVisuals, placeTile, viewRef]
   );
+  dragFinishFnRef.current = finishDrag;
 
   const dragging = Boolean(drag?.tileId);
   useEffect(() => {
@@ -480,47 +600,14 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   }, [dragging, setDragLock]);
 
   useEffect(() => {
-    if (!drag) return undefined;
-    const pointerId = drag.pointerId;
-    const onMove = (event) => {
-      if (pointerId != null && event.pointerId !== pointerId) return;
-      event.preventDefault();
-      setDrag((prev) =>
-        prev ? { ...prev, x: event.clientX, y: event.clientY } : null
-      );
-      const current = dragRef.current;
-      const snap = viewRef.current;
-      if (!current || !snap) return;
-      const layout = layoutFromView(snap);
-      setHotEnd(
-        pickTargetDestination(
-          event.clientX,
-          event.clientY,
-          collectDestinationTargets(
-            legalEndsForTile(snap.legalMoves, current.tileId),
-            layout
-          )
-        )
-      );
-    };
-    const onUp = (event) => {
-      if (pointerId != null && event.pointerId !== pointerId) return;
-      finishDrag(event.clientX, event.clientY);
-    };
-    const onCancel = () => {
-      dragRef.current = null;
-      captureTargetRef.current = null;
-      setDrag(null);
-      setHotEnd(null);
-      skipClickRef.current = true;
-      setDragLock(false);
-    };
-    return attachCapturedPointerTracking(captureTargetRef.current, {
-      onMove,
-      onUp,
-      onCancel,
-    });
-  }, [drag, finishDrag, setDragLock, viewRef]);
+    if (!drag) {
+      stopDragTracking();
+      return undefined;
+    }
+    if (dragTrackingStopRef.current) return undefined;
+    bindDragPointerTracking(drag.pointerId);
+    return undefined;
+  }, [bindDragPointerTracking, drag, stopDragTracking]);
 
   const handlePass = () => {
     if (!actions.canPass || busy) {
@@ -583,25 +670,33 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
       });
   };
 
+  const interactionViewRef = useRef(view);
+  useEffect(() => {
+    const previous = interactionViewRef.current;
+    interactionViewRef.current = view;
+    if (!shouldClearLocalInteraction(previous, view)) return;
+    skipClickRef.current = true;
+    clearDragVisuals();
+    setSelectedId(null);
+  }, [clearDragVisuals, view]);
+
   const tableEpochRef = useRef(tableEpoch);
   useEffect(() => {
     if (tableEpochRef.current === tableEpoch) return;
     tableEpochRef.current = tableEpoch;
-    dragRef.current = null;
+    skipClickRef.current = true;
+    clearDragVisuals();
     setSelectedId(null);
-    setDrag(null);
-    setHotEnd(null);
     setPendingPlay(null);
-  }, [tableEpoch]);
+  }, [clearDragVisuals, tableEpoch]);
 
   useEffect(() => {
     setRoundBanner(null);
-    dragRef.current = null;
+    skipClickRef.current = true;
+    clearDragVisuals();
     setSelectedId(null);
-    setDrag(null);
-    setHotEnd(null);
     setPendingPlay(null);
-  }, [matchId]);
+  }, [clearDragVisuals, matchId]);
 
   useEffect(() => {
     if (!pendingPlay?.tileId) return;
@@ -879,6 +974,8 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
             statusTone={matchOver || roundOver || serviceOutage ? "" : timerTone}
             openingTileId={mustPlayTileId}
             rulesetId={rulesetId}
+            onEndpointActivate={isHumanTurn && !busy ? handleEndpointActivate : undefined}
+            endpointHighlightByEnd={highlightLegalEnds.length ? highlightByEnd : null}
             dock={
               <div className="game-page__dock" data-hand-dock>
                 <BottomBar
@@ -904,6 +1001,21 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
               </div>
             }
           >
+            {needsEndChoice && !drag ? (
+              <div className="game-page__end-choice" data-end-choice="">
+                {selectedLegalEnds.map((end) => (
+                  <button
+                    type="button"
+                    key={end}
+                    className="btn btn--new"
+                    data-end-choice={end}
+                    onClick={() => handleEndpointActivate(end)}
+                  >
+                    {t(endChoiceI18nKey(end))}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             {showReservePicker ? (
               <ReservePicker
                 tileIds={opaqueReserveIds(view.reserveCount)}

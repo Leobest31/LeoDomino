@@ -484,6 +484,10 @@ export default {
     yourTurn: "À vous",
     playToOpenRound: "Jouez {{tile}} pour ouvrir la manche.",
     dragToEnd: "Glissez vers l’extrémité gauche ou droite",
+    chooseLeftEnd: "Extrémité gauche",
+    chooseRightEnd: "Extrémité droite",
+    chooseNorthEnd: "Extrémité haute",
+    chooseSouthEnd: "Extrémité basse",
     waiting: "En attente",
     thinking: "Réflexion…",
     tilesCount: {

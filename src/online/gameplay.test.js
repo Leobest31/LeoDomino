@@ -34,8 +34,9 @@ function mockClient(handler) {
           captured.realtime = { kind, filter };
           return this;
         },
-        subscribe() {
+        subscribe(statusCb) {
           captured.subscribed = true;
+          captured.subscribeStatus = statusCb;
         },
       };
     },
@@ -110,6 +111,7 @@ function mockClient(handler) {
   const client = mockClient(async () => ({ data: {}, error: null }));
   const stop = subscribeGameSession("match-1", () => {}, client);
   assert.equal(client.captured.realtime.filter.table, "game_sessions");
+  assert.equal(typeof client.captured.subscribeStatus, "function");
   assert.doesNotMatch(JSON.stringify(client.captured), /game_secrets/);
   stop();
 }

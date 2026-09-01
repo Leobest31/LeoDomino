@@ -140,6 +140,8 @@ assert.match(hook, /enterOnlineMatch/);
 assert.match(hook, /getGameView/);
 assert.match(hook, /submitGameAction/);
 assert.match(hook, /subscribeGameSession/);
+assert.match(hook, /onStatus/);
+assert.match(hook, /CHANNEL_ERROR|isUnhealthyRealtimeStatus/);
 assert.match(hook, /stop\(\)/);
 assert.match(hook, /keepAuthoritativeView|applyView/);
 assert.match(hook, /onlineErrorKey\(error\)/);

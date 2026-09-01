@@ -29,6 +29,8 @@ function GameTable({
   dock = null,
   children = null,
   rulesetId = "",
+  onEndpointActivate = null,
+  endpointHighlightByEnd = null,
 }) {
   const { t } = useI18n();
 
@@ -69,6 +71,8 @@ function GameTable({
             scoreHighlights={scoreHighlights}
             hiddenIds={hiddenIds}
             rulesetId={rulesetId}
+            onEndpointActivate={onEndpointActivate}
+            endpointHighlightByEnd={endpointHighlightByEnd}
           />
 
           {playScore && !roundSummary ? (

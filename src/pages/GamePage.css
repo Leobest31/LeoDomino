@@ -129,6 +129,17 @@
   pointer-events: auto;
 }
 
+.game-page__end-choice {
+  position: absolute;
+  left: 50%;
+  bottom: 0.65rem;
+  z-index: 8;
+  display: flex;
+  gap: 0.45rem;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
 .game-page__dock .bottom-bar {
   flex: 1 1 auto;
   min-height: var(--game-dock-height, 48px);

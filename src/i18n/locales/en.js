@@ -484,6 +484,10 @@ export default {
     yourTurn: "Your turn",
     playToOpenRound: "Play {{tile}} to open the round.",
     dragToEnd: "Drag to the left or right end",
+    chooseLeftEnd: "Left end",
+    chooseRightEnd: "Right end",
+    chooseNorthEnd: "Top end",
+    chooseSouthEnd: "Bottom end",
     waiting: "Waiting",
     thinking: "Thinking…",
     tilesCount: {

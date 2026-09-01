@@ -112,6 +112,17 @@ assert.doesNotMatch(
   target.dispatch("pointermove", { clientX: 80, clientY: 90, pointerId: 7 });
   assert.equal(ghost.x, 80, "B. captured pointermove updates ghost x");
   assert.equal(ghost.y, 90, "B. captured pointermove updates ghost y");
+  let cancelled = 0;
+  const stopLost = attachCapturedPointerTracking(target, {
+    onMove() {},
+    onUp() {},
+    onCancel() {
+      cancelled += 1;
+    },
+  });
+  target.dispatch("lostpointercapture", { pointerId: 7 });
+  assert.equal(cancelled, 1, "lostpointercapture ends the captured drag");
+  stopLost();
   stop();
 }
 

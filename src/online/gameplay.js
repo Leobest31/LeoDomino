@@ -68,7 +68,7 @@ export function resolveTurnTimeout(matchId, expectedVersion, client) {
   return invoke("resolve_turn_timeout", { matchId, expectedVersion }, client);
 }
 
-export function subscribeGameSession(matchId, onEvent, client) {
+export function subscribeGameSession(matchId, onEvent, client, onStatus) {
   const db = clientOf(client);
   const channel = db.channel(`leo-game-session-${matchId}`);
   channel
@@ -79,7 +79,9 @@ export function subscribeGameSession(matchId, onEvent, client) {
         onEvent?.(payload);
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      onStatus?.(status);
+    });
   return () => {
     db.removeChannel(channel);
   };

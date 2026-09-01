@@ -77,6 +77,8 @@ export function watchHandScrollOrDrag(event, options) {
         originY,
         currentTarget: target,
         button: 0,
+        buttons: moveEvent.buttons,
+        pointerType: moveEvent.pointerType || event.pointerType,
         preventDefault() {},
       });
     }
@@ -104,9 +106,36 @@ export function captureTileDragPointer(target, pointerId) {
   }
 }
 
+export function releaseTileDragPointer(target, pointerId) {
+  if (!target || pointerId == null) return;
+  try {
+    if (typeof target.hasPointerCapture === "function" && !target.hasPointerCapture(pointerId)) {
+      return;
+    }
+    target.releasePointerCapture?.(pointerId);
+  } catch {
+    /* already released */
+  }
+}
+
+/**
+ * Pointer still down enough to start a tile drag. A deferred-drag callback
+ * after lift must not create a stuck ghost with no later pointerup.
+ */
+export function pointerStillDown(event) {
+  if (!event) return false;
+  const buttons = Number(event.buttons);
+  if (Number.isFinite(buttons) && buttons === 0 && event.pointerType !== "touch") {
+    return false;
+  }
+  return true;
+}
+
 /**
  * After setPointerCapture, iOS Safari delivers pointermove to the captured
  * element (and document in capture phase), not window.
+ * Bind from the drag-start path (not only a later React effect) so a fast
+ * pointerup cannot miss the listener and lock the hand.
  * @param {EventTarget | null | undefined} target
  * @param {{ onMove?: Function, onUp?: Function, onCancel?: Function }} handlers
  */
@@ -139,14 +168,20 @@ export function attachCapturedPointerTracking(target, handlers) {
   for (const host of hosts) {
     if (onMove) host.addEventListener("pointermove", onMove, moveOpts);
     if (onceUp) host.addEventListener("pointerup", onceUp, endOpts);
-    if (onceCancel) host.addEventListener("pointercancel", onceCancel, endOpts);
+    if (onceCancel) {
+      host.addEventListener("pointercancel", onceCancel, endOpts);
+      host.addEventListener("lostpointercapture", onceCancel, endOpts);
+    }
   }
 
   return () => {
     for (const host of hosts) {
       if (onMove) host.removeEventListener("pointermove", onMove, moveOpts);
       if (onceUp) host.removeEventListener("pointerup", onceUp, endOpts);
-      if (onceCancel) host.removeEventListener("pointercancel", onceCancel, endOpts);
+      if (onceCancel) {
+        host.removeEventListener("pointercancel", onceCancel, endOpts);
+        host.removeEventListener("lostpointercapture", onceCancel, endOpts);
+      }
     }
   };
 }

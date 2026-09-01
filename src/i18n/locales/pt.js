@@ -484,6 +484,10 @@ export default {
     yourTurn: "Sua vez",
     playToOpenRound: "Jogue {{tile}} para abrir a rodada.",
     dragToEnd: "Arraste para a ponta esquerda ou direita",
+    chooseLeftEnd: "Ponta esquerda",
+    chooseRightEnd: "Ponta direita",
+    chooseNorthEnd: "Ponta de cima",
+    chooseSouthEnd: "Ponta de baixo",
     waiting: "Aguardando",
     thinking: "A pensar…",
     tilesCount: {

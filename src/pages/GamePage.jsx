@@ -43,6 +43,7 @@ import { usesAmericanBoardLayout } from "../board/index.js";
 import { MOTION, wait } from "../utils/motion.js";
 import {
   attachCapturedPointerTracking,
+  pointerStillDown,
   shouldDeferHandDrag,
   watchHandScrollOrDrag,
 } from "../ui/handTilePointer.js";
@@ -211,6 +212,8 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const hiddenIdsRef = useRef(hiddenIds);
   const dragRef = useRef(null);
   const captureTargetRef = useRef(null);
+  const dragTrackingStopRef = useRef(null);
+  const dragFinishFnRef = useRef(null);
   const drawingRef = useRef(false);
   const skipClickRef = useRef(false);
   hiddenIdsRef.current = hiddenIds;
@@ -288,6 +291,8 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     async (clientX, clientY) => {
       const current = dragRef.current;
       if (!current) return;
+      dragTrackingStopRef.current?.();
+      dragTrackingStopRef.current = null;
       captureTargetRef.current = null;
 
       const snap = stateRef.current;
@@ -359,9 +364,15 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     },
     [hideTile, placeTileOnBoard, play, runFlight, setMotionLock, showTile, stateRef]
   );
+  dragFinishFnRef.current = finishDrag;
 
   useEffect(() => {
-    if (!drag) return undefined;
+    if (!drag) {
+      dragTrackingStopRef.current?.();
+      dragTrackingStopRef.current = null;
+      return undefined;
+    }
+    if (dragTrackingStopRef.current) return undefined;
     const pointerId = drag.pointerId;
 
     const onMove = (event) => {
@@ -399,15 +410,16 @@ function GamePage({ onMainMenu, matchOptions = null }) {
 
     const onUp = (event) => {
       if (pointerId != null && event.pointerId !== pointerId) return;
-      void finishDrag(event.clientX, event.clientY);
+      void dragFinishFnRef.current?.(event.clientX, event.clientY);
     };
 
-    return attachCapturedPointerTracking(captureTargetRef.current, {
+    dragTrackingStopRef.current = attachCapturedPointerTracking(captureTargetRef.current, {
       onMove,
       onUp,
       onCancel: onUp,
     });
-  }, [drag, finishDrag, stateRef]);
+    return undefined;
+  }, [drag, stateRef]);
 
   useEffect(() => {
     const pts = Number(lastPlayPoints) || 0;
@@ -592,6 +604,9 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     const startDrag = (pointerEvent) => {
       const target = pointerEvent.currentTarget;
       if (!target) return;
+      if (!pointerStillDown(pointerEvent) && pointerEvent.pointerType !== "touch") {
+        return;
+      }
       const rect = target.getBoundingClientRect();
       pointerEvent.preventDefault?.();
       try {
@@ -601,8 +616,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       }
       captureTargetRef.current = target;
 
-      hideTile(tileId);
-      setDrag({
+      const nextDrag = {
         tileId,
         left: tile.left,
         right: tile.right,
@@ -613,6 +627,52 @@ function GamePage({ onMainMenu, matchOptions = null }) {
         w: rect.width,
         h: rect.height,
         pointerId: pointerEvent.pointerId,
+      };
+      dragRef.current = nextDrag;
+      hideTile(tileId);
+      setDrag(nextDrag);
+      const pointerId = pointerEvent.pointerId;
+      dragTrackingStopRef.current?.();
+      const onMove = (moveEvent) => {
+        if (pointerId != null && moveEvent.pointerId !== pointerId) return;
+        setDrag((prev) =>
+          prev
+            ? {
+                ...prev,
+                x: moveEvent.clientX,
+                y: moveEvent.clientY,
+              }
+            : null
+        );
+        const current = dragRef.current;
+        if (!current) return;
+        const snap = stateRef.current;
+        const legalEnds = legalEndsForTile(
+          getAvailableActions(snap).legalMoves,
+          current.tileId
+        );
+        setHotEnd(
+          pickTargetDestination(
+            moveEvent.clientX,
+            moveEvent.clientY,
+            collectDestinationTargets(legalEnds, {
+              board: snap.board,
+              spinnerId: snap.spinnerId,
+              spinnerNorth: snap.spinnerNorth,
+              spinnerSouth: snap.spinnerSouth,
+              rulesetId: snap.rulesetId,
+            })
+          )
+        );
+      };
+      const onUp = (upEvent) => {
+        if (pointerId != null && upEvent.pointerId !== pointerId) return;
+        void dragFinishFnRef.current?.(upEvent.clientX, upEvent.clientY);
+      };
+      dragTrackingStopRef.current = attachCapturedPointerTracking(target, {
+        onMove,
+        onUp,
+        onCancel: onUp,
       });
       const snap = stateRef.current;
       setHotEnd(

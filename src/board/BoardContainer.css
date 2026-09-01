@@ -101,6 +101,11 @@
   pointer-events: none;
 }
 
+.board-container__slot--endpoint {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 .board-container__score-glow {
   position: absolute;
   pointer-events: none;

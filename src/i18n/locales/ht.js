@@ -487,6 +487,10 @@ export default {
     yourTurn: "Se tou ou",
     playToOpenRound: "Jwe {{tile}} pou louvri wo a.",
     dragToEnd: "Trennen nan bò goch oswa dwat",
+    chooseLeftEnd: "Bò goch",
+    chooseRightEnd: "Bò dwat",
+    chooseNorthEnd: "Bò anwo",
+    chooseSouthEnd: "Bò anba",
     waiting: "Ap tann",
     thinking: "Ap reflechi…",
     tilesCount: {

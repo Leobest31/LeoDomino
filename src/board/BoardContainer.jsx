@@ -24,6 +24,7 @@ import {
   layoutDevDiagnosticsEnabled,
   playedTableTiles,
 } from "./boardIntegrity.js";
+import { endpointEndForTileId } from "../online/interactionRecovery.js";
 import "./BoardContainer.css";
 
 /**
@@ -51,6 +52,8 @@ function BoardContainer({
   scoreHighlights = [],
   hiddenIds = null,
   rulesetId = "",
+  onEndpointActivate = null,
+  endpointHighlightByEnd = null,
 }) {
   const stageRef = useRef(null);
   const probeRef = useRef(null);
@@ -225,7 +228,7 @@ function BoardContainer({
     const onPointerDown = (event) => {
       if (event.button != null && event.button !== 0) return;
       // Don't steal taps meant for interactive chrome inside the stage.
-      if (event.target?.closest?.("button, a, input, select, textarea")) return;
+      if (event.target?.closest?.("button, a, input, select, textarea, [data-endpoint-hit]")) return;
       panDragRef.current = {
         pointerId: event.pointerId,
         startX: event.clientX,
@@ -396,11 +399,14 @@ function BoardContainer({
             const isVertical = display.orientation !== "horizontal";
             const isTip = tipIds.has(tile.id);
             const isTarget = Boolean(targetTileId) && tile.id === targetTileId;
+            const endpointEnd = endpointEndForTileId(endpointHighlightByEnd, tile.id);
+            const isEndpoint = Boolean(onEndpointActivate) && Boolean(endpointEnd);
             const classes = [
               "board-container__slot",
               tile.id === newestId ? "board-container__slot--enter" : "",
               isTip ? "board-container__slot--tip" : "",
-              isTarget ? "board-container__slot--target" : "",
+              isTarget || isEndpoint ? "board-container__slot--target" : "",
+              isEndpoint ? "board-container__slot--endpoint" : "",
               halves.first || halves.second ? "board-container__slot--score" : "",
             ]
               .filter(Boolean)
@@ -412,6 +418,7 @@ function BoardContainer({
                 className={classes}
                 role="listitem"
                 data-board-tile={tile.id}
+                data-endpoint-hit={isEndpoint ? endpointEnd : undefined}
                 data-travel-dir={pos.travelDir || undefined}
                 data-score-glow={
                   halves.first || halves.second
@@ -425,13 +432,21 @@ function BoardContainer({
                   height: pos.h,
                   transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
                 }}
+                onClick={
+                  isEndpoint
+                    ? (event) => {
+                        event.stopPropagation();
+                        onEndpointActivate(endpointEnd);
+                      }
+                    : undefined
+                }
               >
                 <DominoTile
                   left={display.left}
                   right={display.right}
                   orientation={display.orientation}
                   boardTileId={tile.id}
-                  highlighted={isTarget}
+                  highlighted={isTarget || isEndpoint}
                   hidden={Boolean(hiddenIds?.has(tile.id))}
                 />
                 {halves.first ? (
