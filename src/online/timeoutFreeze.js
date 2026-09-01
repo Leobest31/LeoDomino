@@ -72,6 +72,15 @@ export function nextTimeoutRetryAt(attempt, nowMs = Date.now()) {
   return nowMs + TIMEOUT_RESOLVE_RETRY_MS[index];
 }
 
+/** Logical timeout identity: same match + version + deadline cannot be hammered. */
+export function timeoutResolveKey(view) {
+  const matchId = view?.matchId != null ? String(view.matchId) : "";
+  const version = Number.isInteger(Number(view?.version)) ? String(Number(view.version)) : "";
+  const deadline = view?.turnDeadlineAt != null ? String(view.turnDeadlineAt) : "";
+  if (!matchId || version === "") return "";
+  return `${matchId}|${version}|${deadline}`;
+}
+
 export function planTimeoutTick(view, options = {}) {
   const nowMs = options.nowMs ?? Date.now();
   const monoMs = options.monoMs;
@@ -81,6 +90,11 @@ export function planTimeoutTick(view, options = {}) {
   if (!isTurnDeadlineExpired(view, nowMs, monoMs)) return { action: "idle" };
   const retryAt = Number(options.retryNotBefore);
   if (Number.isFinite(retryAt) && nowMs < retryAt) return { action: "wait" };
+  const key = timeoutResolveKey(view);
+  if (key && options.attemptedKey === key) {
+    if (!Number.isFinite(retryAt) || retryAt <= 0) return { action: "wait" };
+    return { action: "resolve" };
+  }
   return { action: "resolve" };
 }
 

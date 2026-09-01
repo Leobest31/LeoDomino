@@ -44,6 +44,52 @@ export function stampDeadlineReceipt(view, extras = {}) {
 }
 
 /**
+ * HTTP views may carry the Edge isolate's performance.now() as deadlineReceivedMono.
+ * That value is not comparable to the browser clock and makes remaining time hit 0
+ * immediately. Always stamp the client monotonic origin locally.
+ */
+export function stampClientDeadlineReceipt(view, nowMono = monotonicNow()) {
+  if (!view || typeof view !== "object") return view;
+  if (!view.turnDeadlineAt && !view.serverNow) return view;
+  const wired = { ...view };
+  delete wired.deadlineReceivedMono;
+  return stampDeadlineReceipt(wired, {
+    serverNow: wired.serverNow,
+    deadlineReceivedAt: wired.deadlineReceivedAt ?? wired.serverNow,
+    deadlineReceivedMono: nowMono,
+  });
+}
+
+/**
+ * Same-version refresh must be allowed to adopt a newer serverNow so the client
+ * can leave "Waiting for timeout…" when the server says the deadline is not due.
+ * Hands / interaction stay on `previous`; only the timeout clock moves.
+ */
+export function overlayNewerTimeoutClock(previous, incoming, nowMono = monotonicNow()) {
+  if (!previous) return incoming ?? null;
+  if (!incoming) return previous;
+  const nextDeadline = incoming.turnDeadlineAt ?? previous.turnDeadlineAt;
+  const nextStrikes =
+    incoming.timeoutStrikes !== undefined ? incoming.timeoutStrikes : previous.timeoutStrikes;
+  const deadlineChanged = nextDeadline !== previous.turnDeadlineAt;
+  const incomingNow = parseTimestampMs(incoming.serverNow);
+  const prevNow = parseTimestampMs(previous.serverNow);
+  const serverNowAdvanced = incomingNow != null && (prevNow == null || incomingNow > prevNow);
+  if (!deadlineChanged && !serverNowAdvanced) return previous;
+  return stampDeadlineReceipt(
+    {
+      ...previous,
+      turnDeadlineAt: nextDeadline,
+      timeoutStrikes: nextStrikes,
+    },
+    {
+      serverNow: incoming.serverNow ?? previous.serverNow,
+      deadlineReceivedMono: nowMono,
+    }
+  );
+}
+
+/**
  * Remaining ms from authoritative deadline.
  * Uses serverNow at snapshot time plus monotonic elapsed so a client clock
  * change cannot extend the displayed (or resolved) window beyond the server deadline.

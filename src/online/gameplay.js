@@ -3,6 +3,7 @@
  * OnlineGamePage / useOnlineMatch consume this. GamePage (LeoBest) must not.
  */
 import { getSupabaseClient } from "./supabaseClient.js";
+import { gameplayCodeFromInvoke } from "./timeoutFreeze.js";
 
 export class GameplayClientError extends Error {
   /** @param {string} code @param {string} [message] @param {unknown} [cause] */
@@ -18,9 +19,11 @@ function clientOf(client) {
   return client ?? getSupabaseClient();
 }
 
-function throwFromFunctions(error, fallback) {
-  const code = error?.context?.code || error?.code || fallback;
-  const wrapped = new GameplayClientError(code, error?.message || fallback, error);
+function throwFromFunctions(error, data, fallback) {
+  const classified = gameplayCodeFromInvoke(error, data);
+  const code = classified.code || error?.context?.code || error?.code || fallback;
+  const message = classified.message || error?.message || fallback;
+  const wrapped = new GameplayClientError(code, message, error);
   const status = Number(error?.context?.status || error?.status || error?.cause?.status);
   if (Number.isInteger(status) && status >= 100) wrapped.status = status;
   throw wrapped;
@@ -36,10 +39,7 @@ async function invoke(op, payload, client) {
   const { data, error } = await clientOf(client).functions.invoke("online-game", {
     body,
   });
-  if (error) throwFromFunctions(error, "GAMEPLAY_FAILED");
-  if (data?.error) {
-    throw new GameplayClientError(data.error.code || "GAMEPLAY_FAILED", data.error.message);
-  }
+  if (error || data?.error) throwFromFunctions(error, data, "GAMEPLAY_FAILED");
   return data;
 }
 

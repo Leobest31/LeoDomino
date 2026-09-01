@@ -45,7 +45,13 @@ import {
 } from "../online/onlineTable.js";
 import { createOnlineMoveTrace, isOnlineMoveTraceEnabled } from "../online/onlineMoveTrace.js";
 import { isTurnDeadlineExpired } from "../online/turnTimeout.js";
-import { planTimeoutTick } from "../online/timeoutFreeze.js";
+import {
+  isFatalTimeoutError,
+  isRetryableTimeoutError,
+  nextTimeoutRetryAt,
+  planTimeoutTick,
+  timeoutResolveKey,
+} from "../online/timeoutFreeze.js";
 import {
   emptyServiceHealthState,
   noteServiceFailure,
@@ -75,6 +81,9 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const refreshQueuedRef = useRef(false);
   const roundAdvanceAtVersionRef = useRef(-1);
   const timeoutInFlightRef = useRef(false);
+  const timeoutRetryAtRef = useRef(0);
+  const timeoutAttemptRef = useRef(0);
+  const timeoutAttemptedKeyRef = useRef("");
   const serviceHealthRef = useRef(emptyServiceHealthState());
 
   matchIdRef.current = matchId;
@@ -163,6 +172,10 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     }
     setStatus("loading");
     setErrorKey("");
+    timeoutAttemptRef.current = 0;
+    timeoutRetryAtRef.current = 0;
+    timeoutAttemptedKeyRef.current = "";
+    timeoutInFlightRef.current = false;
     busyRef.current = false;
     setBusy(false);
     dragLockRef.current = false;
@@ -421,31 +434,48 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     if (shouldSuppressTimeoutResolve(serviceHealthRef.current)) return false;
     if (isMatchOverView(current) || current.phase !== "playing") return false;
     if (!isTurnDeadlineExpired(current)) return false;
+    const nowMs = Date.now();
+    if (nowMs < timeoutRetryAtRef.current) return false;
+    const attemptKey = timeoutResolveKey(current);
+    if (
+      attemptKey &&
+      timeoutAttemptedKeyRef.current === attemptKey &&
+      (!timeoutRetryAtRef.current || nowMs < timeoutRetryAtRef.current)
+    ) {
+      return false;
+    }
     timeoutInFlightRef.current = true;
+    timeoutAttemptedKeyRef.current = attemptKey;
+    const matchIdForRequest = current.matchId;
+    const expectedVersion = current.version;
     try {
       const next = asViewerSnapshot(
-        await resolveTurnTimeout(current.matchId, current.version)
+        await resolveTurnTimeout(matchIdForRequest, expectedVersion)
       );
-      if (unmountedRef.current) return true;
+      if (unmountedRef.current) return false;
       applyView(next, { force: true });
+      timeoutAttemptRef.current = 0;
+      timeoutRetryAtRef.current = 0;
+      timeoutAttemptedKeyRef.current = "";
       return true;
     } catch (error) {
-      if (
-        error?.code === "STALE_VERSION" ||
-        error?.code === "TIMEOUT_NOT_DUE" ||
-        error?.code === "MATCH_NOT_ELIGIBLE"
-      ) {
-        try {
-          await refreshView();
-        } catch {
-          /* keep last authoritative view */
-        }
-        return true;
+      timeoutAttemptRef.current += 1;
+      timeoutRetryAtRef.current = nextTimeoutRetryAt(timeoutAttemptRef.current, Date.now());
+      try {
+        await refreshView();
+      } catch {
+        /* keep last authoritative view */
+      }
+      if (error?.code === "STALE_VERSION" || error?.code === "TIMEOUT_NOT_DUE") {
+        return Boolean(isMatchOverView(viewRef.current));
       }
       markServiceResult(error);
       if (serviceHealthRef.current.outage) {
         if (!unmountedRef.current) setErrorKey(SERVICE_OUTAGE_I18N_KEY);
         return false;
+      }
+      if (isRetryableTimeoutError(error) || !isFatalTimeoutError(error)) {
+        return Boolean(isMatchOverView(viewRef.current));
       }
       if (!unmountedRef.current) setErrorKey(onlineErrorKey(error));
       return false;
@@ -477,6 +507,8 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       const current = viewRef.current;
       const planned = planTimeoutTick(current, {
         inFlight: timeoutInFlightRef.current,
+        retryNotBefore: timeoutRetryAtRef.current,
+        attemptedKey: timeoutAttemptedKeyRef.current,
         nowMs: Date.now(),
         serviceOutage: shouldSuppressTimeoutResolve(serviceHealthRef.current),
       });

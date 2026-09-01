@@ -8,7 +8,9 @@ import {
   TURN_TIMEOUT_MS,
   formatTurnSeconds,
   isTurnDeadlineExpired,
+  overlayNewerTimeoutClock,
   remainingTurnMs,
+  stampClientDeadlineReceipt,
   stampDeadlineReceipt,
   turnTimerTone,
 } from "./turnTimeout.js";
@@ -57,6 +59,26 @@ assert.equal(TIMEOUT_STRIKE_LIMIT, 3);
   assert.equal(afterRefresh.turnDeadlineAt, first.turnDeadlineAt);
   assert.ok(remainingTurnMs(afterRefresh, Date.parse(afterRefresh.serverNow), 50) < 60_000);
   console.log("  ✓ refresh keeps the same deadline instead of restarting at 60");
+}
+
+{
+  const wired = stampDeadlineReceipt(
+    {
+      phase: "playing",
+      turnDeadlineAt: "2026-08-29T12:01:00.000Z",
+    },
+    { serverNow: "2026-08-29T12:00:00.000Z", deadlineReceivedMono: 8 }
+  );
+  const client = stampClientDeadlineReceipt(wired, 90_000);
+  assert.equal(remainingTurnMs(wired, Date.parse(wired.serverNow), 90_000), 0);
+  assert.equal(remainingTurnMs(client, Date.parse(client.serverNow), 90_000), 60_000);
+  const overlaid = overlayNewerTimeoutClock(
+    client,
+    { ...client, serverNow: "2026-08-29T12:00:45.000Z" },
+    90_000
+  );
+  assert.equal(remainingTurnMs(overlaid, Date.parse(overlaid.serverNow), 90_000), 15_000);
+  console.log("  ✓ client restamp and newer serverNow reconcile remaining time");
 }
 
 console.log("  ✓ turnTimeout helpers");

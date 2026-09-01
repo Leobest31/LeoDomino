@@ -2,6 +2,7 @@
 
 export const EXPECTED_ERROR_CODES = Object.freeze([
   "STALE_VERSION",
+  "TIMEOUT_NOT_DUE",
   "MATCH_NOT_FOUND",
   "NOT_FOUND",
   "WRONG_TURN",

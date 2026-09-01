@@ -28,7 +28,12 @@ import { isAutoPlaceable, legalEndsForTile, resolvePlayChoice } from "../game/in
 import { destinationTileId } from "../game/destinationTarget.js";
 import { FIND_MATCH_RULESET_IDS, styleIdFromRulesetId } from "./matchmaking.js";
 import { HAITIAN_OPENING_TILE_ID } from "../game/rules/haitianStart.js";
-import { normalizeTimeoutStrikes, stampDeadlineReceipt } from "./turnTimeout.js";
+import {
+  normalizeTimeoutStrikes,
+  overlayNewerTimeoutClock,
+  stampClientDeadlineReceipt,
+  stampDeadlineReceipt,
+} from "./turnTimeout.js";
 
 export const ONLINE_SESSION_KEY = "leodomino.onlineMatch";
 export const ONLINE_MODE = "online";
@@ -161,7 +166,7 @@ function stampInteractionSource(next, source, options = {}) {
 
 /** Tag an Edge enter / getGameView / action payload as the interaction authority. */
 export function asViewerSnapshot(view) {
-  return sanitizeGameView(view, { asViewer: true });
+  return stampClientDeadlineReceipt(sanitizeGameView(view, { asViewer: true }));
 }
 
 export function viewVersion(view) {
@@ -309,11 +314,11 @@ export function keepAuthoritativeView(previous, next, options = {}) {
     clean.spinner = sealed.spinner;
     if (prevVersion >= 0 && nextVersion === prevVersion) {
       if (isFullerViewerSnapshot(previous, clean) && !isFullerViewerSnapshot(clean, previous)) {
-        return previous;
+        return overlayNewerTimeoutClock(previous, clean);
       }
       if (options.preferIncoming) return clean;
       if (isFullerViewerSnapshot(clean, previous)) return clean;
-      return previous;
+      return overlayNewerTimeoutClock(previous, clean);
     }
   }
   return clean;

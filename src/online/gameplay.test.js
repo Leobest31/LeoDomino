@@ -88,6 +88,25 @@ function mockClient(handler) {
 }
 
 {
+  const client = mockClient(async () => ({
+    data: { error: { code: "TIMEOUT_NOT_DUE", message: "timeout not due" } },
+    error: { message: "Edge function returned a non-2xx status code" },
+  }));
+  await assert.rejects(
+    () => resolveTurnTimeout("match-1", 2, client),
+    (err) => err instanceof GameplayClientError && err.code === "TIMEOUT_NOT_DUE"
+  );
+  const stale = mockClient(async () => ({
+    data: { error: { code: "STALE_VERSION", message: "expected_version does not match" } },
+    error: { message: "Edge function returned a non-2xx status code" },
+  }));
+  await assert.rejects(
+    () => resolveTurnTimeout("match-1", 2, stale),
+    (err) => err instanceof GameplayClientError && err.code === "STALE_VERSION"
+  );
+}
+
+{
   const client = mockClient(async () => ({ data: {}, error: null }));
   const stop = subscribeGameSession("match-1", () => {}, client);
   assert.equal(client.captured.realtime.filter.table, "game_sessions");

@@ -59,6 +59,7 @@ import {
   ONLINE_ACTION_PASS,
 } from "./gameAuthority.js";
 import { networkCallsForMove } from "./onlineMoveTrace.js";
+import { remainingTurnMs } from "./turnTimeout.js";
 
 assert.equal(lockedRulesetId("legacy"), "legacy");
 assert.equal(lockedRulesetId("haitian"), "haitian");
@@ -1225,6 +1226,25 @@ function findDrawState(rulesetId) {
   assert.deepEqual(merged.timeoutStrikes, [1, 0]);
   assert.equal(merged.deadlineReceivedMono, 9);
   console.log("  ✓ realtime merge keeps the server deadline");
+}
+
+{
+  const wired = asViewerSnapshot({
+    matchId: "m1",
+    version: 1,
+    phase: "playing",
+    turnDeadlineAt: "2026-08-29T12:01:00.000Z",
+    serverNow: "2026-08-29T12:00:00.000Z",
+    deadlineReceivedMono: 4,
+    myHand: ["6-6"],
+    handCounts: [1, 1],
+  });
+  assert.notEqual(wired.deadlineReceivedMono, 4);
+  assert.equal(
+    remainingTurnMs(wired, Date.parse("2026-08-29T12:00:00.000Z"), wired.deadlineReceivedMono),
+    60_000
+  );
+  console.log("  ✓ asViewerSnapshot restamps browser monotonic origin (Edge mono cannot poison remaining)");
 }
 
 console.log("  ✓ online table helpers");
