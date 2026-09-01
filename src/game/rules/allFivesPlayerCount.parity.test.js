@@ -262,13 +262,13 @@ function sameAward(makeState, tileId, end) {
   assert.equal(sameAward(make15, "3-6", END.RIGHT).awarded, 15);
 
   let board20 = createBoard();
-  board20 = placeTile(board20, createTile(5, 5), END.RIGHT);
-  board20 = placeTile(board20, createTile(4, 5), END.RIGHT);
+  board20 = placeTile(board20, createTile(6, 6), END.RIGHT);
+  board20 = placeTile(board20, createTile(4, 6), END.RIGHT);
+  board20 = placeTile(board20, createTile(4, 4), END.RIGHT);
   const report20 = explainAllFivesScore({
     board: board20,
     isOpening: false,
-    spinnerId: "5-5",
-    spinnerNorth: [{ id: "5-6", left: 5, right: 6 }],
+    spinnerId: "6-6",
   });
   assert.equal(report20.exactTotal, 20);
   assert.equal(report20.awarded, 20);
@@ -277,8 +277,7 @@ function sameAward(makeState, tileId, end) {
     assert.equal(explainAllFivesScore({
       board: board20,
       isOpening: false,
-      spinnerId: "5-5",
-      spinnerNorth: [{ id: "5-6", left: 5, right: 6 }],
+      spinnerId: "6-6",
     }).awarded, 20);
   }
   section("G. live 10 / 15 / 20 exact awards match across 2P/3P/4P");

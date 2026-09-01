@@ -4,8 +4,10 @@
  *
  * Live play: sum currently exposed terminal ends after every legal placement.
  * Award that exact total when it is a positive multiple of 5 (5, 10, 15, …).
- * An exposed double counts both halves. Spinner branches use the All Fives
- * terminal topology. Target 150.
+ * An exposed double counts both halves. A spinner double contributes both
+ * halves only while it has at most one attachment; after that only outer
+ * chain endpoints count. Extra spinner arms open after both main sides are
+ * occupied. Target 150.
  *
  * Deal / draw / pass chassis matches Classic. Scoring does not.
  */

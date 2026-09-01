@@ -38,7 +38,7 @@
     "test:turn-order": "node src/game/turnOrder.test.js",
     "test:rulesets": "node src/game/rulesets/rulesets.test.js",
     "test:haitian": "node src/game/rulesets/haitian.test.js",
-    "test:american": "node src/game/rulesets/american.test.js && node src/game/rules/americanScoring.test.js && node src/board/americanChain.layout.test.js",
+    "test:american": "node src/game/rulesets/american.test.js && node src/game/rules/americanScoring.test.js && node src/game/rules/americanLeoDominoSpinner.test.js && node src/board/americanChain.layout.test.js",
     "test:dominican": "node src/game/rulesets/dominican.test.js",
     "test:puertorican": "node src/game/rulesets/puertoRican.test.js",
     "test:dekabes": "node src/game/rules/dekabes.test.js",

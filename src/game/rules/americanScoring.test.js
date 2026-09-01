@@ -147,27 +147,29 @@ function americanOpening(tileId, extras = [], currentPlayer = 0) {
 }
 
 {
-  let state = americanOpening("4-4", ["4-6", "2-4", "2-6", "1-6"]);
+  let state = americanOpening("4-4", ["4-6", "4-5", "1-4", "2-4", "2-6"]);
   state = playTile(state, "4-4");
   state = { ...state, currentPlayer: 0 };
   state = playTile(state, "4-6", END.RIGHT);
   state = { ...state, currentPlayer: 0 };
-  state = playTile(state, "2-4", SPINNER_NORTH);
+  state = playTile(state, "4-5", END.LEFT);
   state = { ...state, currentPlayer: 0 };
-  state = playTile(state, "2-6", SPINNER_NORTH);
-  state = { ...state, currentPlayer: 0 };
-  const after = playTile(state, "1-6", END.RIGHT);
+  state = playTile(state, "1-4", SPINNER_NORTH);
   const report = explainAllFivesScore({
-    board: after.board,
-    spinnerId: after.spinnerId,
-    spinnerNorth: after.spinnerNorth,
-    spinnerSouth: after.spinnerSouth,
+    board: state.board,
+    spinnerId: state.spinnerId,
+    spinnerNorth: state.spinnerNorth,
+    spinnerSouth: state.spinnerSouth,
   });
-  assert.equal(after.spinnerId, "4-4");
-  assert.ok(after.spinnerNorth.length >= 1);
-  assert.equal(report.exactTotal, 15);
-  assert.equal(after.lastPlayPoints, 15);
-  section("spinner/branch scoring uses actual exposed American ends");
+  assert.equal(state.spinnerId, "4-4");
+  assert.ok(state.spinnerNorth.length >= 1);
+  assert.equal(
+    report.endpoints.some((end) => end.sourceTileId === "4-4"),
+    false
+  );
+  assert.equal(report.exactTotal, 12);
+  assert.equal(state.lastPlayPoints, 0);
+  section("spinner/branch scoring uses outer chain ends only after the spinner is enclosed");
 }
 
 {

@@ -443,12 +443,21 @@ section("portrait stages keep parallel-row clearance without device CSS");
     statusKey: null,
     statusVars: null,
   };
+  const loneMoves = listLegalMoves(state, 0);
+  const loneEnds = [...new Set(loneMoves.filter((m) => m.tileId === "4-5").map((m) => m.end))];
+  assert.ok(loneEnds.includes(END.LEFT), "4-5 can continue MAIN_LEFT");
+  assert.ok(loneEnds.includes(END.RIGHT), "4-5 can continue MAIN_RIGHT");
+  assert.equal(loneEnds.includes(END.NORTH), false, "extra arms closed until both mains are occupied");
+  assert.equal(loneEnds.includes(END.SOUTH), false);
+
+  state = playTile(state, "5-6", END.RIGHT);
+  state = { ...state, currentPlayer: 0 };
+  state = playTile(state, "2-5", END.LEFT);
+  state = { ...state, currentPlayer: 0 };
   const moves = listLegalMoves(state, 0);
   const endsFor45 = [...new Set(moves.filter((m) => m.tileId === "4-5").map((m) => m.end))];
-  assert.ok(endsFor45.includes(END.LEFT), "4-5 can continue MAIN_LEFT");
-  assert.ok(endsFor45.includes(END.RIGHT), "4-5 can continue MAIN_RIGHT");
-  assert.ok(endsFor45.includes(END.NORTH), "4-5 can attach to spinner left branch");
-  assert.ok(endsFor45.includes(END.SOUTH), "4-5 can attach to spinner right branch");
+  assert.ok(endsFor45.includes(END.NORTH), "4-5 can attach to spinner left branch after both mains");
+  assert.ok(endsFor45.includes(END.SOUTH), "4-5 can attach to spinner right branch after both mains");
 
   const leftPlay = playTile({ ...state, currentPlayer: 0 }, "4-5", END.NORTH);
   const rightPlay = playTile({ ...state, currentPlayer: 0 }, "4-5", END.SOUTH);
@@ -471,7 +480,7 @@ section("portrait stages keep parallel-row clearance without device CSS");
   const rightArm = [...rightLayout.tiles, ...rightLayout.armTiles].find((t) => t.tileId === "4-5");
   assert.ok(leftArm.x + leftArm.w <= leftSpin.x + 1, "legal NORTH play sits on the spinner's left");
   assert.ok(rightArm.x >= rightSpin.x + rightSpin.w - 1, "legal SOUTH play sits on the spinner's right");
-  section("legal play can choose the spinner's left or right branch");
+  section("legal play can choose the spinner's left or right branch after both mains");
 }
 
 function fourWayBoard(leftCount, rightCount, northCount, southCount) {

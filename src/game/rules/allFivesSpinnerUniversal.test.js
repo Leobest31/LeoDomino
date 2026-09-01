@@ -121,24 +121,27 @@ function record(pip, state, rep) {
       spinnerNorth: [nsArm("N", pip, f.c)],
       spinnerSouth: [nsArm("S", pip, f.d)],
     });
-    assert.deepEqual(valuesOf(ns), { spinner: pip * 2, north: f.c, south: f.d });
-    assert.equal(ns.exposedTotal, pip * 2 + f.c + f.d);
+    assert.deepEqual(valuesOf(ns), { north: f.c, south: f.d });
+    assert.equal(ns.exposedTotal, f.c + f.d);
+    assert.equal(ns.endpoints.some((e) => e.sourceTileId === id), false);
     record(pip, "NORTH + SOUTH active", ns);
 
     const leftNorth = score([leftArm(pip, f.a), s], {
       spinnerId: id,
       spinnerNorth: [nsArm("N", pip, f.c)],
     });
-    assert.deepEqual(valuesOf(leftNorth), { left: f.a, spinner: pip * 2, north: f.c });
-    assert.equal(leftNorth.exposedTotal, f.a + pip * 2 + f.c);
+    assert.deepEqual(valuesOf(leftNorth), { left: f.a, north: f.c });
+    assert.equal(leftNorth.exposedTotal, f.a + f.c);
+    assert.equal(leftNorth.endpoints.some((e) => e.sourceTileId === id), false);
     record(pip, "LEFT + NORTH", leftNorth);
 
     const rightSouth = score([s, rightArm(pip, f.b)], {
       spinnerId: id,
       spinnerSouth: [nsArm("S", pip, f.d)],
     });
-    assert.deepEqual(valuesOf(rightSouth), { right: f.b, spinner: pip * 2, south: f.d });
-    assert.equal(rightSouth.exposedTotal, f.b + pip * 2 + f.d);
+    assert.deepEqual(valuesOf(rightSouth), { right: f.b, south: f.d });
+    assert.equal(rightSouth.exposedTotal, f.b + f.d);
+    assert.equal(rightSouth.endpoints.some((e) => e.sourceTileId === id), false);
     record(pip, "RIGHT + SOUTH", rightSouth);
 
     const four = score([leftArm(pip, f.a), s, rightArm(pip, f.b)], {
@@ -267,11 +270,11 @@ function record(pip, state, rep) {
   );
   awards.push({ pts: 15, example: plus15 });
 
-  const plus20 = score([spin(5), rightArm(5, 4)], {
-    spinnerId: "5-5",
-    spinnerNorth: [nsArm("N", 5, 6)],
-  });
-  assert.deepEqual(valuesOf(plus20), { spinner: 10, right: 4, north: 6 });
+  const plus20 = score(
+    [spin(6), rightArm(6, 4), { id: "4-4", left: 4, right: 4 }],
+    { spinnerId: "6-6" }
+  );
+  assert.deepEqual(valuesOf(plus20), { spinner: 12, right: 8 });
   assert.equal(plus20.exposedTotal, 20);
   assert.equal(plus20.pointsAwarded, 20);
   awards.push({ pts: 20, example: plus20 });

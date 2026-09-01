@@ -171,8 +171,8 @@ function allFivesState(overrides = {}) {
     const legal = getAllFivesLegalMoves([partnerId], lone);
     assert.equal(
       legal.some((move) => move.end === SPINNER_NORTH || move.end === "north"),
-      true,
-      `${id}: empty north remains a legal destination`
+      false,
+      `${id}: extra arms stay closed on a lone spinner`
     );
     const loneRep = explain(lone.board, lone);
     assert.deepEqual(byBranch(loneRep), {

@@ -185,15 +185,15 @@ function spinnerBoard() {
     ],
   });
   const moves = getAllFivesLegalMoves(state.players[0].hand, state);
-  assert.equal(spinnerBranchesAvailable(state.players[0].hand, state), true);
+  assert.equal(spinnerBranchesAvailable(state.players[0].hand, state), false);
   assert.ok(moves.some((m) => m.end === END.RIGHT && m.tileId === "0-5"));
-  assert.ok(moves.some((m) => m.end === SPINNER_NORTH && m.tileId === "2-3"));
+  assert.equal(moves.some((m) => m.end === SPINNER_NORTH), false);
   assert.ok(moves.some((m) => m.end === END.LEFT && m.tileId === "2-3"));
   assert.equal(isAutoPlaceable(moves, "0-5"), true);
   assert.equal(isAutoPlaceable(moves, "2-3"), true);
   assert.equal(resolvePlayChoice(moves, "2-3")?.end, END.LEFT);
-  assert.equal(resolvePlayChoice(moves, "2-3", SPINNER_NORTH)?.end, SPINNER_NORTH);
-  section("Case C — unique main-chain end auto-places; spinner remains an explicit target");
+  assert.equal(resolvePlayChoice(moves, "2-3", SPINNER_NORTH), null);
+  section("Case C — unique main-chain end auto-places; extra spinner arms stay closed");
 }
 
 {
@@ -208,9 +208,10 @@ function spinnerBoard() {
   });
   const moves = getAllFivesLegalMoves(state.players[0].hand, state);
   assert.ok(moves.some((m) => m.end === END.LEFT && m.tileId === "0-2"));
-  assert.ok(moves.some((m) => m.end === SPINNER_SOUTH && m.tileId === "3-5"));
+  assert.ok(moves.some((m) => m.end === END.RIGHT && m.tileId === "3-5"));
+  assert.equal(moves.some((m) => m.end === SPINNER_SOUTH), false);
   assert.equal(isAutoPlaceable(moves, "0-2"), true);
-  section("legal left move does not hide spinner destinations for other tiles");
+  section("legal left move stays on the main chain while extra spinner arms are closed");
 }
 
 {
@@ -226,10 +227,10 @@ function spinnerBoard() {
   const moves = getAllFivesLegalMoves(state.players[0].hand, state);
   assert.ok(moves.some((m) => m.end === END.LEFT));
   assert.ok(moves.some((m) => m.end === END.RIGHT));
-  assert.ok(moves.some((m) => m.end === SPINNER_NORTH));
-  assert.ok(moves.some((m) => m.end === SPINNER_SOUTH));
+  assert.equal(moves.some((m) => m.end === SPINNER_NORTH), false);
+  assert.equal(moves.some((m) => m.end === SPINNER_SOUTH), false);
   assert.equal(isAutoPlaceable(moves, "2-3"), false);
-  section("legal left+right+spinner → player must choose; no auto-play");
+  section("legal left+right on a lone spinner → player must choose; extra arms stay closed");
 }
 
 {
@@ -414,11 +415,10 @@ function openDouble(pip) {
     "empty TOP/BOTTOM are not extra spinner-port copies"
   );
   const total = ends.reduce((sum, end) => sum + end.value, 0);
-  assert.equal(byPort.spinner.value, 8);
-  assert.equal(byPort.spinner.type, "terminal-double");
-  assert.equal(total, 15);
-  assert.equal(scoreAllFivesPlay({ board, isOpening: false, spinnerId: "4-4", spinnerNorth: [{ id: "4-1", left: 4, right: 1 }] }), 15);
-  section("E. one-sided spinner still counts both halves; empty south is not a terminal");
+  assert.equal(byPort.spinner, undefined, "two attachments: spinner is no longer a scoring terminal");
+  assert.equal(total, 7);
+  assert.equal(scoreAllFivesPlay({ board, isOpening: false, spinnerId: "4-4", spinnerNorth: [{ id: "4-1", left: 4, right: 1 }] }), 0);
+  section("E. two attachments exclude spinner 8; empty south is not a terminal");
 }
 
 {
@@ -437,14 +437,14 @@ function openDouble(pip) {
       .every((end) => end.source === "terminal"),
     true
   );
-  assert.equal(ends.reduce((sum, end) => sum + end.value, 0), 8 + 6 + 1 + 2);
-  section("F. empty main side keeps spinner as terminal double; N/S outers also count");
+  assert.equal(ends.reduce((sum, end) => sum + end.value, 0), 6 + 1 + 2);
+  assert.equal(ends.some((end) => end.tileId === "4-4"), false);
+  section("F. three attachments: spinner 0; only outer N/S/right pips count");
 }
 
 {
-  // Current 4-4 bug: leftmost spinner, right occupied, top occupied.
-  // Old logic counted terminal 4-4 as 8 plus empty south 4 plus outer ends
-  // 3 and 0 = 15. Occupied spinner faces must not add 4+4.
+  // T-shape: right occupied + top occupied. Spinner is internal (0).
+  // Old engine still added 4-4 = 8 → 8+3+0 = 11 or a 4-port 15.
   let board = openDouble(4);
   board = placeTile(board, createTile(3, 4), END.RIGHT);
   const layout = {
@@ -456,15 +456,15 @@ function openDouble(pip) {
   const spinnerContribution = ends
     .filter((end) => end.tileId === "4-4")
     .reduce((sum, end) => sum + end.value, 0);
-  assert.equal(spinnerContribution, 8, "one-sided 4-4 still counts both halves");
-  assert.equal(total, 11);
+  assert.equal(spinnerContribution, 0, "two attachments: spinner contributes 0");
+  assert.equal(total, 3);
   assert.equal(scoreAllFivesPlay({ board, isOpening: false, ...layout }), 0);
   assert.equal(
     ends.some((end) => end.port === "south"),
     false,
     "empty south is not a fourth copy of the spinner pip"
   );
-  section("G. 4-4 one-sided + top 0 + right 3 = 11, not a 4-port 15");
+  section("G. 4-4 T-shape + top 0 + right 3 = 3, spinner 8 excluded");
 }
 
 {
@@ -507,8 +507,7 @@ function openDouble(pip) {
     const spinnerOpen = branched.filter((end) => end.source === "spinner-port");
     assert.equal(spinnerOpen.length, 0, `${id} empty TOP/BOTTOM are not spinner-port copies`);
     const spinnerTerm = branched.find((end) => end.tileId === id);
-    assert.equal(spinnerTerm?.reason, "spinner-terminal-double-on-main-line");
-    assert.equal(spinnerTerm?.contribution, pip * 2);
+    assert.equal(spinnerTerm, undefined, `${id} T-shape: spinner is not a terminal`);
     assert.equal(
       branched.some((end) => end.port === "south"),
       false,

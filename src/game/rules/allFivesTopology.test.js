@@ -161,12 +161,12 @@ function allFivesState(overrides = {}) {
   assert.equal(rep.endpoints.some((end) => end.branch === "south"), false);
   assert.equal(
     rep.endpoints.filter((end) => end.sourceTileId === "4-4").reduce((s, e) => s + e.value, 0),
-    8
+    0
   );
-  assert.equal(rep.exposedTotal, 11);
+  assert.equal(rep.exposedTotal, 3);
   assert.equal(rep.pointsAwarded, 0);
   assert.notEqual(rep.exposedTotal, 15);
-  section("H. spinner 4-4 one-sided + 3 + north 0 = 11, empty south not a fourth 4");
+  section("H. spinner 4-4 T-shape + 3 + north 0 = 3, spinner 8 excluded");
 }
 
 {
@@ -205,13 +205,13 @@ function allFivesState(overrides = {}) {
     false,
     "consumed 6 on 4-6 is internal"
   );
-  assert.deepEqual(valuesOf(rep), { spinner: 8, right: 1, north: 6 });
-  assert.equal(rep.exposedTotal, 15);
-  assert.equal(rep.pointsAwarded, 15);
+  assert.deepEqual(valuesOf(rep), { right: 1, north: 6 });
+  assert.equal(rep.exposedTotal, 7);
+  assert.equal(rep.pointsAwarded, 0);
   const dump = formatAllFivesScoreReport(rep);
-  assert.match(dump, /EXPOSED TOTAL: 15/);
-  assert.match(dump, /POINTS: 15/);
-  section("J. one-sided 4-4 + right 1 + north 6 = 15; empty south is not counted");
+  assert.match(dump, /EXACT TOTAL: 7/);
+  assert.match(dump, /POINTS: 0/);
+  section("J. T-shape 4-4 + right 1 + north 6 = 7; spinner 8 excluded");
 }
 
 {
@@ -232,14 +232,14 @@ function allFivesState(overrides = {}) {
   });
   assert.equal(rep.boardTileIds.includes("4-1"), false);
   assert.equal(rep.endpoints.some((end) => end.sourceTileId === "4-1"), false);
-  assert.deepEqual(valuesOf(rep), { spinner: 10, right: 3, north: 2 });
-  assert.equal(rep.exposedTotal, 15);
-  assert.equal(rep.pointsAwarded, 15);
+  assert.deepEqual(valuesOf(rep), { right: 3, north: 2 });
+  assert.equal(rep.exposedTotal, 5);
+  assert.equal(rep.pointsAwarded, 5);
   const dump = formatAllFivesScoreReport(rep);
   assert.match(dump, /MOVE: 3-5/);
-  assert.match(dump, /EXPOSED TOTAL: 15/);
-  assert.match(dump, /POINTS: 15/);
-  section("K. one-sided 5-5 + 3 + north 2 = 15; empty south is not a fourth 5");
+  assert.match(dump, /EXACT TOTAL: 5/);
+  assert.match(dump, /POINTS: 5/);
+  section("K. T-shape 5-5 + 3 + north 2 = 5; spinner 10 excluded");
 }
 
 {
@@ -288,9 +288,9 @@ function allFivesState(overrides = {}) {
     spinnerId: "5-5",
     spinnerNorth: [{ id: "n-6", left: 5, right: 6 }],
   });
-  assert.equal(rep.exposedTotal, 20);
-  assert.equal(rep.pointsAwarded, 20);
-  section("O. valid +20 from spinner double + 4 + north 6");
+  assert.equal(rep.exposedTotal, 10);
+  assert.equal(rep.pointsAwarded, 10);
+  section("O. valid +10 from outer 4 + north 6 (spinner no longer a terminal)");
 }
 
 {
@@ -301,8 +301,8 @@ function allFivesState(overrides = {}) {
     spinnerNorth: [{ id: "n-6", left: 5, right: 6 }],
     spinnerSouth: [{ id: "s-5", left: 5, right: 5 }],
   });
-  assert.equal(rep.exposedTotal, 30);
-  assert.equal(rep.pointsAwarded, 30);
+  assert.equal(rep.exposedTotal, 20);
+  assert.equal(rep.pointsAwarded, 20);
   assert.equal(
     rep.terminals.find((end) => end.sourceTileId === "s-5")?.type,
     "terminal-double"
@@ -311,7 +311,7 @@ function allFivesState(overrides = {}) {
     rep.terminals.find((end) => end.sourceTileId === "s-5")?.contribution,
     10
   );
-  section("P. valid +30 from spinner double + 4 + north 6 + south 5-5");
+  section("P. valid +20 from outer 4 + north 6 + south 5-5 (spinner 0)");
 }
 
 {
@@ -360,20 +360,22 @@ function allFivesState(overrides = {}) {
   });
   assert.deepEqual(a.endpoints, b.endpoints);
   assert.equal(a.exposedTotal, b.exposedTotal);
-  assert.equal(a.pointsAwarded, 20);
+  assert.equal(a.pointsAwarded, 10);
   section("S. same topology after resize → identical score");
 }
 
 {
   let state = allFivesState({
     players: [
-      { id: "a", hand: ["4-4", "4-6", "2-4", "2-6", "1-6", "0-0"] },
+      { id: "a", hand: ["4-4", "4-6", "0-4", "2-4", "2-6", "1-6"] },
       { id: "b", hand: ["0-1"] },
     ],
   });
   state = playTile(state, "4-4");
   state = { ...state, currentPlayer: 0 };
   state = playTile(state, "4-6", END.RIGHT);
+  state = { ...state, currentPlayer: 0 };
+  state = playTile(state, "0-4", END.LEFT);
   state = { ...state, currentPlayer: 0 };
   state = playTile(state, "2-4", SPINNER_NORTH);
   state = { ...state, currentPlayer: 0 };
@@ -388,25 +390,27 @@ function allFivesState(overrides = {}) {
     tileId: "1-6",
     end: END.RIGHT,
   });
-  assert.deepEqual(valuesOf(expected), { spinner: 8, right: 1, north: 6 });
-  assert.equal(expected.exposedTotal, 15);
-  assert.equal(after.lastPlayPoints, 15);
-  section("J-engine. playTile 6-1 awards +15 from spinner double + 1 + 6");
+  assert.deepEqual(valuesOf(expected), { left: 0, right: 1, north: 6 });
+  assert.equal(expected.exposedTotal, 7);
+  assert.equal(after.lastPlayPoints, 0);
+  section("J-engine. playTile after both mains: outers 0+1+6=7, spinner excluded");
 }
 
 {
   let state = allFivesState({
     players: [
-      { id: "a", hand: ["5-5", "2-5", "3-5", "0-0"] },
+      { id: "a", hand: ["5-5", "2-5", "3-5", "0-5"] },
       { id: "b", hand: ["1-4", "0-1"] },
     ],
     reserve: ["6-6"],
   });
   state = playTile(state, "5-5");
   state = { ...state, currentPlayer: 0 };
-  state = playTile(state, "2-5", SPINNER_NORTH);
+  state = playTile(state, "3-5", END.RIGHT);
   state = { ...state, currentPlayer: 0 };
-  const after = playTile(state, "3-5", END.RIGHT);
+  state = playTile(state, "0-5", END.LEFT);
+  state = { ...state, currentPlayer: 0 };
+  const after = playTile(state, "2-5", SPINNER_NORTH);
   assert.equal(after.board.some((tile) => tile.id === "1-4" || tile.id === "4-1"), false);
   assert.equal(after.players[1].hand.includes("1-4"), true);
   const expected = explainAllFivesScore({
@@ -414,15 +418,15 @@ function allFivesState(overrides = {}) {
     spinnerId: after.spinnerId,
     spinnerNorth: after.spinnerNorth,
     spinnerSouth: after.spinnerSouth,
-    tileId: "3-5",
-    end: END.RIGHT,
+    tileId: "2-5",
+    end: SPINNER_NORTH,
     byId: after.byId,
   });
   assert.equal(expected.endpoints.some((end) => end.sourceTileId === "4-1"), false);
-  assert.deepEqual(valuesOf(expected), { spinner: 10, right: 3, north: 2 });
-  assert.equal(expected.exposedTotal, 15);
-  assert.equal(after.lastPlayPoints, 15);
-  section("K-engine. playTile 5-3 awards +15; unplayed 4-1 cannot affect score");
+  assert.deepEqual(valuesOf(expected), { left: 0, right: 3, north: 2 });
+  assert.equal(expected.exposedTotal, 5);
+  assert.equal(after.lastPlayPoints, 5);
+  section("K-engine. playTile after both mains: 0+3+2=5; unplayed 4-1 cannot affect score");
 }
 
 {

@@ -8,9 +8,14 @@
  * LEGAL PLAY PORT != SCORING TERMINAL.
  * Empty TOP/BOTTOM ports are destinations, not extra copies of the spinner pip.
  *
- * While only one MAIN side is occupied, the spinner is still a terminal double
- * on the main line: both halves count (X+X), plus the outer branch pip (Y).
- * Once BOTH main sides are occupied, the spinner is internal (contribution 0).
+ * Spinner double scoring (LeoDomino American):
+ *   The spinner contributes both halves (X+X) only while it is still the
+ *   single exposed double terminal — zero or exactly one tile attached to it.
+ *   Once two or more occupied chain directions exist (main and/or arms),
+ *   the spinner is internal and contributes 0. Only outer endpoints count.
+ *
+ * Extra spinner arms (NORTH/SOUTH) are not legal until BOTH main sides are
+ * occupied. After that, a matching tile may be dragged onto an open arm.
  *
  * A non-double terminal contributes its outward pip once.
  * A non-spinner double that is the outermost tile of a branch contributes
@@ -167,7 +172,7 @@ function pushTerminal(ends, branch, tile, outwardFace, spinnerId) {
 }
 
 /**
- * Spinner still sits at an open main-chain end: both halves count.
+ * Spinner is still the exposed double terminal (0 or 1 attachment).
  * Empty TOP/BOTTOM ports are not extra copies of this pip.
  */
 function pushSpinnerMainTerminalDouble(ends, tile) {
@@ -191,11 +196,62 @@ function pushSpinnerMainTerminalDouble(ends, tile) {
 }
 
 /**
+ * Occupied spinner directions: each filled MAIN_LEFT / MAIN_RIGHT /
+ * SPINNER_TOP / SPINNER_BOTTOM counts as one attachment, regardless of chain length.
+ *
+ * @param {object[]} board
+ * @param {string|null} spinnerId
+ * @param {object[]} [north]
+ * @param {object[]} [south]
+ * @returns {number}
+ */
+export function countSpinnerAttachments(board, spinnerId, north = [], south = []) {
+  if (!spinnerId || !Array.isArray(board) || !board.length) return 0;
+  const spinnerIndex = board.findIndex((tile) => tile.id === spinnerId);
+  if (spinnerIndex < 0) return 0;
+  const leftOccupied = spinnerIndex > 0;
+  const rightOccupied = spinnerIndex < board.length - 1;
+  return (
+    (leftOccupied ? 1 : 0) +
+    (rightOccupied ? 1 : 0) +
+    (Array.isArray(north) && north.length ? 1 : 0) +
+    (Array.isArray(south) && south.length ? 1 : 0)
+  );
+}
+
+/**
+ * Spinner scores as a terminal double only with 0 or 1 attachment.
+ *
+ * @param {object[]} board
+ * @param {string|null} spinnerId
+ * @param {object[]} [north]
+ * @param {object[]} [south]
+ */
+export function isSpinnerExposedScoringTerminal(board, spinnerId, north = [], south = []) {
+  if (!spinnerId || !Array.isArray(board) || !board.some((tile) => tile.id === spinnerId)) {
+    return false;
+  }
+  return countSpinnerAttachments(board, spinnerId, north, south) <= 1;
+}
+
+/**
+ * Extra spinner arms open only after both main-chain sides are occupied.
+ *
+ * @param {object[]} board
+ * @param {string|null} spinnerId
+ */
+export function areSpinnerArmsOpen(board, spinnerId) {
+  if (!spinnerId || !Array.isArray(board) || !board.length) return false;
+  const spinnerIndex = board.findIndex((tile) => tile.id === spinnerId);
+  if (spinnerIndex < 0) return false;
+  return spinnerIndex > 0 && spinnerIndex < board.length - 1;
+}
+
+/**
  * Canonical live-play terminals from post-move topology.
  *
  * MAIN_LEFT / MAIN_RIGHT: outermost tile of that occupied main branch.
- * SPINNER: terminal double on the main line while the spinner is not enclosed
- *   between two main-chain tiles (lone spinner, or only one main side filled).
+ * SPINNER: terminal double only while attachment count is 0 or 1.
  * SPINNER_TOP / SPINNER_BOTTOM: outermost tile of that arm, only when it has tiles.
  *
  * Empty TOP/BOTTOM ports are not terminals. Legal future destinations are not
@@ -221,7 +277,8 @@ export function getCurrentTerminalEnds(boardState = {}) {
   const leftOccupied = spinnerIndex > 0;
   const rightOccupied =
     spinnerIndex >= 0 && spinnerIndex < board.length - 1;
-  const spinnerEnclosedOnMain = leftOccupied && rightOccupied;
+  const attachments = countSpinnerAttachments(board, spinnerId, north, south);
+  const spinnerExposed = isSpinnerExposedScoringTerminal(board, spinnerId, north, south);
 
   if (spinnerIndex < 0) {
     pushTerminal(ends, BRANCH.MAIN_LEFT, board[0], "left", null);
@@ -239,7 +296,7 @@ export function getCurrentTerminalEnds(boardState = {}) {
         spinnerId
       );
     }
-    if (!spinnerEnclosedOnMain) {
+    if (spinnerExposed) {
       pushSpinnerMainTerminalDouble(ends, spinnerTile);
     }
     if (north.length) {
@@ -270,7 +327,7 @@ export function getCurrentTerminalEnds(boardState = {}) {
       );
     }
     if (spinnerId && end.sourceTileId === spinnerId) {
-      if (spinnerEnclosedOnMain) {
+      if (attachments > 1) {
         throw new Error(
           `Internal spinner ${spinnerId} must not remain a scoring terminal`
         );
@@ -427,8 +484,7 @@ export function mainChainLegal(handIds, board, byId) {
 
 /**
  * True when this hand has at least one legal spinner N/S placement.
- * Spinner destinations are independent of left/right — a tile may legally
- * choose either a main-chain end or a spinner branch.
+ * Arms open only after both main-chain sides are occupied.
  *
  * @param {string[]} handIds
  * @param {object} state
@@ -470,6 +526,7 @@ export function resolveSpinnerBranchPlacement(tile, endPip, end = END.NORTH) {
 }
 
 function spinnerBranchMoves(handIds, state) {
+  if (!areSpinnerArmsOpen(state?.board, state?.spinnerId)) return [];
   const { id, pip, north, south } = readSpinnerLayout(state);
   if (!id || pip == null) return [];
   const northPip = branchOpenPip(north, pip);
@@ -508,9 +565,8 @@ function spinnerBranchMoves(handIds, state) {
 }
 
 /**
- * All Fives legal moves: every currently legal destination — main-chain
- * left/right plus spinner N/S when the spinner is on the board. The UI
- * chooses among them; the engine does not collapse or prioritize.
+ * All Fives / American legal moves: main-chain left/right, plus spinner N/S
+ * only after both main sides are occupied.
  *
  * @param {string[]} handIds
  * @param {object} state
