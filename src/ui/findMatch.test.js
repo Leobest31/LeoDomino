@@ -22,6 +22,9 @@ const home = read("pages/HomePage.jsx");
 const css = read("pages/FindMatchPage.css");
 const en = read("i18n/locales/en.js");
 const ht = read("i18n/locales/ht.js");
+const fr = read("i18n/locales/fr.js");
+const es = read("i18n/locales/es.js");
+const pt = read("i18n/locales/pt.js");
 
 assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game"/);
 assert.match(app, /<FindMatchPage/);
@@ -110,6 +113,15 @@ assert.match(page, /findMatch\.unavailable/);
 assert.match(page, /findMatch\.matchReady/);
 assert.match(page, /findMatch\.statusOpen/);
 assert.match(page, /findMatch\.cannotAcceptOwn/);
+assert.match(page, /findMatch\.rankedPairLimit/);
+assert.match(page, /case "RANKED_PAIR_LIMIT"/);
+assert.match(page, /case "RANKED_PAIR_LIMIT":\s*return "findMatch\.rankedPairLimit"/);
+assert.doesNotMatch(page, /case "RANKED_PAIR_LIMIT":\s*return "findMatch\.acceptError"/);
+assert.match(en, /rankedPairLimit: "You already played this opponent 3 times in the last 24 hours\. Try again later\."/);
+assert.match(ht, /rankedPairLimit: "Ou deja jwe ak advèsè sa a 3 fwa nan 24 èdtan ki sot pase yo\. Eseye ankò pita\."/);
+assert.match(fr, /rankedPairLimit: "Vous avez déjà joué 3 fois contre cet adversaire au cours des 24 dernières heures\. Réessayez plus tard\."/);
+assert.match(es, /rankedPairLimit: "Ya jugaste 3 veces contra este rival en las últimas 24 horas\. Inténtalo de nuevo más tarde\."/);
+assert.match(pt, /rankedPairLimit: "Já jogou 3 vezes contra este adversário nas últimas 24 horas\. Tente novamente mais tarde\."/);
 assert.match(page, /findMatch\.styleLocked/);
 assert.match(page, /findMatch\.enterTable/);
 

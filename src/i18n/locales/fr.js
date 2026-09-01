@@ -175,6 +175,7 @@ export default {
     cancelError: "Impossible d’annuler la demande.",
     alreadyOpen: "Vous avez déjà une demande ouverte. Annulez-la d’abord.",
     alreadyInMatch: "Vous êtes déjà dans une partie active.",
+    rankedPairLimit: "Vous avez déjà joué 3 fois contre cet adversaire au cours des 24 dernières heures. Réessayez plus tard.",
     playerUnavailable: "Désolé, ce joueur n’est plus disponible.",
     expired: "Cette demande a expiré.",
     notOpen: "Cette demande n’est plus ouverte.",

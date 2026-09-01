@@ -46,6 +46,8 @@ function errorMessageKey(error) {
     case "NOT_OPEN":
     case "NOT_FOUND":
       return "findMatch.playerUnavailable";
+    case "RANKED_PAIR_LIMIT":
+      return "findMatch.rankedPairLimit";
     case "EXPIRED":
       return "findMatch.expired";
     case "ALREADY_OPEN":

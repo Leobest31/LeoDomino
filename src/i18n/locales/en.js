@@ -175,6 +175,7 @@ export default {
     cancelError: "Could not cancel the request.",
     alreadyOpen: "You already have an open request. Cancel it first.",
     alreadyInMatch: "You are already in an active match.",
+    rankedPairLimit: "You already played this opponent 3 times in the last 24 hours. Try again later.",
     playerUnavailable: "Sorry, this player is no longer available.",
     expired: "This request expired.",
     notOpen: "This request is no longer open.",

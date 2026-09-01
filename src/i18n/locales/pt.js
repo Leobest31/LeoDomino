@@ -175,6 +175,7 @@ export default {
     cancelError: "Não foi possível cancelar o pedido.",
     alreadyOpen: "Já tem um pedido aberto. Cancele-o primeiro.",
     alreadyInMatch: "Já está numa partida ativa.",
+    rankedPairLimit: "Já jogou 3 vezes contra este adversário nas últimas 24 horas. Tente novamente mais tarde.",
     playerUnavailable: "Lamentamos, este jogador já não está disponível.",
     expired: "Este pedido expirou.",
     notOpen: "Este pedido já não está aberto.",

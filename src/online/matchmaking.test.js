@@ -457,6 +457,21 @@ const CREATOR_ROW = {
     (err) => err.code === "REQUEST_UNAVAILABLE"
   );
   assert.throws(
+    () => throwFromPostgrest({ message: "RANKED_PAIR_LIMIT" }),
+    (err) => err.code === "RANKED_PAIR_LIMIT"
+  );
+  assert.throws(
+    () => throwFromPostgrest({ code: "P0004", message: "RANKED_PAIR_LIMIT" }),
+    (err) => err.code === "RANKED_PAIR_LIMIT"
+  );
+  assert.throws(
+    () => throwFromPostgrest({ code: "P0004", message: "RANKED_PAIR_LIMIT" }, "ACCEPT_FAILED"),
+    (err) => err.code === "RANKED_PAIR_LIMIT",
+    "P0004 RANKED_PAIR_LIMIT is not PLAYER_BUSY or ACCEPT_FAILED"
+  );
+  assert.equal(isStaleMatchAcceptError(new MatchmakingError("RANKED_PAIR_LIMIT")), true);
+  assert.equal(friendInviteErrorKey(new MatchmakingError("RANKED_PAIR_LIMIT")), "findMatch.rankedPairLimit");
+  assert.throws(
     () => throwFromPostgrest({ message: "not friends" }),
     (err) => err.code === "NOT_FRIENDS"
   );

@@ -175,6 +175,7 @@ export default {
     cancelError: "No se pudo cancelar la solicitud.",
     alreadyOpen: "Ya tienes una solicitud abierta. Cancélala primero.",
     alreadyInMatch: "Ya estás en una partida activa.",
+    rankedPairLimit: "Ya jugaste 3 veces contra este rival en las últimas 24 horas. Inténtalo de nuevo más tarde.",
     playerUnavailable: "Lo sentimos, este jugador ya no está disponible.",
     expired: "Esta solicitud expiró.",
     notOpen: "Esta solicitud ya no está abierta.",

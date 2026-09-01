@@ -277,6 +277,9 @@ export function throwFromPostgrest(error, fallbackCode = "RPC") {
   if (/cannot accept own/i.test(msg)) {
     throw new MatchmakingError("SELF_ACCEPT", msg, error);
   }
+  if (/RANKED_PAIR_LIMIT/i.test(msg) || error?.code === "P0004") {
+    throw new MatchmakingError("RANKED_PAIR_LIMIT", msg, error);
+  }
   if (/PLAYER_BUSY|active_match_players|ACTIVE_MATCH_EXISTS/i.test(msg)) {
     throw new MatchmakingError("PLAYER_BUSY", msg, error);
   }
@@ -337,7 +340,8 @@ export function isStaleMatchAcceptError(error) {
       error.code === "NOT_FOUND" ||
       error.code === "EXPIRED" ||
       error.code === "NOT_FRIENDS" ||
-      error.code === "NOT_INVITEE")
+      error.code === "NOT_INVITEE" ||
+      error.code === "RANKED_PAIR_LIMIT")
   );
 }
 
@@ -345,6 +349,8 @@ export function friendInviteErrorKey(error) {
   switch (error?.code) {
     case "PLAYER_BUSY":
       return "findMatch.alreadyInMatch";
+    case "RANKED_PAIR_LIMIT":
+      return "findMatch.rankedPairLimit";
     case "NOT_FRIENDS":
       return "friends.notFriendsPlay";
     case "SELF_INVITE":

@@ -178,6 +178,7 @@ export default {
     cancelError: "N pa t ka anile demann nan.",
     alreadyOpen: "Ou deja gen yon demann ouvè. Anile li anvan.",
     alreadyInMatch: "Ou deja nan yon match aktif.",
+    rankedPairLimit: "Ou deja jwe ak advèsè sa a 3 fwa nan 24 èdtan ki sot pase yo. Eseye ankò pita.",
     playerUnavailable: "Padon, jwè sa a pa disponib ankò.",
     expired: "Demann sa a ekspire.",
     notOpen: "Demann sa a pa ouvè ankò.",
