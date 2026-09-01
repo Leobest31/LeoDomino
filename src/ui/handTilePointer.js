@@ -93,3 +93,60 @@ export function watchHandScrollOrDrag(event, options) {
   window.addEventListener("pointercancel", onEnd);
   return finish;
 }
+
+export function captureTileDragPointer(target, pointerId) {
+  if (!target || pointerId == null) return false;
+  try {
+    target.setPointerCapture?.(pointerId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * After setPointerCapture, iOS Safari delivers pointermove to the captured
+ * element (and document in capture phase), not window.
+ * @param {EventTarget | null | undefined} target
+ * @param {{ onMove?: Function, onUp?: Function, onCancel?: Function }} handlers
+ */
+export function attachCapturedPointerTracking(target, handlers) {
+  const onMove = handlers?.onMove;
+  const onUp = handlers?.onUp;
+  const onCancel = handlers?.onCancel;
+  const moveOpts = { capture: true, passive: false };
+  const endOpts = { capture: true };
+  const hosts = [];
+  if (target && typeof target.addEventListener === "function") hosts.push(target);
+  if (typeof document !== "undefined" && document !== target) hosts.push(document);
+
+  let ended = false;
+  const onceUp = onUp
+    ? (event) => {
+        if (ended) return;
+        ended = true;
+        onUp(event);
+      }
+    : null;
+  const onceCancel = onCancel
+    ? (event) => {
+        if (ended) return;
+        ended = true;
+        onCancel(event);
+      }
+    : null;
+
+  for (const host of hosts) {
+    if (onMove) host.addEventListener("pointermove", onMove, moveOpts);
+    if (onceUp) host.addEventListener("pointerup", onceUp, endOpts);
+    if (onceCancel) host.addEventListener("pointercancel", onceCancel, endOpts);
+  }
+
+  return () => {
+    for (const host of hosts) {
+      if (onMove) host.removeEventListener("pointermove", onMove, moveOpts);
+      if (onceUp) host.removeEventListener("pointerup", onceUp, endOpts);
+      if (onceCancel) host.removeEventListener("pointercancel", onceCancel, endOpts);
+    }
+  };
+}

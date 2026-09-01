@@ -55,11 +55,20 @@ assert.match(en, /forfeitFailed:/);
 assert.match(onlinePage, /leavingRef\.current = true/);
 assert.match(onlinePage, /\.finally\(/);
 assert.match(onlinePage, /busy=\{leaving\}/);
-assert.match(onlinePage, /errorKey=\{errorKey\}/);
+assert.match(onlinePage, /errorKey=\{leaveErrorKey\}/);
 assert.match(onlinePage, /if \(!ok\) return/);
 
 assert.match(hook, /forfeitOnlineMatch/);
 assert.match(hook, /forfeitOnlineMatch\(id\)/);
+assert.match(hook, /leaveErrorKey/);
+assert.match(hook, /setLeaveErrorKey\(onlineErrorKey\(error\)\)/);
+const leaveFn = hook.slice(hook.indexOf("const leave = useCallback"), hook.indexOf("return {"));
+assert.match(leaveFn, /setLeaveErrorKey/);
+assert.doesNotMatch(
+  leaveFn,
+  /setErrorKey\(onlineErrorKey/,
+  "H. Leave dialog ignores unrelated gameplay error"
+);
 assert.match(hook, /reportError\(error/);
 assert.match(hook, /online forfeit failed/);
 assert.match(hook, /FORFEIT_FAILED/);

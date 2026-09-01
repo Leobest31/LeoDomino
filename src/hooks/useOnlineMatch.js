@@ -67,6 +67,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const [view, setView] = useState(null);
   const [status, setStatus] = useState(matchId ? "loading" : "error");
   const [errorKey, setErrorKey] = useState(matchId ? "" : "online.notFound");
+  const [leaveErrorKey, setLeaveErrorKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [serviceOutage, setServiceOutage] = useState(false);
   const viewRef = useRef(null);
@@ -172,6 +173,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     }
     setStatus("loading");
     setErrorKey("");
+    setLeaveErrorKey("");
     timeoutAttemptRef.current = 0;
     timeoutRetryAtRef.current = 0;
     timeoutAttemptedKeyRef.current = "";
@@ -562,6 +564,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     }
     let timeoutId = 0;
     try {
+      setLeaveErrorKey("");
       addSafeBreadcrumb("online forfeit requested", {
         screen: "onlineTable",
         actionName: "forfeit",
@@ -611,7 +614,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         code: error?.code || "FORFEIT_FAILED",
       });
       if (!unmountedRef.current) {
-        setErrorKey(onlineErrorKey(error));
+        setLeaveErrorKey(onlineErrorKey(error));
       }
       return false;
     }
@@ -620,6 +623,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
   return {
     status,
     errorKey,
+    leaveErrorKey,
     view,
     viewRef,
     busy,

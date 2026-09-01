@@ -191,6 +191,21 @@ export function canAcceptMatchRequest(request, playerId) {
 }
 
 /**
+ * Lobby cards that may still render as Waiting/Open.
+ * A request that is no longer open must never stay in this list.
+ *
+ * @param {Array<{ id?: string, status?: string }|null|undefined>} open
+ * @param {{ id?: string, status?: string }|null|undefined} own
+ */
+export function visibleFindMatchRequests(open, own) {
+  return (Array.isArray(open) ? open : []).filter((row) => {
+    if (!row || row.status !== "open") return false;
+    if (own && row.id === own.id && own.status !== "open") return false;
+    return true;
+  });
+}
+
+/**
  * @param {{ visibility?: string, status?: string, inviteeId?: string, expiresAt?: string }|null|undefined} request
  * @param {string} playerId
  */
@@ -262,7 +277,7 @@ export function throwFromPostgrest(error, fallbackCode = "RPC") {
   if (/cannot accept own/i.test(msg)) {
     throw new MatchmakingError("SELF_ACCEPT", msg, error);
   }
-  if (/PLAYER_BUSY|active_match_players/i.test(msg) || error?.code === "P0001") {
+  if (/PLAYER_BUSY|active_match_players|ACTIVE_MATCH_EXISTS/i.test(msg)) {
     throw new MatchmakingError("PLAYER_BUSY", msg, error);
   }
   if (/REQUEST_ALREADY_ACCEPTED/i.test(msg)) {

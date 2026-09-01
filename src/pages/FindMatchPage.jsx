@@ -23,8 +23,9 @@ import {
   isStaleMatchAcceptError,
   loadFindMatchBoard,
   subscribeMatchRequests,
+  visibleFindMatchRequests,
 } from "../online/matchmaking.js";
-import { canRecoverMatch, decideMatchRecovery } from "../online/matchRecovery.js";
+import { canRecoverMatch, decideMatchRecovery, shouldPromoteAcceptedToMatchReady } from "../online/matchRecovery.js";
 import { isNotedTerminalMatch } from "../online/terminalMatchMemory.js";
 import { isReservedNotStarted } from "../online/joinTimeout.js";
 import { useFriendsBoard } from "../hooks/useFriends.js";
@@ -203,13 +204,17 @@ function FindMatchPage({ onBack, onMainMenu, onEnterMatch }) {
         clearMatched();
         if (wasWaiting) setNotice("joinTimeout");
       }
+      if (shouldPromoteAcceptedToMatchReady(nextOwn, occupancyMatch)) {
+        applyMatched(occupancyMatch);
+      }
       ownStatusRef.current = nextOwn?.status ?? null;
       setOwn(nextOwn);
-      setOpen(nextOpen);
+      const visibleOpenRows = visibleFindMatchRequests(nextOpen, nextOwn);
+      setOpen(visibleOpenRows);
       setErrorKey("");
       if (matchedRef.current) {
         setState("matched");
-      } else if (nextOpen.length === 0) {
+      } else if (visibleOpenRows.length === 0) {
         setState("empty");
       } else {
         setState("list");
@@ -236,6 +241,24 @@ function FindMatchPage({ onBack, onMainMenu, onEnterMatch }) {
       // Listing still works without Realtime.
     }
     return () => stop();
+  }, [onlineReady, refresh]);
+
+  useEffect(() => {
+    if (!onlineReady) return undefined;
+    const onVis = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+    const onFocus = () => {
+      refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [onlineReady, refresh]);
 
   useEffect(() => {
@@ -359,6 +382,7 @@ function FindMatchPage({ onBack, onMainMenu, onEnterMatch }) {
   const handleMainMenu = () => tap(() => onMainMenu?.());
 
   const ownOpen = own?.status === "open";
+  const visibleOpen = visibleFindMatchRequests(open, own);
   const screenState = matched ? "matched" : state;
   const createDisabled = Boolean(busy) || ownOpen || !selectedId;
 
@@ -508,7 +532,7 @@ function FindMatchPage({ onBack, onMainMenu, onEnterMatch }) {
                     <p className="find-match__note">{t("findMatch.empty")}</p>
                   ) : null}
                   <ul className="find-match__list">
-                    {open.map((request) => {
+                    {visibleOpen.map((request) => {
                       const mine = isOwnMatchRequest(request, playerId);
                       const canAccept = canAcceptMatchRequest(request, playerId);
                       const accepting = busy === "accepting" && busyId === request.id;

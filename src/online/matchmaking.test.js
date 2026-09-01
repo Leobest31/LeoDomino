@@ -31,6 +31,7 @@ import {
   toFindMatchRulesetId,
   isStaleMatchAcceptError,
   friendInviteErrorKey,
+  visibleFindMatchRequests,
 } from "./matchmaking.js";
 
 function thenable(result, capture = {}) {
@@ -399,6 +400,7 @@ const CREATOR_ROW = {
   const result = await forfeitOnlineMatch("match-1", client);
   assert.equal(forfeited.name, "forfeit_online_match");
   assert.equal(result.ok, true);
+  assert.equal(result.idempotent, true, "J. finished/idempotent forfeit still succeeds");
 }
 
 {
@@ -444,6 +446,11 @@ const CREATOR_ROW = {
   assert.throws(
     () => throwFromPostgrest({ code: "P0001", message: "PLAYER_BUSY" }),
     (err) => err.code === "PLAYER_BUSY"
+  );
+  assert.throws(
+    () => throwFromPostgrest({ code: "P0001", message: "forfeit_online_match failed" }, "FORFEIT_FAILED"),
+    (err) => err instanceof MatchmakingError && err.code === "FORFEIT_FAILED",
+    "I. forfeit P0001 is not automatically PLAYER_BUSY"
   );
   assert.throws(
     () => throwFromPostgrest({ message: "REQUEST_UNAVAILABLE" }),
@@ -541,6 +548,37 @@ const CREATOR_ROW = {
     },
   };
   assert.equal(await cleanupStaleOccupiedMatches(client), 0);
+}
+
+{
+  assert.deepEqual(
+    visibleFindMatchRequests(
+      [
+        { id: "r-open", status: "open" },
+        { id: "r-accepted", status: "accepted" },
+      ],
+      { id: "r-accepted", status: "accepted" }
+    ).map((row) => row.id),
+    ["r-open"],
+    "E. accepted creator cannot remain in Waiting"
+  );
+  assert.equal(
+    visibleFindMatchRequests([{ id: "r1", status: "accepted" }], { id: "r1", status: "accepted" }).length,
+    0
+  );
+}
+
+{
+  await assert.rejects(
+    () =>
+      forfeitOnlineMatch("match-1", {
+        async rpc() {
+          return { error: { code: "P0001", message: "forfeit_online_match failed" } };
+        },
+      }),
+    (err) => err instanceof MatchmakingError && err.code === "FORFEIT_FAILED",
+    "I. forfeit P0001 is not automatically PLAYER_BUSY"
+  );
 }
 
 console.log("  ✓ Find Match matchmaking adapter");

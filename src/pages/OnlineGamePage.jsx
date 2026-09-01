@@ -45,6 +45,7 @@ import {
 } from "../game/destinationTarget.js";
 import { usesAmericanBoardLayout } from "../board/index.js";
 import {
+  attachCapturedPointerTracking,
   shouldDeferHandDrag,
   watchHandScrollOrDrag,
 } from "../ui/handTilePointer.js";
@@ -57,6 +58,7 @@ import {
   handTilesFromView,
   layoutFromView,
   lockedRulesetId,
+  applyOptimisticBoardPreview,
   onlineDragGate,
   opaqueReserveIds,
   optimisticPlayPreview,
@@ -189,6 +191,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     setDragLock,
     retry,
     leave,
+    leaveErrorKey,
   } = useOnlineMatch({
     matchId,
     rulesetId: lockedRulesetId(matchOptions.rulesetId),
@@ -224,6 +227,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   const [matchRp, setMatchRp] = useState(null);
   const leavingRef = useRef(false);
   const dragRef = useRef(null);
+  const captureTargetRef = useRef(null);
   const skipClickRef = useRef(false);
 
   useEffect(() => {
@@ -276,15 +280,8 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   const tableEpoch = tableEpochFromView(view);
   const boardTiles = useMemo(() => {
     const tiles = boardTilesFromView(view);
-    if (
-      pendingPlay?.tile &&
-      !pendingPlay.hideOnly &&
-      pendingPlay.roundIdentity === roundIdentity &&
-      !tiles.some((tile) => tile.id === pendingPlay.tile.id)
-    ) {
-      return [...tiles, pendingPlay.tile];
-    }
-    return tiles;
+    if (!pendingPlay || pendingPlay.roundIdentity !== roundIdentity) return tiles;
+    return applyOptimisticBoardPreview(tiles, pendingPlay);
   }, [view, pendingPlay, roundIdentity]);
   const humanHand = useMemo(() => {
     const tiles = handTilesFromView(view);
@@ -400,6 +397,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
       } catch {
         /* some browsers reject capture */
       }
+      captureTargetRef.current = target;
       const nextDrag = {
         tileId,
         left: tile.left,
@@ -408,6 +406,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         y: pointerEvent.clientY,
         w: rect.width,
         h: rect.height,
+        pointerId: pointerEvent.pointerId,
         originX: pointerEvent.originX ?? pointerEvent.clientX,
         originY: pointerEvent.originY ?? pointerEvent.clientY,
       };
@@ -427,6 +426,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
       const current = dragRef.current;
       if (!current) return;
       dragRef.current = null;
+      captureTargetRef.current = null;
       const snap = viewRef.current;
       const moves = snap?.legalMoves ?? [];
       const layout = layoutFromView(snap);
@@ -476,7 +476,9 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
 
   useEffect(() => {
     if (!drag) return undefined;
+    const pointerId = drag.pointerId;
     const onMove = (event) => {
+      if (pointerId != null && event.pointerId !== pointerId) return;
       event.preventDefault();
       setDrag((prev) =>
         prev ? { ...prev, x: event.clientX, y: event.clientY } : null
@@ -497,23 +499,22 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
       );
     };
     const onUp = (event) => {
+      if (pointerId != null && event.pointerId !== pointerId) return;
       finishDrag(event.clientX, event.clientY);
     };
     const onCancel = () => {
       dragRef.current = null;
+      captureTargetRef.current = null;
       setDrag(null);
       setHotEnd(null);
       skipClickRef.current = true;
       setDragLock(false);
     };
-    window.addEventListener("pointermove", onMove, { passive: false });
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onCancel);
-    };
+    return attachCapturedPointerTracking(captureTargetRef.current, {
+      onMove,
+      onUp,
+      onCancel,
+    });
   }, [drag, finishDrag, setDragLock, viewRef]);
 
   const handlePass = () => {
@@ -719,7 +720,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
           open={Boolean(abandonIntent)}
           intent={abandonIntent}
           busy={leaving}
-          errorKey={errorKey}
+          errorKey={leaveErrorKey}
           onLeave={handleAbandonLeave}
           onCancel={handleAbandonCancel}
         />
@@ -955,7 +956,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         open={Boolean(abandonIntent)}
         intent={abandonIntent}
         busy={leaving}
-        errorKey={errorKey}
+        errorKey={leaveErrorKey}
         onLeave={handleAbandonLeave}
         onCancel={handleAbandonCancel}
       />

@@ -24,6 +24,7 @@ import {
   decideMatchRecovery,
   isMissingActiveMatchRow,
   shouldDropLastKnownOnOccupancyFailure,
+  shouldPromoteAcceptedToMatchReady,
 } from "./matchRecovery.js";
 import { isInfrastructureOutageError } from "./serviceHealth.js";
 import {
@@ -111,6 +112,43 @@ beginCase();
     hydratedAcceptedMatch: { id: "m-forfeit", status: "playing" },
   });
   assert.equal(decision.kind, "clear", "3. occupancy-none does not reopen via leftover accepted request");
+}
+
+{
+  beginCase();
+  assert.equal(
+    shouldPromoteAcceptedToMatchReady({ status: "accepted", matchId: LIVE.id }, LIVE),
+    true,
+    "E. accepted + resumable occupancy promotes to Match Ready"
+  );
+  assert.equal(
+    shouldPromoteAcceptedToMatchReady({ status: "open" }, LIVE),
+    false,
+    "E. open request stays waiting until accepted"
+  );
+  assert.equal(
+    shouldPromoteAcceptedToMatchReady({ status: "accepted" }, null),
+    false,
+    "E. accepted without occupancy does not invent Match Ready"
+  );
+}
+
+{
+  beginCase();
+  const occupancyNone = decideMatchRecovery({
+    occupancyUnknown: false,
+    occupancyMatch: null,
+    lastKnown: null,
+    acceptedMatchId: "m-stale-ready",
+    hydratedAcceptedMatch: LIVE,
+  });
+  assert.equal(occupancyNone.kind, "clear", "G. occupancy-none still prevents stale Match Ready recovery");
+  assert.equal(occupancyNone.source, "occupancy_none");
+  assert.equal(
+    shouldPromoteAcceptedToMatchReady({ status: "accepted", matchId: LIVE.id }, null),
+    false,
+    "G. occupancy-none must not promote leftover accepted rows"
+  );
 }
 
 {
@@ -312,6 +350,10 @@ beginCase();
   assert.match(findMatch, /occupancyUnknown/);
   assert.match(findMatch, /nextOwn\?\.status === ["']accepted["']/);
   assert.match(findMatch, /canRecoverMatch/);
+  assert.match(findMatch, /shouldPromoteAcceptedToMatchReady/);
+  assert.match(findMatch, /visibleFindMatchRequests/);
+  assert.match(findMatch, /visibilitychange/);
+  assert.match(findMatch, /addEventListener\("focus"/);
   assert.doesNotMatch(
     findMatch,
     /getMyActiveMatch\(\)\.catch\(\(\) => matchedRef\.current\)/,

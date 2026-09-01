@@ -42,6 +42,7 @@ import {
 import { usesAmericanBoardLayout } from "../board/index.js";
 import { MOTION, wait } from "../utils/motion.js";
 import {
+  attachCapturedPointerTracking,
   shouldDeferHandDrag,
   watchHandScrollOrDrag,
 } from "../ui/handTilePointer.js";
@@ -208,6 +209,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
   const aiDrawKeyRef = useRef("");
   const hiddenIdsRef = useRef(hiddenIds);
   const dragRef = useRef(null);
+  const captureTargetRef = useRef(null);
   const drawingRef = useRef(false);
   const skipClickRef = useRef(false);
   hiddenIdsRef.current = hiddenIds;
@@ -285,6 +287,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     async (clientX, clientY) => {
       const current = dragRef.current;
       if (!current) return;
+      captureTargetRef.current = null;
 
       const snap = stateRef.current;
       const legalMoves = getAvailableActions(snap).legalMoves;
@@ -358,8 +361,10 @@ function GamePage({ onMainMenu, matchOptions = null }) {
 
   useEffect(() => {
     if (!drag) return undefined;
+    const pointerId = drag.pointerId;
 
     const onMove = (event) => {
+      if (pointerId != null && event.pointerId !== pointerId) return;
       setDrag((prev) =>
         prev
           ? {
@@ -392,17 +397,15 @@ function GamePage({ onMainMenu, matchOptions = null }) {
     };
 
     const onUp = (event) => {
+      if (pointerId != null && event.pointerId !== pointerId) return;
       void finishDrag(event.clientX, event.clientY);
     };
 
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-    };
+    return attachCapturedPointerTracking(captureTargetRef.current, {
+      onMove,
+      onUp,
+      onCancel: onUp,
+    });
   }, [drag, finishDrag, stateRef]);
 
   useEffect(() => {
@@ -595,6 +598,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
       } catch {
         // Ignore capture failures on some browsers.
       }
+      captureTargetRef.current = target;
 
       hideTile(tileId);
       setDrag({
@@ -607,6 +611,7 @@ function GamePage({ onMainMenu, matchOptions = null }) {
         originY: pointerEvent.originY ?? pointerEvent.clientY,
         w: rect.width,
         h: rect.height,
+        pointerId: pointerEvent.pointerId,
       });
       const snap = stateRef.current;
       setHotEnd(
@@ -1179,6 +1184,8 @@ function GamePage({ onMainMenu, matchOptions = null }) {
           right={drag.right}
           x={drag.x}
           y={drag.y}
+          width={drag.w}
+          height={drag.h}
         />
       ) : null}
 

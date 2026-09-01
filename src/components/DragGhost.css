@@ -8,10 +8,11 @@
   --domino-w: var(--player-hand-w, var(--domino-hand-w));
   --domino-h: var(--player-hand-h, var(--domino-hand-h));
   --domino-pip: var(--player-hand-pip, var(--domino-hand-pip));
+  width: var(--domino-w);
+  height: var(--domino-h);
 }
 
 .drag-ghost .domino {
-  /* Shared DominoTile size — never stretch */
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
 }

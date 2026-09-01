@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   assertNeverClassicRuleset,
   applyForfeitTerminalFields,
+  applyOptimisticBoardPreview,
   asViewerSnapshot,
   occupancyTouchMissed,
   boardTilesFromView,
@@ -60,6 +61,8 @@ import {
 } from "./gameAuthority.js";
 import { networkCallsForMove } from "./onlineMoveTrace.js";
 import { remainingTurnMs } from "./turnTimeout.js";
+import { placeTile } from "../game/board.js";
+import { createTile } from "../game/tiles.js";
 
 assert.equal(lockedRulesetId("legacy"), "legacy");
 assert.equal(lockedRulesetId("haitian"), "haitian");
@@ -936,6 +939,49 @@ function findDrawState(rulesetId) {
   });
   assert.equal(spinner.hideOnly, true);
   assert.equal(optimisticPlayPreview(null), null);
+}
+
+{
+  const opening = placeTile([], createTile(6, 6));
+  const leftTile = createTile(6, 5);
+  const engineLeft = placeTile(opening, leftTile, END.LEFT);
+  const leftPreview = optimisticPlayPreview({
+    tileId: leftTile.id,
+    end: END.LEFT,
+    left: engineLeft[0].left,
+    right: engineLeft[0].right,
+    orientation: engineLeft[0].orientation,
+  });
+  const optimisticLeft = applyOptimisticBoardPreview(opening, leftPreview);
+  assert.deepEqual(
+    optimisticLeft.map((tile) => tile.id),
+    engineLeft.map((tile) => tile.id),
+    "C. optimistic left equals engine left placement"
+  );
+  assert.equal(optimisticLeft[0].id, leftTile.id, "C. left prepends");
+  const appendOnly = [...opening, leftPreview.tile];
+  assert.notDeepEqual(
+    appendOnly.map((tile) => tile.id),
+    engineLeft.map((tile) => tile.id),
+    "C. append-only would place left on the wrong end"
+  );
+
+  const rightTile = createTile(6, 4);
+  const engineRight = placeTile(opening, rightTile, END.RIGHT);
+  const rightPreview = optimisticPlayPreview({
+    tileId: rightTile.id,
+    end: END.RIGHT,
+    left: engineRight[engineRight.length - 1].left,
+    right: engineRight[engineRight.length - 1].right,
+    orientation: engineRight[engineRight.length - 1].orientation,
+  });
+  const optimisticRight = applyOptimisticBoardPreview(opening, rightPreview);
+  assert.deepEqual(
+    optimisticRight.map((tile) => tile.id),
+    engineRight.map((tile) => tile.id),
+    "D. optimistic right equals engine right placement"
+  );
+  assert.equal(optimisticRight[optimisticRight.length - 1].id, rightTile.id, "D. right appends");
 }
 
 {

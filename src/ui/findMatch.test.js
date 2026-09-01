@@ -44,6 +44,10 @@ assert.match(page, /acceptMatchRequest/, "accept uses the RPC adapter");
 assert.match(page, /cancelMatchRequest/, "cancel uses the RPC adapter");
 assert.match(page, /subscribeMatchRequests/, "subscribes to match_requests");
 assert.match(page, /loadFindMatchBoard/, "loads open + own requests");
+assert.match(page, /visibilitychange/, "F. Find Match refreshes on visibilitychange");
+assert.match(page, /addEventListener\("focus"/, "F. Find Match refreshes on focus");
+assert.match(page, /visibleFindMatchRequests/, "accepted requests cannot stay Waiting");
+assert.match(page, /shouldPromoteAcceptedToMatchReady/);
 
 {
   const home = read("pages/HomePage.jsx");

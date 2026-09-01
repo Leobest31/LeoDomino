@@ -26,6 +26,7 @@ import { getLegalMoves } from "../game/moves.js";
 import { getAllFivesLegalMoves } from "../game/rules/allFivesSpinner.js";
 import { isAutoPlaceable, legalEndsForTile, resolvePlayChoice } from "../game/interaction.js";
 import { destinationTileId } from "../game/destinationTarget.js";
+import { END } from "../game/constants.js";
 import { FIND_MATCH_RULESET_IDS, styleIdFromRulesetId } from "./matchmaking.js";
 import { HAITIAN_OPENING_TILE_ID } from "../game/rules/haitianStart.js";
 import {
@@ -410,12 +411,13 @@ export function optimisticPlayPreview(move) {
   if (!move?.tileId) return null;
   const end = move.end || move.destination;
   if (end === "north" || end === "south") {
-    return { tileId: move.tileId, hideOnly: true };
+    return { tileId: move.tileId, hideOnly: true, end };
   }
   if (move.left == null || move.right == null || !move.orientation) return { tileId: move.tileId, hideOnly: true };
   return {
     tileId: move.tileId,
     hideOnly: false,
+    end: end ?? null,
     tile: {
       id: move.tileId,
       left: move.left,
@@ -424,6 +426,21 @@ export function optimisticPlayPreview(move) {
       destination: move.destination ?? end ?? null,
     },
   };
+}
+
+/**
+ * Visual-only board insert using the same left-prepend / right-append contract
+ * as engine `placeTile`. Does not run rules. North/south stay hide-only.
+ */
+export function applyOptimisticBoardPreview(tiles, preview) {
+  const board = Array.isArray(tiles) ? tiles.slice() : [];
+  if (!preview?.tile || preview.hideOnly) return board;
+  if (board.some((tile) => tile.id === preview.tile.id)) return board;
+  const side = preview.end ?? preview.tile.destination;
+  if (side === END.LEFT || side === "MAIN_LEFT") {
+    return [preview.tile, ...board];
+  }
+  return [...board, preview.tile];
 }
 
 export const ONLINE_ACTION_TIMEOUT_MS = 15000;

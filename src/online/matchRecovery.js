@@ -31,6 +31,18 @@ export function canRecoverMatch(match, storage = globalThis.sessionStorage) {
 }
 
 /**
+ * Creator whose request is already accepted must leave Waiting and enter
+ * Match Ready when occupancy has a resumable match. Occupancy-none and
+ * terminal matches must not take this path.
+ *
+ * @param {object|null|undefined} own
+ * @param {object|null|undefined} occupancyMatch
+ */
+export function shouldPromoteAcceptedToMatchReady(own, occupancyMatch) {
+  return own?.status === "accepted" && canRecoverMatch(occupancyMatch);
+}
+
+/**
  * Hydrate/get-row failures that mean "this match is gone", not "service down".
  * Outage / unknown must not take this path.
  *
