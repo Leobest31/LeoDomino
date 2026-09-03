@@ -1,0 +1,575 @@
+.leopips-stake {
+  --lp-navy: #0c121c;
+  --lp-chip: #121a28;
+  --lp-gold: #c9a227;
+  --lp-gold-line: rgba(201, 162, 39, 0.55);
+  --lp-ink: #f2ede5;
+  --lp-muted: rgba(169, 183, 195, 0.78);
+  --lp-emerald: linear-gradient(180deg, #3de08c 0%, #00b85c 52%, #006b38 100%);
+  --lp-gold-metal: linear-gradient(180deg, #ffe566 0%, #ffd24d 18%, #ffb800 48%, #e69500 78%, #c46e00 100%);
+  --lp-radius: 18px;
+  position: relative;
+  z-index: 40;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding:
+    max(0.7rem, env(safe-area-inset-top))
+    max(0.85rem, env(safe-area-inset-right))
+    max(0.9rem, env(safe-area-inset-bottom))
+    max(0.85rem, env(safe-area-inset-left));
+  background: #05070c;
+  color: var(--lp-ink);
+  -webkit-overflow-scrolling: touch;
+}
+
+.leopips-stake *,
+.leopips-stake *::before,
+.leopips-stake *::after {
+  box-sizing: border-box;
+}
+
+.leopips-stake__atmosphere {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.leopips-stake__wood {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 68% 46% at 50% 14%, rgba(28, 48, 88, 0.28), transparent 58%),
+    radial-gradient(ellipse 50% 36% at 50% 78%, rgba(58, 40, 18, 0.14), transparent 64%),
+    linear-gradient(168deg, #0b1018 0%, #07090e 46%, #040508 100%);
+}
+
+.leopips-stake__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 28%, transparent 18%, rgba(0, 0, 0, 0.66) 100%);
+}
+
+.leopips-stake__shell {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 26.5rem);
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.leopips-stake__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.leopips-stake__back {
+  appearance: none;
+  justify-self: start;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--lp-muted);
+  cursor: pointer;
+}
+
+.leopips-stake__back-chevron {
+  display: block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.leopips-stake__brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.leopips-stake__crest {
+  height: 1.7rem;
+  filter: drop-shadow(0 0 8px rgba(232, 197, 71, 0.28));
+}
+
+.leopips-stake__wordmark {
+  font-family: var(--font-ui);
+  font-size: clamp(0.82rem, 3.4vw, 0.98rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  background: var(--lp-gold-metal);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #ffb800;
+}
+
+.leopips-stake__wallet {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.28rem 0.35rem 0.28rem 0.28rem;
+  border: 1px solid var(--lp-gold-line);
+  border-radius: 12px;
+  background: rgba(8, 12, 20, 0.88);
+}
+
+.leopips-stake__wallet-coin {
+  width: 1.7rem;
+  height: 1.7rem;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+}
+
+.leopips-stake__wallet-copy {
+  display: grid;
+  min-width: 0;
+  line-height: 1.05;
+}
+
+.leopips-stake__wallet-label {
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  color: var(--lp-gold);
+}
+
+.leopips-stake__wallet strong {
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.leopips-stake__plus {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.1rem;
+  padding: 0;
+  border: 1px solid #7affc4;
+  border-radius: 4px;
+  background: var(--lp-emerald);
+  color: #04150c;
+  font-weight: 900;
+  line-height: 1;
+  cursor: default;
+}
+
+.leopips-stake__progress {
+  list-style: none;
+  margin: 0;
+  padding: 0.55rem 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3rem;
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  border-radius: 14px;
+  background: rgba(12, 18, 28, 0.92);
+}
+
+.leopips-stake__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+  text-align: center;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--lp-muted);
+}
+
+.leopips-stake__step-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: rgba(169, 183, 195, 0.28);
+}
+
+.leopips-stake__step.is-completed {
+  color: #9fe7bf;
+}
+
+.leopips-stake__step.is-completed .leopips-stake__step-dot {
+  background: #00b85c;
+}
+
+.leopips-stake__step.is-active {
+  color: #f3e2a4;
+  font-weight: 700;
+}
+
+.leopips-stake__step.is-active .leopips-stake__step-dot {
+  background: #e4c35a;
+  box-shadow: 0 0 10px rgba(228, 195, 90, 0.55);
+}
+
+.leopips-stake__style {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.4rem;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--lp-gold-line);
+  border-radius: var(--lp-radius);
+  background:
+    linear-gradient(165deg, rgba(16, 24, 38, 0.94) 0%, rgba(10, 14, 22, 0.96) 100%);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.leopips-stake__style h1 {
+  margin: 0;
+  font-size: clamp(1.05rem, 4.6vw, 1.35rem);
+  letter-spacing: 0.08em;
+}
+
+.leopips-stake__style p {
+  margin: 0.35rem 0 0.7rem;
+  color: var(--lp-muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.leopips-stake__change {
+  appearance: none;
+  padding: 0.38rem 0.7rem;
+  border: 1px solid var(--lp-gold-line);
+  border-radius: 999px;
+  background: transparent;
+  color: #f3e2a4;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.leopips-stake__style-art {
+  position: relative;
+  min-width: 0;
+}
+
+.leopips-stake__dominos {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 5.2rem;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.45));
+}
+
+.leopips-stake__style-flag {
+  position: absolute;
+  right: 0.15rem;
+  bottom: 0.1rem;
+  width: 1.55rem;
+  height: 1.05rem;
+  object-fit: cover;
+  border-radius: 0.18rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(242, 237, 229, 0.28);
+}
+
+.leopips-stake__style-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.leopips-stake__style-scrim {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: rgba(4, 6, 10, 0.58);
+  cursor: pointer;
+}
+
+.leopips-stake__style-menu {
+  position: absolute;
+  left: 50%;
+  top: 28%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 0.4rem;
+  width: min(20.5rem, calc(100% - 2rem));
+  max-width: 100%;
+  padding: 0.55rem;
+  border: 1px solid var(--lp-gold-line);
+  border-radius: var(--lp-radius);
+  background:
+    linear-gradient(165deg, rgba(16, 24, 38, 0.98) 0%, rgba(8, 12, 20, 0.98) 100%);
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.leopips-stake__style-option {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  border-radius: 12px;
+  background: rgba(12, 18, 28, 0.94);
+  color: var(--lp-ink);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.leopips-stake__style-option.is-selected {
+  border-color: #e4c35a;
+  color: #f3e2a4;
+  box-shadow:
+    0 0 0 1px rgba(228, 195, 90, 0.28),
+    inset 0 0 0 1px rgba(228, 195, 90, 0.18);
+}
+
+.leopips-stake__style-option-flag {
+  width: 1.45rem;
+  height: 1rem;
+  object-fit: cover;
+  border-radius: 0.16rem;
+  flex: 0 0 auto;
+}
+
+.leopips-stake__style-option-mark {
+  width: 0.72rem;
+  height: 0.72rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid rgba(201, 162, 39, 0.55);
+  background: transparent;
+}
+
+.leopips-stake__style-option.is-selected .leopips-stake__style-option-mark {
+  background: #e4c35a;
+  box-shadow: 0 0 8px rgba(228, 195, 90, 0.45);
+}
+
+.leopips-stake__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.7rem;
+  width: 100%;
+}
+
+.leopips-stake__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 0.95rem 0.55rem 0.7rem;
+  border: 1px solid rgba(201, 162, 39, 0.32);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(18, 26, 40, 0.98) 0%, rgba(10, 14, 20, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+.leopips-stake__card.is-popular {
+  border-color: #e4c35a;
+  box-shadow:
+    0 0 0 1px rgba(228, 195, 90, 0.28),
+    0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.leopips-stake__card.is-disabled {
+  opacity: 0.55;
+}
+
+.leopips-stake__badge {
+  position: absolute;
+  top: -0.55rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: var(--lp-gold-metal);
+  color: #14100a;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.leopips-stake__card .leopips-coin {
+  width: clamp(4.4rem, 22vw, 5.8rem);
+  height: auto;
+  margin-top: 0.15rem;
+}
+
+.leopips-stake__denom {
+  margin: 0.35rem 0 0.15rem;
+  font-size: clamp(0.86rem, 3.4vw, 0.98rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.leopips-stake__meta,
+.leopips-stake__pot-kicker {
+  margin: 0;
+  color: var(--lp-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+.leopips-stake__pot-kicker {
+  margin-top: 0.45rem;
+}
+
+.leopips-stake__pot {
+  margin: 0.12rem 0 0.55rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #f3e2a4;
+}
+
+.leopips-stake__play {
+  appearance: none;
+  width: 100%;
+  min-height: 2.7rem;
+  border: 0;
+  border-radius: 12px;
+  background: var(--lp-emerald);
+  color: #04150c;
+  font-family: var(--font-ui);
+  font-size: clamp(0.82rem, 3.2vw, 0.95rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 6px 12px rgba(0, 0, 0, 0.28);
+}
+
+.leopips-stake__play:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.leopips-stake__blocked {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  border-radius: 14px;
+  background: rgba(18, 26, 40, 0.9);
+  text-align: center;
+}
+
+.leopips-stake__blocked p {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.leopips-stake__friends {
+  appearance: none;
+  margin-top: 0.35rem;
+  min-height: 2.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--lp-ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.leopips-stake__rules {
+  margin: 0;
+  color: var(--lp-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.leopips-stake__info {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.leopips-stake__info div {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.65rem 0.4rem;
+  border: 1px solid rgba(201, 162, 39, 0.22);
+  border-radius: 12px;
+  background: rgba(12, 18, 28, 0.88);
+  text-align: center;
+}
+
+.leopips-stake__info strong {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: #f3e2a4;
+}
+
+.leopips-stake__info span {
+  font-size: 0.68rem;
+  color: var(--lp-muted);
+  line-height: 1.3;
+}
+
+@media (max-width: 400px) {
+  .leopips-stake {
+    padding-left: max(0.7rem, env(safe-area-inset-left));
+    padding-right: max(0.7rem, env(safe-area-inset-right));
+  }
+
+  .leopips-stake__style {
+    grid-template-columns: minmax(0, 1fr) 5.4rem;
+    padding: 0.75rem 0.7rem;
+  }
+
+  .leopips-stake__grid {
+    gap: 0.55rem;
+  }
+
+  .leopips-stake__card {
+    padding: 0.85rem 0.4rem 0.6rem;
+  }
+
+  .leopips-stake__step {
+    font-size: 0.62rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leopips-stake__play,
+  .leopips-stake__card {
+    transition: none;
+  }
+}

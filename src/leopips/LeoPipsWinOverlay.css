@@ -1,0 +1,111 @@
+.leopips-win {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 7, 12, 0.78);
+  overflow: hidden;
+}
+
+.leopips-win.is-big {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(228, 195, 90, 0.22), transparent 42%),
+    rgba(5, 7, 12, 0.82);
+}
+
+.leopips-win__drop {
+  position: absolute;
+  top: -12%;
+  object-fit: contain;
+  animation-name: leopips-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.leopips-win__panel {
+  position: relative;
+  z-index: 1;
+  width: min(22rem, calc(100% - 2rem));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 1.4rem 1.1rem 1.2rem;
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  border-radius: 20px;
+  background: #0c121c;
+  color: #f2ede5;
+  text-align: center;
+}
+
+.leopips-win__panel.is-big {
+  border-color: #e4c35a;
+  box-shadow:
+    0 0 0 1px rgba(228, 195, 90, 0.35),
+    0 0 48px rgba(228, 195, 90, 0.22);
+  animation: leopips-win-pulse 1.6s ease-in-out infinite;
+}
+
+.leopips-win__hello {
+  margin: 0.3rem 0 0;
+  font-size: 1.15rem;
+}
+
+.leopips-win__big {
+  margin: 0;
+  letter-spacing: 0.18em;
+  color: #e4c35a;
+  font-weight: 800;
+  font-size: 1.35rem;
+}
+
+.leopips-win__amount {
+  margin: 0 0 0.6rem;
+  font-size: 1.05rem;
+}
+
+.leopips-win__panel button {
+  width: 100%;
+  min-height: 2.7rem;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #3de08c 0%, #00b85c 52%, #006b38 100%);
+  color: #04150c;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+@keyframes leopips-fall {
+  from {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0.95;
+  }
+  to {
+    transform: translate3d(0, 120vh, 0) rotate(220deg);
+    opacity: 0.15;
+  }
+}
+
+@keyframes leopips-win-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leopips-win__drop {
+    display: none;
+  }
+
+  .leopips-win__panel.is-big {
+    animation: none;
+  }
+}

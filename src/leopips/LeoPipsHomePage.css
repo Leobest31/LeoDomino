@@ -1,0 +1,160 @@
+/**
+ * Isolated Home overlay only. Live HomePage.css remains the visual standard.
+ * Do not import this from App.jsx or pages/HomePage.jsx.
+ */
+
+.leopips-home {
+  overflow-x: hidden;
+  --home-status-h: clamp(52px, calc(var(--home-vvh) * 0.074), 62px);
+}
+
+.leopips-home .home__stat--pips {
+  flex: 1.15 1 0;
+  gap: 8px;
+}
+
+.leopips-home .leopips-home__wallet-coin {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(255, 184, 0, 0.35));
+}
+
+.leopips-home .home__stat--pips .home__stat-copy,
+.leopips-home [data-leopips-home-xp] .home__stat-copy {
+  min-width: 0;
+  gap: 2px;
+}
+
+.leopips-home .home__stat--pips .home__stat-next,
+.leopips-home [data-leopips-home-xp] .home__stat-next {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.leopips-home .home__stat--pips .home__stat-value {
+  font-size: 14px;
+  line-height: 17px;
+}
+
+.leopips-home .home__stat--level {
+  flex: 0 0 88px;
+  width: 88px;
+}
+
+.leopips-home .home__stat-value--lvl {
+  font-size: 12px;
+  line-height: 14px;
+}
+
+.leopips-home [data-leopips-home-xp] {
+  flex: 1 1 0;
+}
+
+.leopips-home [data-leopips-home-xp] .home__stat-value {
+  font-size: 12px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.leopips-home .leopips-home__season-hero {
+  margin: 0;
+  background: var(--home-gold-metal);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: clamp(14px, calc(var(--home-vvh) * 0.02), 18px);
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.leopips-home__mode-chip {
+  margin: 0 0 6px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 184, 0, 0.45);
+  border-radius: 6px;
+  color: var(--home-gold-soft);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.leopips-home__reward {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.leopips-home__reward-copy {
+  min-width: 0;
+}
+
+.leopips-home__reward-amount {
+  margin: 2px 0 4px;
+  color: var(--home-emerald-hi);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 8px rgba(0, 230, 118, 0.28);
+}
+
+.leopips-home__reward-coin {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.leopips-home__cash {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.leopips-home__cash-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.leopips-home__cash .home__eyebrow {
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.leopips-home__cash .home__card-sub {
+  grid-column: 1 / -1;
+}
+
+.leopips-home__cash-prize {
+  margin: 0;
+  color: #f3e2a4;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-shadow: 0 0 8px rgba(255, 184, 0, 0.28);
+}
+
+@media (max-width: 384px) {
+  .leopips-home .home__stat--level {
+    flex-basis: 78px;
+    width: 78px;
+  }
+
+  .leopips-home .home__stat--pips .home__stat-value {
+    font-size: 13px;
+    line-height: 16px;
+  }
+
+  .leopips-home__cash-prize {
+    font-size: 14px;
+  }
+}
