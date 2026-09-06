@@ -8,3 +8,8 @@ entrypoint = "./functions/online-game/index.js"
 [functions.delete-account]
 verify_jwt = true
 entrypoint = "./functions/delete-account/index.js"
+
+[functions.online-timeout-sweep]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/online-timeout-sweep/index.js"

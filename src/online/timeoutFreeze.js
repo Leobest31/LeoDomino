@@ -6,7 +6,9 @@
 import { isMatchOverView } from "./onlineTable.js";
 import { isTurnDeadlineExpired } from "./turnTimeout.js";
 
-export const TIMEOUT_RESOLVE_RETRY_MS = [750, 1500, 3000, 5000];
+export const TIMEOUT_RESOLVE_RETRY_MS = [750, 1500, 3000, 5000, 8000, 12000];
+/** After this overdue wait, client must fetch authoritative state (not invent moves). */
+export const TIMEOUT_PENDING_RECONCILE_MS = 20_000;
 
 export function gameplayCodeFromInvoke(error, data) {
   const payload = readInvokeErrorPayload(error, data);
@@ -81,21 +83,51 @@ export function timeoutResolveKey(view) {
   return `${matchId}|${version}|${deadline}`;
 }
 
+/**
+ * True when the client should drop timeout-pending soft-lock state after a
+ * refresh/resolve. Authority advanced, terminal, or deadline no longer due.
+ */
+export function shouldClearTimeoutPending(previous, next, nowMs = Date.now(), monoMs) {
+  if (!previous) return true;
+  if (!next) return false;
+  if (isMatchOverView(next) || next.phase !== "playing") return true;
+  const prevV = Number(previous.version);
+  const nextV = Number(next.version);
+  if (Number.isInteger(prevV) && Number.isInteger(nextV) && nextV > prevV) return true;
+  if (String(next.turnDeadlineAt ?? "") !== String(previous.turnDeadlineAt ?? "")) return true;
+  if (!isTurnDeadlineExpired(next, nowMs, monoMs)) return true;
+  return false;
+}
+
 export function planTimeoutTick(view, options = {}) {
   const nowMs = options.nowMs ?? Date.now();
   const monoMs = options.monoMs;
   if (options.serviceOutage) return { action: "idle" };
   if (!view || options.inFlight) return { action: "idle" };
-  if (isMatchOverView(view) || view.phase !== "playing") return { action: "idle" };
-  if (!isTurnDeadlineExpired(view, nowMs, monoMs)) return { action: "idle" };
-  const retryAt = Number(options.retryNotBefore);
-  if (Number.isFinite(retryAt) && nowMs < retryAt) return { action: "wait" };
+  if (isMatchOverView(view) || view.phase !== "playing") return { action: "idle", clearPending: true };
+  if (!isTurnDeadlineExpired(view, nowMs, monoMs)) return { action: "idle", clearPending: true };
+
+  const deadlineMs = Date.parse(String(view.turnDeadlineAt ?? ""));
+  const overdueMs = Number.isFinite(deadlineMs) ? Math.max(0, nowMs - deadlineMs) : 0;
   const key = timeoutResolveKey(view);
-  if (key && options.attemptedKey === key) {
-    if (!Number.isFinite(retryAt) || retryAt <= 0) return { action: "wait" };
-    return { action: "resolve" };
+  const alreadyAttempted = Boolean(key && options.attemptedKey === key);
+  const retryAt = Number(options.retryNotBefore);
+  const retryReady = Number.isFinite(retryAt) && nowMs >= retryAt;
+  const lastReconcileAt = Number(options.lastReconcileAt);
+  const reconcileDue =
+    overdueMs >= TIMEOUT_PENDING_RECONCILE_MS &&
+    (!Number.isFinite(lastReconcileAt) || nowMs - lastReconcileAt >= TIMEOUT_PENDING_RECONCILE_MS);
+
+  // Soft-locked waiting: periodically fetch authoritative state; never invent moves.
+  if (alreadyAttempted) {
+    if (retryReady) return { action: "resolve", overdueMs };
+    if (reconcileDue && options.allowReconcile !== false) {
+      return { action: "reconcile", overdueMs };
+    }
+    return { action: "wait", overdueMs };
   }
-  return { action: "resolve" };
+
+  return { action: "resolve", overdueMs };
 }
 
 export function authoritativeMatchResult(view) {

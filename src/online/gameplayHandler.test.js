@@ -40,6 +40,14 @@ async function seated(rulesetId = "legacy", createSeed = () => 1001) {
   return { store, view };
 }
 
+/** View for the seat whose turn it is (legalMoves are viewer-scoped). */
+async function currentSeatView(store, hintView) {
+  const actorId = hintView.currentSeat === 0 ? PLAYER_A : PLAYER_B;
+  if (hintView.viewerSeat === hintView.currentSeat) return { view: hintView, actorId };
+  const view = await handleGetGameView({ userId: actorId, matchId: MATCH_ID, store });
+  return { view, actorId };
+}
+
 {
   const { store, view } = await seated();
   assert.equal(view.viewerSeat, 0);
@@ -357,7 +365,8 @@ async function playUntilNotPlaying(store, startView) {
   let seed = 0;
   let opener = 0;
   let other = 1;
-  for (let s = 1; s <= 400; s += 1) {
+  let openingTileId = "6-6";
+  for (let s = 1; s <= 800; s += 1) {
     const { state } = dealOnlineGame({
       rulesetId: "legacy",
       playerAId: PLAYER_A,
@@ -368,6 +377,7 @@ async function playUntilNotPlaying(store, startView) {
     opener = state.currentPlayer;
     other = opener === 0 ? 1 : 0;
     if (!state.players[other].hand.includes("2-6")) continue;
+    openingTileId = state.mustPlayTileId;
     seed = s;
     break;
   }
@@ -376,15 +386,15 @@ async function playUntilNotPlaying(store, startView) {
   const openerId = opener === 0 ? PLAYER_A : PLAYER_B;
   const otherId = other === 0 ? PLAYER_A : PLAYER_B;
   const before = await handleGetGameView({ userId: openerId, matchId: MATCH_ID, store });
-  const afterSix = await handleSubmitGameAction({
+  const afterOpen = await handleSubmitGameAction({
     userId: openerId,
     matchId: MATCH_ID,
     expectedVersion: before.version,
-    action: { type: "play", tileId: "6-6", end: "right" },
+    action: { type: "play", tileId: openingTileId, end: "right" },
     store,
   });
-  assert.equal(afterSix.board[0].id, "6-6");
-  assert.equal(afterSix.canPlay, false);
+  assert.equal(afterOpen.board[0].id, openingTileId);
+  assert.equal(afterOpen.canPlay, false);
   const otherView = await handleGetGameView({ userId: otherId, matchId: MATCH_ID, store });
   assert.equal(otherView.currentSeat, other);
   assert.equal(otherView.viewerSeat, other);
@@ -409,11 +419,13 @@ async function playUntilNotPlaying(store, startView) {
 }
 
 {
-  const { store, view } = await seated("legacy", () => 2001);
+  const { store, view: entered } = await seated("legacy", () => 2001);
+  const { view, actorId } = await currentSeatView(store, entered);
   const started = Date.now();
   const move = view.legalMoves[0];
+  assert.ok(move, "seed 2001 current seat needs a legal play");
   const played = await handleSubmitGameAction({
-    userId: view.currentSeat === 0 ? PLAYER_A : PLAYER_B,
+    userId: actorId,
     matchId: MATCH_ID,
     expectedVersion: view.version,
     action: { type: "play", tileId: move.tileId, end: move.end },
@@ -430,8 +442,8 @@ async function playUntilNotPlaying(store, startView) {
 }
 
 {
-  const { store, view } = await seated("legacy", () => 2001);
-  let current = view;
+  const { store, view: entered } = await seated("legacy", () => 2001);
+  let current = (await currentSeatView(store, entered)).view;
   let moves = 0;
   while (current.phase === "playing" && moves < 20) {
     const actor = current.currentSeat === 0 ? PLAYER_A : PLAYER_B;
@@ -505,7 +517,7 @@ async function playUntilNotPlaying(store, startView) {
   assert.equal(viewA.matchWinnerSeat, 1);
   assert.equal(viewB.roundResult.reason, "forfeit");
   assert.equal(viewA.roundResult.reason, "forfeit");
-  const move = view.legalMoves[0];
+  const move = view.legalMoves[0] || { tileId: "0-0", end: "right" };
   await assert.rejects(
     () =>
       handleSubmitGameAction({
@@ -526,14 +538,15 @@ function expireTurn(store) {
 }
 
 {
-  const { store, view } = await seated();
-  assert.ok(view.turnDeadlineAt);
-  const remaining = Date.parse(view.turnDeadlineAt) - Date.parse(view.serverNow);
-  assert.ok(remaining > 55_000 && remaining <= TURN_TIMEOUT_MS + 50);
-  assert.deepEqual(view.timeoutStrikes, [0, 0]);
-  const actor = view.currentSeat === 0 ? PLAYER_A : PLAYER_B;
+  const { store, view: entered } = await seated();
+  assert.ok(entered.turnDeadlineAt);
+  const remaining = Date.parse(entered.turnDeadlineAt) - Date.parse(entered.serverNow);
+  assert.ok(remaining > 25_000 && remaining <= TURN_TIMEOUT_MS + 50);
+  assert.deepEqual(entered.timeoutStrikes, [0, 0]);
+  const { view, actorId: actor } = await currentSeatView(store, entered);
   const move = view.legalMoves[0];
-  const shortDeadline = new Date(Date.now() + 30_000).toISOString();
+  assert.ok(move, "current seat must have a legal opening play");
+  const shortDeadline = new Date(Date.now() + 10_000).toISOString();
   store.sessions.get(MATCH_ID).turnDeadlineAt = shortDeadline;
   const played = await handleSubmitGameAction({
     userId: actor,
@@ -545,8 +558,8 @@ function expireTurn(store) {
   assert.notEqual(played.currentSeat, view.currentSeat);
   assert.notEqual(played.turnDeadlineAt, shortDeadline);
   const afterPlayRemaining = Date.parse(played.turnDeadlineAt) - Date.parse(played.serverNow);
-  assert.ok(afterPlayRemaining > 55_000 && afterPlayRemaining <= TURN_TIMEOUT_MS + 50);
-  console.log("  ✓ turn starts with 60s deadline; legal play resets next player's deadline");
+  assert.ok(afterPlayRemaining > 25_000 && afterPlayRemaining <= TURN_TIMEOUT_MS + 50);
+  console.log("  ✓ turn starts with 30s deadline; legal play resets next player's deadline");
 }
 
 {
@@ -583,7 +596,7 @@ function expireTurn(store) {
     });
   }
   if (current.canDraw) {
-    const shortDeadline = new Date(Date.now() + 40_000).toISOString();
+    const shortDeadline = new Date(Date.now() + 8_000).toISOString();
     store.sessions.get(MATCH_ID).turnDeadlineAt = shortDeadline;
     const actor = current.currentSeat === 0 ? PLAYER_A : PLAYER_B;
     const drawn = await handleSubmitGameAction({
@@ -594,10 +607,12 @@ function expireTurn(store) {
       store,
     });
     assert.equal(drawn.currentSeat, current.currentSeat);
-    assert.equal(drawn.turnDeadlineAt, shortDeadline);
-    console.log("  ✓ draw on the same seat keeps the existing deadline");
+    assert.notEqual(drawn.turnDeadlineAt, shortDeadline);
+    const afterDrawRemaining = Date.parse(drawn.turnDeadlineAt) - Date.parse(drawn.serverNow);
+    assert.ok(afterDrawRemaining > 25_000 && afterDrawRemaining <= TURN_TIMEOUT_MS + 50);
+    console.log("  ✓ draw on the same seat refreshes the turn deadline");
   } else {
-    console.log("  ✓ draw on the same seat keeps the existing deadline (no draw in this deal)");
+    console.log("  ✓ draw on the same seat refreshes the turn deadline (no draw in this deal)");
   }
 }
 
@@ -632,12 +647,13 @@ function expireTurn(store) {
   }
   const first = await timeoutCurrentSeat(view.version);
   assert.equal(store.actions.at(-1).actionType, "timeout");
-  assert.equal(first.roundResult.reason, "timeout_pass");
+  assert.ok(first.roundResult.reason === "timeout_auto" || first.roundResult.reason === "timeout_pass");
   assert.equal(first.roundResult.timedOutSeat, seat);
   assert.equal(first.timeoutStrikes[seat], 1);
   const second = await timeoutCurrentSeat(first.version);
-  assert.equal(second.roundResult.reason, "timeout_pass");
+  assert.ok(second.roundResult.reason === "timeout_auto" || second.roundResult.reason === "timeout_pass");
   assert.equal(second.timeoutStrikes[seat], 2);
+  const boardBeforeThird = store.secrets.get(MATCH_ID).engineState.board.slice();
   const third = await timeoutCurrentSeat(second.version);
   assert.equal(third.phase, "matchOver");
   assert.equal(third.roundResult.reason, "timeout");
@@ -645,6 +661,7 @@ function expireTurn(store) {
   assert.equal(store.matches.get(MATCH_ID).status, "finished");
   assert.equal(store.matches.get(MATCH_ID).finish_reason, "timeout");
   assert.equal(third.matchWinnerSeat, seat === 0 ? 1 : 0);
+  assert.deepEqual(store.secrets.get(MATCH_ID).engineState.board, boardBeforeThird);
   await assert.rejects(
     () =>
       handleResolveTurnTimeout({
@@ -815,9 +832,9 @@ function expireTurn(store) {
     expectedVersion: view.version,
     store,
   });
-  assert.deepEqual(resolved.timeoutStrikes, [0, 0]);
-  assert.notEqual(resolved.roundResult?.reason, "timeout_pass");
-  console.log("  ✓ no legal move timeout does not add a strike");
+  assert.equal(resolved.timeoutStrikes[seat], 1);
+  assert.notEqual(resolved.roundResult?.reason, "timeout");
+  console.log("  ✓ no legal move timeout records a strike then draw/pass");
 }
 
 {
@@ -836,12 +853,13 @@ function expireTurn(store) {
       expectedVersion: view.version,
       store,
     });
-    assert.equal(timed.roundResult.reason, "timeout_pass");
+    assert.ok(timed.roundResult.reason === "timeout_auto" || timed.roundResult.reason === "timeout_pass");
     assert.equal(timed.currentSeat, nextSeat);
     assert.equal(timed.mustPlayTileId, null);
     assert.ok(Date.parse(timed.turnDeadlineAt) > Date.parse(timed.serverNow));
     const remaining = Date.parse(timed.turnDeadlineAt) - Date.parse(timed.serverNow);
-    assert.ok(remaining > 55_000 && remaining <= TURN_TIMEOUT_MS + 50);
+    assert.ok(remaining > 25_000 && remaining <= TURN_TIMEOUT_MS + 50);
+    assert.ok(store.secrets.get(MATCH_ID).engineState.board.length > 0);
 
     const viewA = await handleGetGameView({ userId: PLAYER_A, matchId: MATCH_ID, store });
     const viewB = await handleGetGameView({ userId: PLAYER_B, matchId: MATCH_ID, store });
@@ -854,24 +872,64 @@ function expireTurn(store) {
     const nextView = nextSeat === 0 ? viewA : viewB;
     const waiterView = nextSeat === 0 ? viewB : viewA;
     assert.equal(nextView.mustPlayTileId, null);
-    assert.equal(nextView.canPlay, true);
-    assert.ok(nextView.legalMoves.length > 0);
+    assert.ok(nextView.canPlay || nextView.canDraw || nextView.canPass);
     assert.equal(waiterView.canPlay, false);
     assert.deepEqual(waiterView.legalMoves, []);
 
-    const move = nextView.legalMoves[0];
-    const played = await handleSubmitGameAction({
-      userId: nextId,
-      matchId: MATCH_ID,
-      expectedVersion: timed.version,
-      action: { type: "play", tileId: move.tileId, end: move.end },
-      store,
-    });
-    assert.equal(played.version, timed.version + 1);
-    assert.ok(played.board.length > 0);
-    assert.notEqual(store.actions.at(-1).actionType, "timeout");
+    if (nextView.canPlay) {
+      const move = nextView.legalMoves[0];
+      const played = await handleSubmitGameAction({
+        userId: nextId,
+        matchId: MATCH_ID,
+        expectedVersion: timed.version,
+        action: { type: "play", tileId: move.tileId, end: move.end },
+        store,
+      });
+      assert.equal(played.version, timed.version + 1);
+      assert.ok(played.board.length > 0);
+      assert.notEqual(store.actions.at(-1).actionType, "timeout");
+    } else if (nextView.canDraw) {
+      const drawn = await handleSubmitGameAction({
+        userId: nextId,
+        matchId: MATCH_ID,
+        expectedVersion: timed.version,
+        action: { type: "draw" },
+        store,
+      });
+      assert.equal(drawn.version, timed.version + 1);
+      assert.notEqual(store.actions.at(-1).actionType, "timeout");
+    }
   }
-  console.log("  ✓ opener timeout → next seat playable; getGameView converges; legal play accepted");
+  console.log("  ✓ opener timeout auto-plays; next seat playable; getGameView converges; legal play accepted");
+}
+
+{
+  for (const rulesetId of ["legacy", "haitian", "american"]) {
+    const { view } = await seated(rulesetId);
+    const remaining = Date.parse(view.turnDeadlineAt) - Date.parse(view.serverNow);
+    assert.ok(
+      remaining > 25_000 && remaining <= TURN_TIMEOUT_MS + 50,
+      `${rulesetId} stamps a 30s authoritative deadline`
+    );
+  }
+  console.log("  ✓ Classic, Haitian, and American online turns stamp 30 seconds");
+}
+
+{
+  const { store, view } = await seated("legacy");
+  expireTurn(store);
+  const hydrated = await handleGetGameView({ userId: PLAYER_B, matchId: MATCH_ID, store });
+  assert.ok(hydrated.version > view.version);
+  assert.equal(store.actions.filter((row) => row.actionType === "timeout").length, 1);
+  assert.ok(hydrated.roundResult?.reason === "timeout_auto" || hydrated.roundResult?.reason === "timeout_pass");
+  if (hydrated.phase === "playing") {
+    const remaining = Date.parse(hydrated.turnDeadlineAt) - Date.parse(hydrated.serverNow);
+    assert.ok(remaining > 25_000 && remaining <= TURN_TIMEOUT_MS + 50);
+    const nextId = hydrated.currentSeat === 0 ? PLAYER_A : PLAYER_B;
+    const nextView = await handleGetGameView({ userId: nextId, matchId: MATCH_ID, store });
+    assert.ok(nextView.canPlay || nextView.canDraw || nextView.canPass);
+  }
+  console.log("  ✓ get_game_view expires a due timeout so Waiting for timeout cannot stick");
 }
 
 console.log("  ✓ gameplayHandler");

@@ -50,6 +50,7 @@ import {
   isRetryableTimeoutError,
   nextTimeoutRetryAt,
   planTimeoutTick,
+  shouldClearTimeoutPending,
   timeoutResolveKey,
 } from "../online/timeoutFreeze.js";
 import {
@@ -91,6 +92,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const timeoutRetryAtRef = useRef(0);
   const timeoutAttemptRef = useRef(0);
   const timeoutAttemptedKeyRef = useRef("");
+  const timeoutReconcileAtRef = useRef(0);
   const serviceHealthRef = useRef(emptyServiceHealthState());
 
   matchIdRef.current = matchId;
@@ -119,6 +121,12 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       setBusy(false);
     }
     if (kept === viewRef.current) return kept;
+    if (shouldClearTimeoutPending(viewRef.current, kept)) {
+      timeoutAttemptRef.current = 0;
+      timeoutRetryAtRef.current = 0;
+      timeoutAttemptedKeyRef.current = "";
+      timeoutReconcileAtRef.current = 0;
+    }
     viewRef.current = kept;
     setView(kept);
     if (isMatchOverView(kept)) {
@@ -553,9 +561,23 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         inFlight: timeoutInFlightRef.current,
         retryNotBefore: timeoutRetryAtRef.current,
         attemptedKey: timeoutAttemptedKeyRef.current,
+        lastReconcileAt: timeoutReconcileAtRef.current,
         nowMs: Date.now(),
         serviceOutage: shouldSuppressTimeoutResolve(serviceHealthRef.current),
       });
+      if (planned.clearPending) {
+        timeoutAttemptRef.current = 0;
+        timeoutRetryAtRef.current = 0;
+        timeoutAttemptedKeyRef.current = "";
+        timeoutReconcileAtRef.current = 0;
+      }
+      if (planned.action === "reconcile") {
+        timeoutReconcileAtRef.current = Date.now();
+        void refreshView({ force: true }).catch(() => {
+          /* keep last authoritative view */
+        });
+        return;
+      }
       if (planned.action === "resolve") void resolveTimeout();
     };
     tick();
@@ -568,7 +590,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onVis);
     };
-  }, [status, turnDeadlineAt, roundPhase, roundVersion, resolveTimeout]);
+  }, [status, turnDeadlineAt, roundPhase, roundVersion, resolveTimeout, refreshView]);
 
   useEffect(() => {
     if (status !== "ready" || !serviceOutage) return undefined;

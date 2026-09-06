@@ -18,6 +18,7 @@ import {
 import {
   nextTimeoutRetryAt,
   planTimeoutTick,
+  shouldClearTimeoutPending,
   timeoutResolveKey,
   TIMEOUT_RESOLVE_RETRY_MS,
 } from "./timeoutFreeze.js";
@@ -25,6 +26,7 @@ import {
 const MATCH_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const hook = readFileSync(join(root, "src/hooks/useOnlineMatch.js"), "utf8");
+const handler = readFileSync(join(root, "src/online/gameplayHandler.js"), "utf8");
 
 function playingClockView(extras = {}) {
   return stampDeadlineReceipt(
@@ -119,7 +121,7 @@ function playingClockView(extras = {}) {
     nowMs: Date.parse(expired.serverNow) + 180_000,
     monoMs: 1000 + 180_000,
   });
-  assert.equal(focusCannotBypass.action, "wait");
+  assert.equal(focusCannotBypass.action, "reconcile", "long overdue soft-lock must refresh authority");
   assert.ok(nextTimeoutRetryAt(0, 0) === TIMEOUT_RESOLVE_RETRY_MS[0]);
   console.log("  ✓ same match/version/deadline is gated; new version can resolve; focus cannot bypass");
 }
@@ -138,16 +140,58 @@ function playingClockView(extras = {}) {
 {
   assert.match(hook, /planTimeoutTick/);
   assert.match(hook, /timeoutResolveKey/);
+  assert.match(hook, /shouldClearTimeoutPending/);
   assert.match(hook, /timeoutAttemptedKeyRef/);
   assert.match(hook, /attemptedKey: timeoutAttemptedKeyRef/);
   assert.match(hook, /setInterval\(tick, 250\)/);
+  assert.match(hook, /planned\.clearPending/);
   assert.match(hook, /roundAdvanceAtVersionRef\.current = version/);
   assert.match(hook, /advanceRound\(\)/);
   assert.match(hook, /error\?\.code === "STALE_VERSION"/);
   assert.match(hook, /error\?\.code === "TIMEOUT_NOT_DUE"/);
   assert.match(hook, /asViewerSnapshot/);
   assert.match(hook, /nextTimeoutRetryAt/);
+  assert.match(hook, /await refreshView\(\)/);
+  assert.ok(TIMEOUT_RESOLVE_RETRY_MS.length >= 5);
   console.log("  ✓ hook gates timeout RPC and treats stale advance/timeout as refresh+backoff");
+}
+
+{
+  const previous = playingClockView({ version: 2 });
+  const advanced = playingClockView({
+    version: 3,
+    turnDeadlineAt: "2026-08-29T12:02:00.000Z",
+    serverNow: "2026-08-29T12:01:30.000Z",
+  });
+  assert.equal(shouldClearTimeoutPending(previous, advanced), true);
+  assert.equal(
+    shouldClearTimeoutPending(previous, { ...previous, phase: "matchOver", status: "match_over" }),
+    true
+  );
+  assert.equal(
+    shouldClearTimeoutPending(
+      previous,
+      previous,
+      Date.parse(previous.serverNow) + 90_000,
+      (previous.deadlineReceivedMono || 0) + 90_000
+    ),
+    false,
+    "still overdue same version keeps pending soft-lock until authority advances"
+  );
+  const idleClear = planTimeoutTick(advanced, {
+    nowMs: Date.parse(advanced.serverNow),
+    monoMs: advanced.deadlineReceivedMono,
+  });
+  assert.equal(idleClear.clearPending, true);
+  console.log("  ✓ timeoutPending clears after authoritative advance; failed path stays bounded");
+}
+
+{
+  assert.match(handler, /async function expireDueTimeoutIfNeeded/);
+  assert.match(handler, /handleGetGameView[\s\S]*expireDueTimeoutIfNeeded/);
+  assert.match(handler, /handleEnterOnlineMatch[\s\S]*expireDueTimeoutIfNeeded/);
+  assert.match(handler, /_leopips_commit_online_game_transition/);
+  console.log("  ✓ get_game_view and enter expire a due timeout on the shared commit path");
 }
 
 console.log("  ✓ timeout freeze-safety");
