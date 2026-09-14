@@ -13,6 +13,7 @@ export const SAFE_TAG_KEYS = Object.freeze([
   "matchVersion",
   "actionName",
   "backendErrorCode",
+  "failureStage",
 ]);
 
 const SAFE = new Set(SAFE_TAG_KEYS);
@@ -73,8 +74,20 @@ export function pickSafeMetadata(input = {}) {
       continue;
     }
     if (key === "actionName") {
-      if (typeof value === "string" && /^(play|draw|pass|enter|advance_round)$/.test(value)) {
+      if (
+        typeof value === "string" &&
+        /^(play|draw|pass|enter|advance_round|advance|timeout|hydrate|forfeit)$/.test(value)
+      ) {
         out.actionName = value;
+      }
+      continue;
+    }
+    if (key === "failureStage") {
+      if (
+        typeof value === "string" &&
+        /^(client_submit|received|rejected|persist|realtime|hydrate)$/.test(value)
+      ) {
+        out.failureStage = value;
       }
       continue;
     }

@@ -12,6 +12,11 @@ export { AuthProvider } from "./AuthProvider.jsx";
 export { useAuth } from "./useAuth.js";
 export { publicAccount } from "./validation.js";
 export {
+  passwordResetRedirectTo,
+  locationLooksLikeAuthCallback,
+  PASSWORD_RECOVERY_EVENT,
+} from "./passwordRecovery.js";
+export {
   DEFAULT_AVATAR_ID,
   PLAYER_AVATAR_IDS,
   normalizeAvatarId,

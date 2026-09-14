@@ -47,3 +47,6 @@ ios/App/App.xcodeproj/xcuserdata/
 
 # Sentry build plugin local state (may contain auth token)
 .env.sentry-build-plugin
+.vercel
+.env*
+supabase/.temp

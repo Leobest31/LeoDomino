@@ -106,7 +106,9 @@ export function startMatch(options = {}) {
 /**
  * Deal is already done on `base`; attach round fields + starter.
  *
- * Round 1: ruleset round1Starter policy (legacy highest double / Haitian 6-6).
+ * Round 1: ruleset round1Starter policy. Legacy/Haitian/American share the
+ * same highest-double-else-highest-tile chooser — no fixed opening tile.
+ * Dominican/Puerto Rican keep their own fixed-6-6 "doubleSix" policy.
  * Later rounds: previous round winner starts and may open with any tile.
  *
  * @param {object} base - createMatch result
@@ -137,7 +139,8 @@ function beginRound(base, meta) {
     playerIndex = meta.starterIndex;
   } else if (
     ruleset.round1Starter === "highestDoubleElseHighest" ||
-    ruleset.round1Starter === "doubleSix"
+    ruleset.round1Starter === "doubleSix" ||
+    ruleset.round1Starter === "doubleTwo"
   ) {
     const chosen = ruleset.policies.chooseStartingPlayer(base.players, base.byId);
     if (!chosen) {

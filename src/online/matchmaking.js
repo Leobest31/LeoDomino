@@ -1,6 +1,8 @@
 /**
  * Find Match client — public match_requests + accept/cancel RPCs.
- * Inserts only { ruleset_id }. Creator, status, and seats come from the backend.
+ * Public LeoPips inserts { ruleset_id, stake_pips } when the hosted column
+ * exists. Creator, status, and seats come from the backend.
+ * Does not import LeoPips economy or call debit/payout helpers.
  */
 import {
   V1_GAME_STYLE_IDS,
@@ -14,9 +16,25 @@ import {
   joinDeadlineFromIso,
 } from "./joinTimeout.js";
 import { isMissingActiveMatchRow } from "./matchRecovery.js";
-import { isImmediateInfrastructureOutage } from "./serviceHealth.js";
+import { reportSafeEvent } from "../monitoring/client.js";
+import {
+  httpStatusFromError,
+  isImmediateInfrastructureOutage,
+  isInfrastructureOutageError,
+  NETWORK_REQUEST_TIMEOUT_MS,
+  postgrestCodeFromError,
+  SERVICE_UNAVAILABLE_CODE,
+} from "./serviceHealth.js";
 import { getSupabaseClient } from "./supabaseClient.js";
 import { noteTerminalMatch } from "./terminalMatchMemory.js";
+
+/** Bound a PostgREST query builder with the shared network timeout, when supported. */
+function withNetworkTimeout(query) {
+  if (typeof query?.abortSignal === "function" && typeof AbortSignal?.timeout === "function") {
+    return query.abortSignal(AbortSignal.timeout(NETWORK_REQUEST_TIMEOUT_MS));
+  }
+  return query;
+}
 
 export const FIND_MATCH_STYLE_IDS = V1_GAME_STYLE_IDS;
 export const FIND_MATCH_RULESET_IDS = Object.freeze(["legacy", "haitian", "american"]);
@@ -24,23 +42,85 @@ export const FIND_MATCH_RULESET_IDS = Object.freeze(["legacy", "haitian", "ameri
 export const MATCH_REQUEST_SELECT_LEGACY =
   "id, creator_id, ruleset_id, status, created_at, expires_at, match_id, acceptor_id, profiles!creator_id ( display_name, avatar_id, country_code )";
 
-export const MATCH_REQUEST_SELECT =
+export const MATCH_REQUEST_SELECT_INVITE =
   `${MATCH_REQUEST_SELECT_LEGACY}, visibility, invitee_id`;
+
+export const MATCH_REQUEST_SELECT =
+  `${MATCH_REQUEST_SELECT_INVITE}, waiting_heartbeat_at`;
+
+export const MATCH_REQUEST_SELECT_STAKE =
+  `${MATCH_REQUEST_SELECT}, stake_pips`;
 
 export const FRIEND_MATCH_INVITE_SELECT =
   `${MATCH_REQUEST_SELECT}, invitee:profiles!invitee_id ( display_name, avatar_id, country_code )`;
 
+/** Public LeoPips lobby stakes. Never coerce NULL/invalid to 20. */
+export const FIND_MATCH_STAKE_PIPS = Object.freeze([20, 50, 100, 150]);
+
+const FRIEND_MATCH_INVITE_SELECT_NO_HEARTBEAT =
+  `${MATCH_REQUEST_SELECT_INVITE}, invitee:profiles!invitee_id ( display_name, avatar_id, country_code )`;
+
 /** Must match SQL interval '5 minutes' in stale occupancy cleanup. */
 export const STALE_MATCH_GRACE_MS = 5 * 60 * 1000;
 export const MATCH_PRESENCE_HEARTBEAT_MS = 20 * 1000;
+/** Public Find Match waiting heartbeat while the creator is on the visible waiting screen. */
+export const PUBLIC_REQUEST_HEARTBEAT_MS = 10 * 1000;
+/**
+ * Maximum age of waiting_heartbeat_at for a public request to stay joinable /
+ * accept-ready. Aligned with SQL grace (5 minutes). A short mobile gap must
+ * not hide or permanently expire a still-valid waiting request.
+ */
+export const PUBLIC_REQUEST_HEARTBEAT_TTL_MS = 5 * 60 * 1000;
 export {
   JOIN_GRACE_MS,
   ACTIVE_MATCH_STATUSES,
   isGameplayStarted,
   isReservedNotStarted,
   isResumableMatch,
+  isTerminalMatch,
   joinDeadlineFromIso,
 } from "./joinTimeout.js";
+
+/**
+ * Own Find Match request is actionable only when OPEN (unexpired) or ACCEPTED
+ * with a still-resumable linked match (ready/playing). Accepted→finished/missing
+ * history must not trap Find Match.
+ *
+ * @param {{ status?: string, matchId?: string|null }|null|undefined} request
+ * @param {{ id?: string, status?: string, finishReason?: string|null, finishedAt?: string|null }|null|undefined} linkedMatch
+ * @param {number} [now]
+ */
+export function isLiveOwnMatchmakingRequest(request, linkedMatch, now = Date.now()) {
+  if (!request) return false;
+  if (request.status === "open") return !isMatchRequestExpired(request, now);
+  if (request.status === "accepted") {
+    if (!request.matchId) return false;
+    if (!linkedMatch?.id) return false;
+    return isResumableMatch(linkedMatch);
+  }
+  return false;
+}
+
+async function fetchLinkedMatchBrief(matchId, client) {
+  if (!matchId) return null;
+  const db = clientOf(client);
+  const { data, error } = await db
+    .from("matches")
+    .select("id, status, finish_reason, finished_at")
+    .eq("id", matchId)
+    .maybeSingle();
+  if (error) {
+    if (isMissingActiveMatchRow(error)) return null;
+    throwFromPostgrest(error, "MATCH_FAILED");
+  }
+  if (!data) return null;
+  return {
+    id: data.id,
+    status: data.status,
+    finishReason: data.finish_reason ?? null,
+    finishedAt: data.finished_at ?? null,
+  };
+}
 
 function isMissingRpcError(error) {
   if (isImmediateInfrastructureOutage(error)) return false;
@@ -55,7 +135,43 @@ function isMissingInviteColumnError(error) {
   return /visibility|invitee_id/i.test(msg);
 }
 
+function isMissingHeartbeatColumnError(error) {
+  const msg = String(error?.message || error?.details || "");
+  return /waiting_heartbeat_at/i.test(msg);
+}
+
+function isMissingStakeColumnError(error) {
+  const msg = String(error?.message || error?.details || "");
+  return /stake_pips/i.test(msg);
+}
+
+function isUnknownAcceptSignatureError(error) {
+  const msg = String(error?.message || error?.details || error?.code || "");
+  return /p_ruleset_id|p_stake_pips|PGRST202|could not find the function/i.test(msg);
+}
+
 const ALLOWED_RULESETS = new Set(FIND_MATCH_RULESET_IDS);
+
+/**
+ * @param {unknown} stake
+ * @returns {number|null}
+ */
+export function toFindMatchStakePips(stake) {
+  const n = Number(stake);
+  if (!Number.isInteger(n) || !FIND_MATCH_STAKE_PIPS.includes(n)) return null;
+  return n;
+}
+
+/**
+ * @param {unknown} stake
+ */
+export function isAllowedFindMatchStake(stake) {
+  return toFindMatchStakePips(stake) != null;
+}
+
+function isClientLike(value) {
+  return Boolean(value && (typeof value.from === "function" || typeof value.rpc === "function"));
+}
 
 export class MatchmakingError extends Error {
   /**
@@ -121,6 +237,7 @@ export function normalizeMatchRequest(row) {
   const rulesetId = row.ruleset_id;
   const inviteeProfile = unwrapProfile(row.invitee);
   const visibility = row.visibility === "friend" ? "friend" : "public";
+  const stakePips = toFindMatchStakePips(row.stake_pips ?? row.stakePips);
   return {
     id: row.id,
     creatorId: row.creator_id,
@@ -128,11 +245,13 @@ export function normalizeMatchRequest(row) {
     visibility,
     rulesetId,
     styleId: styleIdFromRulesetId(rulesetId),
+    stakePips,
     status: row.status,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     matchId: row.match_id ?? null,
     acceptorId: row.acceptor_id ?? null,
+    waitingHeartbeatAt: row.waiting_heartbeat_at ?? null,
     creator: {
       playerId: row.creator_id,
       displayName: profile.displayName,
@@ -177,32 +296,79 @@ export function isPublicMatchRequest(request) {
 }
 
 /**
+ * Public Find Match creator is accept-ready only while the waiting heartbeat
+ * is within PUBLIC_REQUEST_HEARTBEAT_TTL_MS. Friend invites ignore this clock.
+ *
+ * @param {{ visibility?: string, waitingHeartbeatAt?: string|null }|null|undefined} request
+ * @param {number} [now]
+ */
+export function isPublicRequestCreatorFresh(request, now = Date.now()) {
+  if (!isPublicMatchRequest(request)) return true;
+  const raw = request?.waitingHeartbeatAt ?? request?.waiting_heartbeat_at;
+  const heartbeatMs = Date.parse(String(raw ?? ""));
+  if (!Number.isFinite(heartbeatMs)) return false;
+  return now - heartbeatMs <= PUBLIC_REQUEST_HEARTBEAT_TTL_MS;
+}
+
+/**
  * @param {{ creatorId?: string, status?: string, expiresAt?: string, visibility?: string }|null|undefined} request
  * @param {string} playerId
+ * @param {number} [now]
  */
-export function canAcceptMatchRequest(request, playerId) {
+export function canAcceptMatchRequest(request, playerId, now = Date.now()) {
   return (
     isPublicMatchRequest(request) &&
     request?.status === "open" &&
     Boolean(playerId) &&
     !isOwnMatchRequest(request, playerId) &&
-    !isMatchRequestExpired(request)
+    !isMatchRequestExpired(request, now) &&
+    isPublicRequestCreatorFresh(request, now)
   );
 }
 
 /**
  * Lobby cards that may still render as Waiting/Open.
  * A request that is no longer open must never stay in this list.
+ * Stale public creators are hidden from other players; the owner still sees
+ * their own waiting row so they can cancel it.
  *
  * @param {Array<{ id?: string, status?: string }|null|undefined>} open
  * @param {{ id?: string, status?: string }|null|undefined} own
+ * @param {number} [now]
  */
-export function visibleFindMatchRequests(open, own) {
+export function visibleFindMatchRequests(open, own, now = Date.now()) {
   return (Array.isArray(open) ? open : []).filter((row) => {
     if (!row || row.status !== "open") return false;
     if (own && row.id === own.id && own.status !== "open") return false;
+    if (own && row.id === own.id) return true;
+    if (isPublicMatchRequest(row) && !isPublicRequestCreatorFresh(row, now)) return false;
     return true;
   });
+}
+
+/**
+ * Exact LeoPips lobby. NULL stake never matches 20/50/100/150.
+ * @param {{ rulesetId?: string, stakePips?: number|null }|null|undefined} request
+ * @param {unknown} styleOrRuleset
+ * @param {unknown} stake
+ */
+export function requestMatchesFindMatchLobby(request, styleOrRuleset, stake) {
+  const rulesetId = toFindMatchRulesetId(styleOrRuleset);
+  const stakePips = toFindMatchStakePips(stake);
+  if (!request || !rulesetId || stakePips == null) return false;
+  if (!isPublicMatchRequest(request)) return false;
+  if (toFindMatchStakePips(request.stakePips) == null) return false;
+  return request.rulesetId === rulesetId && request.stakePips === stakePips;
+}
+
+/**
+ * Exact public LeoPips lobby cards. Own / friend / NULL-stake rows never
+ * bypass the style+stake filter.
+ */
+export function visibleFindMatchLobbyRequests(open, own, styleOrRuleset, stake, now = Date.now()) {
+  return visibleFindMatchRequests(open, own, now).filter((row) =>
+    requestMatchesFindMatchLobby(row, styleOrRuleset, stake)
+  );
 }
 
 /**
@@ -280,6 +446,9 @@ export function throwFromPostgrest(error, fallbackCode = "RPC") {
   if (/RANKED_PAIR_LIMIT/i.test(msg) || error?.code === "P0004") {
     throw new MatchmakingError("RANKED_PAIR_LIMIT", msg, error);
   }
+  if (/CREATOR_UNAVAILABLE/i.test(msg) || error?.code === "P0005") {
+    throw new MatchmakingError("CREATOR_UNAVAILABLE", msg, error);
+  }
   if (/PLAYER_BUSY|active_match_players|ACTIVE_MATCH_EXISTS/i.test(msg)) {
     throw new MatchmakingError("PLAYER_BUSY", msg, error);
   }
@@ -304,8 +473,17 @@ export function throwFromPostgrest(error, fallbackCode = "RPC") {
   if (/authentication required/i.test(msg)) {
     throw new MatchmakingError("AUTH", msg, error);
   }
+  if (/ACCOUNT_DELETED/i.test(msg)) {
+    throw new MatchmakingError("ACCOUNT_DELETED", msg, error);
+  }
   if (/invalid ruleset_id/i.test(msg)) {
     throw new MatchmakingError("INVALID_STYLE", msg, error);
+  }
+  if (/invalid stake_pips/i.test(msg)) {
+    throw new MatchmakingError("INVALID_STAKE", msg, error);
+  }
+  if (/LOBBY_MISMATCH/i.test(msg) || /LOBBY_REQUIRED/i.test(msg) || error?.code === "P0006") {
+    throw new MatchmakingError("LOBBY_MISMATCH", msg, error);
   }
   if (/cannot invite yourself/i.test(msg)) {
     throw new MatchmakingError("SELF_INVITE", msg, error);
@@ -319,6 +497,28 @@ export function throwFromPostgrest(error, fallbackCode = "RPC") {
   if (/duplicate key|unique constraint|one_open_per_creator|one_open_friend_pair/i.test(msg)) {
     throw new MatchmakingError("ALREADY_OPEN", msg, error);
   }
+  // Infrastructure/network-class failures (dropped connection, aborted or
+  // timed-out request, PGRST002/PGRST003, 502/503/504-style gateway errors)
+  // must never collapse into the generic fallback below — same classifier
+  // already used by every admin reader in this directory (adminDashboard.js,
+  // adminLeopipsGift.js, adminLeopipsReads.js, adminPlayerMessages.js,
+  // adminPlayerRankings.js, adminV1.js, matchRecovery.js).
+  if (isInfrastructureOutageError(error) || error?.code === "PGRST003") {
+    throw new MatchmakingError(SERVICE_UNAVAILABLE_CODE, msg || "service unavailable", error);
+  }
+  // Every specific domain/infrastructure classification above has already
+  // thrown and returned. Reaching here means a genuinely unclassified
+  // backend error — the fallback codes (CREATE_FAILED/ACCEPT_FAILED/
+  // CANCEL_FAILED/"RPC") are all listed as EXPECTED in monitoring so they
+  // never spam Sentry as crashes, but that previously meant an unexpected
+  // error landing here left zero trace anywhere. Safe fields only — no raw
+  // message, no tokens, no hand/secret data.
+  reportSafeEvent("matchmaking_unclassified_error", {
+    fallbackCode,
+    postgrestCode: postgrestCodeFromError(error) || null,
+    httpStatus: httpStatusFromError(error) || null,
+    errorCode: typeof error?.code === "string" ? error.code : null,
+  });
   throw new MatchmakingError(fallbackCode, msg || "request failed", error);
 }
 
@@ -341,7 +541,9 @@ export function isStaleMatchAcceptError(error) {
       error.code === "EXPIRED" ||
       error.code === "NOT_FRIENDS" ||
       error.code === "NOT_INVITEE" ||
-      error.code === "RANKED_PAIR_LIMIT")
+      error.code === "RANKED_PAIR_LIMIT" ||
+      error.code === "CREATOR_UNAVAILABLE" ||
+      error.code === "LOBBY_MISMATCH")
   );
 }
 
@@ -365,6 +567,7 @@ export function friendInviteErrorKey(error) {
     case "NOT_OPEN":
     case "EXPIRED":
     case "REQUEST_ALREADY_ACCEPTED":
+    case "CREATOR_UNAVAILABLE":
       return "findMatch.playerUnavailable";
     case "AUTH":
       return "findMatch.unavailable";
@@ -374,20 +577,112 @@ export function friendInviteErrorKey(error) {
 }
 
 /**
+ * Atomic public LeoPips Find Match: accept oldest joinable peer in the exact
+ * style+stake lobby, else reuse/create own OPEN. Server-authoritative when
+ * `join_or_create_public_match_request` is hosted.
+ *
+ * @param {unknown} styleId
+ * @param {unknown} stake
+ * @param {object} [client]
+ * @returns {Promise<{ outcome: 'created'|'accepted'|'already_open', request: object|null, match: object|null }>}
+ */
+export async function joinOrCreatePublicMatchRequest(styleId, stake, client) {
+  const rulesetId = toFindMatchRulesetId(styleId);
+  const stakePips = toFindMatchStakePips(stake);
+  if (!rulesetId) {
+    throw new MatchmakingError("INVALID_STYLE", "invalid Find Match style");
+  }
+  if (stakePips == null) {
+    throw new MatchmakingError("INVALID_STAKE", "invalid Find Match stake");
+  }
+  const db = clientOf(client);
+  if (typeof db.rpc !== "function") {
+    throw new MatchmakingError("JOIN_OR_CREATE_UNAVAILABLE", "join_or_create unavailable");
+  }
+  const { data, error } = await withNetworkTimeout(
+    db.rpc("join_or_create_public_match_request", {
+      p_ruleset_id: rulesetId,
+      p_stake_pips: stakePips,
+    })
+  );
+  if (error) {
+    if (isMissingRpcError(error)) {
+      throw new MatchmakingError("JOIN_OR_CREATE_UNAVAILABLE", "join_or_create unavailable");
+    }
+    throwFromPostgrest(error, "CREATE_FAILED");
+  }
+  const payload = data && typeof data === "object" ? data : {};
+  const outcome =
+    payload.outcome === "accepted" ||
+    payload.outcome === "already_open" ||
+    payload.outcome === "created"
+      ? payload.outcome
+      : "created";
+  const requestId = payload.request_id ?? payload.requestId ?? null;
+  const matchId = payload.match_id ?? payload.matchId ?? null;
+  let request = null;
+  if (requestId) {
+    const run = (cols) =>
+      withNetworkTimeout(db.from("match_requests").select(cols).eq("id", requestId).maybeSingle());
+    let { data: row, error: rowError } = await run(MATCH_REQUEST_SELECT_STAKE);
+    if (rowError && isMissingStakeColumnError(rowError)) {
+      ({ data: row, error: rowError } = await run(MATCH_REQUEST_SELECT));
+    }
+    if (rowError) throwFromPostgrest(rowError, "CREATE_FAILED");
+    request = normalizeMatchRequest(row);
+  }
+  let match = null;
+  if (outcome === "accepted" && matchId) {
+    try {
+      match = await getMatchWithPlayers(matchId, client);
+    } catch {
+      match = { id: matchId };
+    }
+  }
+  return { outcome, request, match };
+}
+
+/**
  * Create a public open request. Backend trigger stamps creator_id = auth.uid().
+ * Public staked Find Match MUST use `join_or_create_public_match_request` and
+ * never silently falls back to blind INSERT (that recreates dual-OPEN races).
+ * Unstaked / NULL-stake inserts keep the legacy table path.
  * @param {string} styleId
+ * @param {unknown} [stakeOrClient]
  * @param {object} [client]
  */
-export async function createMatchRequest(styleId, client) {
+export async function createMatchRequest(styleId, stakeOrClient, client) {
   const rulesetId = toFindMatchRulesetId(styleId);
   if (!rulesetId) {
     throw new MatchmakingError("INVALID_STYLE", "invalid Find Match style");
   }
-  const { data, error } = await clientOf(client)
-    .from("match_requests")
-    .insert({ ruleset_id: rulesetId })
-    .select(MATCH_REQUEST_SELECT_LEGACY)
-    .single();
+  const stakeGiven = !isClientLike(stakeOrClient) && stakeOrClient != null && stakeOrClient !== "";
+  const stakePips = stakeGiven ? toFindMatchStakePips(stakeOrClient) : null;
+  if (stakeGiven && stakePips == null) {
+    throw new MatchmakingError("INVALID_STAKE", "invalid Find Match stake");
+  }
+  const db = clientOf(isClientLike(stakeOrClient) ? stakeOrClient : client);
+
+  // Public LeoPips stake path: atomic join-or-create only. Fail closed.
+  if (stakePips != null) {
+    const joined = await joinOrCreatePublicMatchRequest(styleId, stakePips, db);
+    if (joined.request) {
+      return joined.match
+        ? {
+            ...joined.request,
+            matchId: joined.match.id ?? joined.request.matchId,
+            _joinOutcome: joined.outcome,
+            _match: joined.match,
+          }
+        : { ...joined.request, _joinOutcome: joined.outcome };
+    }
+    throw new MatchmakingError("CREATE_FAILED", "join_or_create returned no request");
+  }
+
+  const row = { ruleset_id: rulesetId };
+  let { data, error } = await withNetworkTimeout(
+    db.from("match_requests").insert(row).select(MATCH_REQUEST_SELECT_LEGACY).single()
+  );
   if (error) throwFromPostgrest(error, "CREATE_FAILED");
   return normalizeMatchRequest(data);
 }
@@ -406,7 +701,13 @@ export async function listOpenMatchRequests(client) {
     if (publicOnly) query = query.neq("visibility", "friend");
     return query.order("created_at", { ascending: false });
   };
-  let { data, error } = await run(MATCH_REQUEST_SELECT, true);
+  let { data, error } = await run(MATCH_REQUEST_SELECT_STAKE, true);
+  if (error && isMissingStakeColumnError(error)) {
+    ({ data, error } = await run(MATCH_REQUEST_SELECT, true));
+  }
+  if (error && isMissingHeartbeatColumnError(error)) {
+    ({ data, error } = await run(MATCH_REQUEST_SELECT_INVITE, true));
+  }
   if (error && isMissingInviteColumnError(error)) {
     ({ data, error } = await run(MATCH_REQUEST_SELECT_LEGACY, false));
   }
@@ -414,11 +715,61 @@ export async function listOpenMatchRequests(client) {
   return (data ?? [])
     .map((row) => normalizeMatchRequest(row))
     .filter(Boolean)
-    .filter((row) => isPublicMatchRequest(row) && !isMatchRequestExpired(row));
+    .filter(
+      (row) =>
+        isPublicMatchRequest(row) &&
+        !isMatchRequestExpired(row) &&
+        isPublicRequestCreatorFresh(row)
+    );
+}
+
+function normalizeLobbyListRow(row) {
+  if (!row) return null;
+  return normalizeMatchRequest({
+    ...row,
+    profiles: row.profiles ?? {
+      display_name: row.display_name,
+      avatar_id: row.avatar_id,
+      country_code: row.country_code,
+    },
+  });
 }
 
 /**
- * Latest open or accepted request created by this player (for waiting / matched).
+ * Server-authoritative exact-bucket list. Missing RPC returns [] for a
+ * staked lobby so Classic 20 cannot match Classic 50 through a fallback.
+ * Invalid / NULL stake returns [] and is never coerced to 20.
+ *
+ * @param {unknown} styleOrRuleset
+ * @param {unknown} stake
+ * @param {object} [client]
+ */
+export async function listJoinableOpenMatchRequests(styleOrRuleset, stake, client) {
+  const rulesetId = toFindMatchRulesetId(styleOrRuleset);
+  const stakePips = toFindMatchStakePips(stake);
+  if (!rulesetId || stakePips == null) return [];
+  const db = clientOf(client);
+  if (typeof db.rpc === "function") {
+    const { data, error } = await db.rpc("list_joinable_open_match_requests", {
+      p_ruleset_id: rulesetId,
+      p_stake_pips: stakePips,
+    });
+    if (!error) {
+      return (data ?? [])
+        .map((row) => normalizeLobbyListRow(row))
+        .filter(Boolean)
+        .filter((row) => requestMatchesFindMatchLobby(row, rulesetId, stakePips))
+        .filter((row) => !isMatchRequestExpired(row) && isPublicRequestCreatorFresh(row));
+    }
+    if (!isMissingRpcError(error)) throwFromPostgrest(error, "LIST_FAILED");
+  }
+  return [];
+}
+
+/**
+ * Latest open or live-accepted request created by this player (for waiting / matched).
+ * Accepted rows whose linked match is finished/terminal/missing are ignored so
+ * historical accepted→finished cannot trap Find Match.
  * @param {string} playerId
  * @param {object} [client]
  */
@@ -434,27 +785,85 @@ export async function getOwnLatestRequest(playerId, client) {
     if (publicOnly) query = query.neq("visibility", "friend");
     return query.order("created_at", { ascending: false }).limit(1).maybeSingle();
   };
-  let { data, error } = await run(MATCH_REQUEST_SELECT, true);
+  let { data, error } = await run(MATCH_REQUEST_SELECT_STAKE, true);
+  if (error && isMissingStakeColumnError(error)) {
+    ({ data, error } = await run(MATCH_REQUEST_SELECT, true));
+  }
+  if (error && isMissingHeartbeatColumnError(error)) {
+    ({ data, error } = await run(MATCH_REQUEST_SELECT_INVITE, true));
+  }
   if (error && isMissingInviteColumnError(error)) {
     ({ data, error } = await run(MATCH_REQUEST_SELECT_LEGACY, false));
   }
   if (error) throwFromPostgrest(error, "LIST_FAILED");
   const own = normalizeMatchRequest(data);
-  if (own?.status === "open" && isMatchRequestExpired(own)) return null;
-  return own ?? null;
+  if (!own) return null;
+  if (own.status === "open") {
+    return isMatchRequestExpired(own) ? null : own;
+  }
+  if (own.status === "accepted") {
+    let linked = null;
+    try {
+      linked = await fetchLinkedMatchBrief(own.matchId, db);
+    } catch {
+      return null;
+    }
+    return isLiveOwnMatchmakingRequest(own, linked) ? own : null;
+  }
+  return null;
 }
 
 /**
  * @param {string} playerId
+ * @param {object|{ rulesetId?: string, styleId?: string, stake?: unknown, stakePips?: unknown }} [lobbyOrClient]
  * @param {object} [client]
  */
-export async function loadFindMatchBoard(playerId, client) {
-  const open = await listOpenMatchRequests(client);
-  const own = await getOwnLatestRequest(playerId, client);
-  if (own?.status === "open" && !open.some((row) => row.id === own.id)) {
-    return { open: [own, ...open], own };
+export async function loadFindMatchBoard(playerId, lobbyOrClient, client) {
+  const lobby = isClientLike(lobbyOrClient) || lobbyOrClient == null ? null : lobbyOrClient;
+  const db = clientOf(isClientLike(lobbyOrClient) ? lobbyOrClient : client);
+  const styleOrRuleset = lobby?.rulesetId ?? lobby?.styleId;
+  const stake = lobby?.stakePips ?? lobby?.stake;
+  const rulesetId = toFindMatchRulesetId(styleOrRuleset);
+  const stakePips = toFindMatchStakePips(stake);
+  let source = "legacy-list";
+  let open;
+  if (rulesetId && stakePips != null) {
+    if (typeof db.rpc !== "function") {
+      source = "lobby-rpc-missing";
+      open = [];
+    } else {
+      const { data, error } = await db.rpc("list_joinable_open_match_requests", {
+        p_ruleset_id: rulesetId,
+        p_stake_pips: stakePips,
+      });
+      if (!error) {
+        source = "lobby-rpc";
+        open = (data ?? [])
+          .map((row) => normalizeLobbyListRow(row))
+          .filter(Boolean)
+          .filter((row) => requestMatchesFindMatchLobby(row, rulesetId, stakePips))
+          .filter((row) => !isMatchRequestExpired(row) && isPublicRequestCreatorFresh(row));
+      } else if (isMissingRpcError(error)) {
+        source = "lobby-rpc-missing";
+        open = [];
+      } else {
+        throwFromPostgrest(error, "LIST_FAILED");
+      }
+    }
+  } else {
+    open = await listOpenMatchRequests(db);
   }
-  return { open, own };
+  const own = await getOwnLatestRequest(playerId, db);
+  const canShowOwn =
+    own?.status === "open" &&
+    isPublicMatchRequest(own) &&
+    (stakePips == null
+      ? source !== "lobby-rpc-missing"
+      : source === "lobby-rpc" && requestMatchesFindMatchLobby(own, rulesetId, stakePips));
+  if (canShowOwn && !open.some((row) => row.id === own.id)) {
+    return { open: [own, ...open], own, source };
+  }
+  return { open, own, source };
 }
 
 /**
@@ -627,10 +1036,10 @@ async function attachActiveMatchMeta(match, discovered, db) {
 }
 
 /**
- * Accept another player's open request. Does not send ruleset_id —
- * the RPC copies the creator's locked style onto the match.
+ * Accept another player's open request. Expected style + stake are sent for
+ * server validation; the RPC still copies the creator's locked values.
  * @param {string} requestId
- * @param {{ playerId?: string, creatorId?: string }} [options]
+ * @param {{ playerId?: string, creatorId?: string, rulesetId?: string, styleId?: string, stakePips?: unknown, stake?: unknown }} [options]
  * @param {object} [client]
  */
 export async function acceptMatchRequest(requestId, options = {}, client) {
@@ -638,9 +1047,22 @@ export async function acceptMatchRequest(requestId, options = {}, client) {
   if (playerId && creatorId && playerId === creatorId) {
     throw new MatchmakingError("SELF_ACCEPT", "cannot accept own match request");
   }
-  const { data, error } = await clientOf(client).rpc("accept_match_request", {
-    p_request_id: requestId,
-  });
+  const expectedRuleset = toFindMatchRulesetId(options.rulesetId ?? options.styleId);
+  const expectedStake = toFindMatchStakePips(options.stakePips ?? options.stake);
+  const args = { p_request_id: requestId };
+  if (expectedRuleset && expectedStake != null) {
+    args.p_ruleset_id = expectedRuleset;
+    args.p_stake_pips = expectedStake;
+  }
+  const db = clientOf(client);
+  let { data, error } = await db.rpc("accept_match_request", args);
+  if (
+    error &&
+    args.p_ruleset_id &&
+    (isUnknownAcceptSignatureError(error) || isMissingRpcError(error))
+  ) {
+    ({ data, error } = await db.rpc("accept_match_request", { p_request_id: requestId }));
+  }
   if (error) throwFromPostgrest(error, "ACCEPT_FAILED");
   const matchId = data;
   try {
@@ -691,11 +1113,18 @@ export async function sendFriendMatchInvite(inviteeId, styleId, client) {
       status: "open",
     };
   }
-  const { data: row, error: rowError } = await db
+  let { data: row, error: rowError } = await db
     .from("match_requests")
     .select(FRIEND_MATCH_INVITE_SELECT)
     .eq("id", requestId)
     .maybeSingle();
+  if (rowError && isMissingHeartbeatColumnError(rowError)) {
+    ({ data: row, error: rowError } = await db
+      .from("match_requests")
+      .select(FRIEND_MATCH_INVITE_SELECT_NO_HEARTBEAT)
+      .eq("id", requestId)
+      .maybeSingle());
+  }
   if (rowError && !isMissingInviteColumnError(rowError)) {
     throwFromPostgrest(rowError, "INVITE_FAILED");
   }
@@ -716,14 +1145,20 @@ export async function sendFriendMatchInvite(inviteeId, styleId, client) {
  */
 export async function listIncomingFriendInvites(playerId, client) {
   if (!playerId) return [];
-  const { data, error } = await clientOf(client)
-    .from("match_requests")
-    .select(FRIEND_MATCH_INVITE_SELECT)
-    .eq("visibility", "friend")
-    .eq("status", "open")
-    .eq("invitee_id", playerId)
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false });
+  const db = clientOf(client);
+  const run = (selectCols) =>
+    db
+      .from("match_requests")
+      .select(selectCols)
+      .eq("visibility", "friend")
+      .eq("status", "open")
+      .eq("invitee_id", playerId)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false });
+  let { data, error } = await run(FRIEND_MATCH_INVITE_SELECT);
+  if (error && isMissingHeartbeatColumnError(error)) {
+    ({ data, error } = await run(FRIEND_MATCH_INVITE_SELECT_NO_HEARTBEAT));
+  }
   if (error) {
     if (isMissingInviteColumnError(error)) return [];
     throwFromPostgrest(error, "LIST_FAILED");
@@ -740,14 +1175,20 @@ export async function listIncomingFriendInvites(playerId, client) {
  */
 export async function listOutgoingFriendInvites(playerId, client) {
   if (!playerId) return [];
-  const { data, error } = await clientOf(client)
-    .from("match_requests")
-    .select(FRIEND_MATCH_INVITE_SELECT)
-    .eq("visibility", "friend")
-    .eq("status", "open")
-    .eq("creator_id", playerId)
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false });
+  const db = clientOf(client);
+  const run = (selectCols) =>
+    db
+      .from("match_requests")
+      .select(selectCols)
+      .eq("visibility", "friend")
+      .eq("status", "open")
+      .eq("creator_id", playerId)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false });
+  let { data, error } = await run(FRIEND_MATCH_INVITE_SELECT);
+  if (error && isMissingHeartbeatColumnError(error)) {
+    ({ data, error } = await run(FRIEND_MATCH_INVITE_SELECT_NO_HEARTBEAT));
+  }
   if (error) {
     if (isMissingInviteColumnError(error)) return [];
     throwFromPostgrest(error, "LIST_FAILED");
@@ -792,15 +1233,36 @@ export async function abortOnlineMatch(matchId, client) {
 }
 
 /**
+ * Public Find Match waiting heartbeat. Identity is auth.uid() on the server.
+ * Missing RPC (pre-migration) is a no-op.
+ * @param {object} [client]
+ */
+export async function touchMyOpenPublicRequest(client) {
+  const { data, error } = await clientOf(client).rpc("touch_my_open_public_request");
+  if (error) {
+    if (isMissingRpcError(error)) return false;
+    throwFromPostgrest(error, "HEARTBEAT_FAILED");
+  }
+  return Boolean(data);
+}
+
+/**
  * Seated-player heartbeat. Missing RPC (pre-migration) is a no-op.
  * @param {string} matchId
  * @param {object} [client]
  */
 export async function touchMyMatchPresence(matchId, client) {
   if (!matchId) return { ok: false, touched: false };
-  const { data, error } = await clientOf(client).rpc("touch_my_match_presence", {
+  let query = clientOf(client).rpc("touch_my_match_presence", {
     p_match_id: matchId,
   });
+  // Bound the request so a stalled connection settles as a catchable error
+  // instead of leaving this heartbeat pending forever (mirrors the same
+  // fix applied to the Edge Function invoke in gameplay.js).
+  if (typeof query?.abortSignal === "function" && typeof AbortSignal?.timeout === "function") {
+    query = query.abortSignal(AbortSignal.timeout(NETWORK_REQUEST_TIMEOUT_MS));
+  }
+  const { data, error } = await query;
   if (error) return { ok: false, touched: false };
   return data ?? { ok: true };
 }

@@ -28,7 +28,6 @@ import { isAutoPlaceable, legalEndsForTile, resolvePlayChoice } from "../game/in
 import { destinationTileId } from "../game/destinationTarget.js";
 import { END } from "../game/constants.js";
 import { FIND_MATCH_RULESET_IDS, styleIdFromRulesetId } from "./matchmaking.js";
-import { HAITIAN_OPENING_TILE_ID } from "../game/rules/haitianStart.js";
 import {
   normalizeTimeoutStrikes,
   overlayNewerTimeoutClock,
@@ -270,6 +269,70 @@ export function viewerHandMatchesCounts(view) {
   return view.myHand.length === Number(expected);
 }
 
+export const PRIVATE_VIEWER_STATE = Object.freeze({
+  NONE: "none",
+  MISSING: "hydration_missing",
+  EMPTY_OK: "empty_ok",
+  COHERENT: "coherent",
+  PUBLIC_ONLY: "public_only",
+  TERMINAL: "terminal",
+});
+
+export function expectedViewerHandCount(view) {
+  const seat = Number(view?.viewerSeat);
+  if (!Number.isInteger(seat) || seat < 0) return null;
+  const expected = view?.handCounts?.[seat];
+  if (expected == null) return null;
+  const n = Number(expected);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+export function privateHandLength(view) {
+  return Array.isArray(view?.myHand) ? view.myHand.length : 0;
+}
+
+/**
+ * Authoritative tiles exist for this viewer, but private tiles are missing.
+ * A) myHand=[] + handCount>0 => hydration missing
+ * B) myHand=[] + handCount=0  => legitimate empty (not missing)
+ */
+export function privateHandIsMissing(view) {
+  const expected = expectedViewerHandCount(view);
+  if (expected == null || expected <= 0) return false;
+  return privateHandLength(view) === 0;
+}
+
+/**
+ * Single private-viewer coherence helper.
+ * Terminal match-over is never a hydration problem (retries stop).
+ */
+export function privateViewerCoherence(view) {
+  if (!view) return PRIVATE_VIEWER_STATE.NONE;
+  if (isMatchOverView(view)) return PRIVATE_VIEWER_STATE.TERMINAL;
+  if (privateHandIsMissing(view)) return PRIVATE_VIEWER_STATE.MISSING;
+  if (hasCoherentInteraction(view)) return PRIVATE_VIEWER_STATE.COHERENT;
+  if (privateHandLength(view) === 0) return PRIVATE_VIEWER_STATE.EMPTY_OK;
+  return PRIVATE_VIEWER_STATE.PUBLIC_ONLY;
+}
+
+export function isLivePrivateHydrationView(view) {
+  if (!view || isMatchOverView(view)) return false;
+  return (
+    view.phase === "playing" ||
+    view.status === "playing" ||
+    isRoundOverView(view)
+  );
+}
+
+/** Live/round-over viewer whose server handCount is >0 but myHand is empty. */
+export function needsPrivateHydration(view) {
+  return isLivePrivateHydrationView(view) && privateHandIsMissing(view);
+}
+
+export function hasCoherentPrivateViewer(view) {
+  return privateViewerCoherence(view) === PRIVATE_VIEWER_STATE.COHERENT;
+}
+
 export function interactionQuality(view) {
   if (!view) return 0;
   let score = 0;
@@ -386,26 +449,28 @@ export function occupancyTouchMissed(result) {
 export function shouldRefreshViewerAfterRealtime(previous, merged, options = {}) {
   if (!merged) return false;
   if (isMatchOverView(merged) && !isMatchOverView(previous)) return true;
-  if (hasCoherentInteraction(merged)) return false;
   const nextV = viewVersion(merged);
   const prevV = viewVersion(previous);
   if (nextV < prevV) return false;
   const inFlightBase = options.inFlightBaseVersion;
-  if (
+  const skipInFlightEcho =
     options.busy &&
     Number.isInteger(inFlightBase) &&
     inFlightBase >= 0 &&
-    nextV === inFlightBase + 1
-  ) {
-    return false;
+    nextV === inFlightBase + 1;
+  if (needsPrivateHydration(merged)) {
+    if (skipInFlightEcho) return false;
+    return true;
   }
+  if (hasCoherentInteraction(merged)) return false;
+  if (skipInFlightEcho) return false;
   return nextV > prevV;
 }
 
 /**
- * Visual-only preview of a play the viewer already chose from server legalMoves.
- * Does not run the engine. North/south spinner branches are hide-from-hand only
- * so we never invent a main-chain placement.
+ * Visual-only preview helpers (unit-tested). OnlineGamePage must NOT apply these
+ * before server accept — physical incident 369c7279: tile appeared committed with
+ * no game_actions row, then timeout -5.
  */
 export function optimisticPlayPreview(move) {
   if (!move?.tileId) return null;
@@ -478,6 +543,7 @@ export function isViewerTurn(view) {
 /** Private interaction fields belong to this public version and came from Edge. */
 export function hasCoherentInteraction(view) {
   if (!view) return false;
+  if (privateHandIsMissing(view)) return false;
   if (view.interactionSource !== INTERACTION_SOURCE_VIEWER) return false;
   if (viewVersion(view) !== Number(view.interactionVersion)) return false;
   return viewerHandMatchesCounts(view);
@@ -522,25 +588,32 @@ export function reconcileViewerHand(myHand, view) {
 }
 
 /**
- * Restore interaction from a consistent viewer hand when the snapshot omitted
- * legalMoves (SQL-shaped views). Not used as the live Realtime authority —
- * Edge getGameView / action results stamp interactionSource=viewer instead.
+ * Restore interaction from a consistent viewer hand when a snapshot omits
+ * legalMoves (SQL-shaped views, e.g. the get_game_view RPC, which has no
+ * mustPlayTileId column). Currently unreferenced in this codebase — no
+ * production or test caller invokes it today. Kept and audited in case a
+ * future degraded-recovery path is wired up to it.
+ *
+ * Round 1's mandatory opener (legacy/haitian/american share the same
+ * highest-double-else-highest-tile rule) depends on BOTH hands, which this
+ * degraded, viewer-hand-only payload never carries. If this function is ever
+ * reused: on an empty round-1 board with no mustPlayTileId already present,
+ * it deliberately leaves the view non-interactable instead of guessing — it
+ * must never fabricate a tile from the ruleset id (no hardcoded 2-2/6-6) and
+ * must never recompute the opener from the viewer's own hand alone, since
+ * that would require assuming this hand's highest tile beats a hand this
+ * code cannot see. When mustPlayTileId IS already present (an authoritative
+ * value from elsewhere), it is used as-is.
  */
 export function hydrateViewerInteraction(view) {
   if (!view || typeof view !== "object") return view;
   const next = { ...view };
-  if (
-    next.rulesetId === "haitian" &&
-    !(next.board && next.board.length) &&
-    !next.mustPlayTileId &&
-    (next.myHand ?? []).includes(HAITIAN_OPENING_TILE_ID) &&
-    isViewerTurn(next)
-  ) {
-    next.mustPlayTileId = HAITIAN_OPENING_TILE_ID;
-  }
   if (!isViewerTurn(next) || !viewerHandMatchesCounts(next)) return next;
   if (Array.isArray(next.legalMoves) && next.legalMoves.length > 0) {
     next.canPlay = true;
+    return next;
+  }
+  if (next.round === 1 && !(next.board && next.board.length) && !next.mustPlayTileId) {
     return next;
   }
   const moves = legalMovesForPublicView(next);
@@ -682,12 +755,32 @@ export function publicSessionFromRealtime(payload) {
   };
 }
 
+function shouldPreservePrivateHand(previous, pub, roundAdvanced) {
+  const counts = pub.handCounts ?? previous?.handCounts;
+  if (!privateHandMatchesPublicCounts(previous, counts)) return false;
+  if (!roundAdvanced) return true;
+  return (
+    Number(pub.round) === Number(previous.round) &&
+    (previous.phase === "playing" || previous.status === "playing")
+  );
+}
+
+export function privateHandMatchesPublicCounts(view, handCounts) {
+  const seat = Number(view?.viewerSeat);
+  if (!Number.isInteger(seat) || seat < 0) return false;
+  if (!Array.isArray(view?.myHand) || view.myHand.length === 0) return false;
+  const expected = handCounts?.[seat];
+  if (expected == null) return false;
+  return view.myHand.length === Number(expected);
+}
+
 export function mergeRealtimeSessionView(previous, payload) {
   const pub = publicSessionFromRealtime(payload);
   if (!previous?.matchId || !pub) return previous ?? null;
   if (viewVersion(pub) < viewVersion(previous)) return previous;
   const versionAdvanced = viewVersion(pub) > viewVersion(previous);
   const roundAdvanced = didAuthoritativeRoundAdvance(previous, pub);
+  const preservePrivateHand = shouldPreservePrivateHand(previous, pub, roundAdvanced);
   const nextTable = roundAdvanced
     ? tableForNextRound(previous, pub.board, pub.spinner)
     : viewVersion(pub) <= viewVersion(previous) &&
@@ -738,11 +831,12 @@ export function mergeRealtimeSessionView(previous, payload) {
       pub.turnDeadlineAt === undefined ? previous.turnDeadlineAt : pub.turnDeadlineAt,
     timeoutStrikes:
       pub.timeoutStrikes === undefined ? previous.timeoutStrikes : pub.timeoutStrikes,
-    myHand: roundAdvanced
-      ? []
-      : Array.isArray(previous.myHand)
-        ? previous.myHand.slice()
-        : [],
+    myHand:
+      roundAdvanced && !preservePrivateHand
+        ? []
+        : Array.isArray(previous.myHand)
+          ? previous.myHand.slice()
+          : [],
     viewerSeat: previous.viewerSeat,
     matchId: previous.matchId,
     rulesetId: previous.rulesetId,

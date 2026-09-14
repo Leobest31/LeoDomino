@@ -4,7 +4,7 @@
  * counted down with a monotonic clock so device time changes cannot extend it.
  */
 
-export const TURN_TIMEOUT_MS = 60 * 1000;
+export const TURN_TIMEOUT_MS = 30 * 1000;
 export const TIMEOUT_WARNING_MS = 15 * 1000;
 export const TIMEOUT_STRIKE_LIMIT = 3;
 

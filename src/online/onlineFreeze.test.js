@@ -1,6 +1,6 @@
 /**
  * Online table freeze recovery — drag lifecycle, tap-to-end, Realtime/focus.
- * Does not change engine legality, 60s timeout, strikes, scoring, or RP.
+ * Does not change engine legality, 30s timeout, strikes, scoring, or RP.
  * Run: node src/online/onlineFreeze.test.js
  */
 import assert from "node:assert/strict";
@@ -11,6 +11,7 @@ import { attachCapturedPointerTracking, pointerStillDown } from "../ui/handTileP
 import {
   endChoiceI18nKey,
   hasUsableDomTargets,
+  isTimeoutClockRestamp,
   isUnhealthyRealtimeStatus,
   resolvePlayWithoutDomTargets,
   shouldBypassDragLock,
@@ -183,6 +184,23 @@ function playingView(extras = {}) {
 }
 
 {
+  const previous = playingView({
+    version: 10,
+    turnDeadlineAt: "2026-09-06T15:00:30.000Z",
+    serverNow: "2026-09-06T15:00:00.000Z",
+  });
+  const restamped = {
+    ...previous,
+    serverNow: "2026-09-06T15:00:20.000Z",
+    deadlineReceivedMono: 5000,
+  };
+  assert.equal(shouldClearLocalInteraction(previous, restamped), false);
+  assert.equal(isTimeoutClockRestamp(previous, restamped), true);
+  assert.equal(shouldBypassDragLock(previous, restamped), true);
+  console.log("  ✓ same-version deadline clock restamp bypasses drag lock");
+}
+
+{
   assert.equal(shouldRefreshAuthoritativeViewOnResume(playingView()), true);
   assert.equal(
     shouldRefreshAuthoritativeViewOnResume({ phase: "match_over", status: "match_over" }),
@@ -191,8 +209,11 @@ function playingView(extras = {}) {
   assert.match(hook, /shouldRefreshAuthoritativeViewOnResume/);
   assert.match(hook, /visibilitychange/);
   assert.match(hook, /window\.addEventListener\("focus", refreshIfPlaying\)/);
+  assert.match(hook, /window\.addEventListener\("pageshow", refreshIfPlaying\)/);
+  assert.match(hook, /window\.addEventListener\("online"/);
+  assert.match(hook, /addEventListener\("resume", refreshIfPlaying\)/);
   assert.match(hook, /refreshView\(\{ force: true \}\)/);
-  console.log("  ✓ missed Realtime + visibility return refetches authoritative view");
+  console.log("  ✓ missed Realtime + visibility/pageshow/online/resume refetches authoritative view");
 }
 
 {
@@ -224,9 +245,9 @@ function playingView(extras = {}) {
 }
 
 {
-  assert.equal(TURN_TIMEOUT_MS, 60_000);
+  assert.equal(TURN_TIMEOUT_MS, 30_000);
   assert.equal(TIMEOUT_STRIKE_LIMIT, 3);
-  assert.match(timeout, /export const TURN_TIMEOUT_MS = 60 \* 1000/);
+  assert.match(timeout, /export const TURN_TIMEOUT_MS = 30 \* 1000/);
   assert.match(timeout, /export const TIMEOUT_STRIKE_LIMIT = 3/);
   assert.match(authority, /applyTimeoutResolution/);
   assert.match(onlinePage, /timeoutStrike/);

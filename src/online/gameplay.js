@@ -4,6 +4,7 @@
  */
 import { getSupabaseClient } from "./supabaseClient.js";
 import { gameplayCodeFromInvoke } from "./timeoutFreeze.js";
+import { NETWORK_REQUEST_TIMEOUT_MS } from "./serviceHealth.js";
 
 export class GameplayClientError extends Error {
   /** @param {string} code @param {string} [message] @param {unknown} [cause] */
@@ -36,8 +37,13 @@ async function invoke(op, payload, client) {
   } catch {
     /* node tests have no Vite DEV flag */
   }
+  // A dropped/stalled connection must settle as a catchable error, not hang
+  // the underlying fetch forever — an unbounded promise here is indistinguishable
+  // from a legitimately in-flight one and permanently wedges every caller that
+  // guards against concurrent refreshes (see useOnlineMatch's refreshInFlightRef).
   const { data, error } = await clientOf(client).functions.invoke("online-game", {
     body,
+    timeout: NETWORK_REQUEST_TIMEOUT_MS,
   });
   if (error || data?.error) throwFromFunctions(error, data, "GAMEPLAY_FAILED");
   return data;

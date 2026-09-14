@@ -1,0 +1,37 @@
+-- WITHHELD — timeout sweeper cron activation.
+-- Do NOT move this file into supabase/migrations/.
+-- Do NOT apply until the discovery RPC is approved AND this file is approved.
+-- Does not contain secrets. Vault names are placeholders only.
+--
+-- C. Scheduler only. Frequency: 10 seconds. Not 5 seconds.
+-- Requires hosted:
+--   CREATE EXTENSION IF NOT EXISTS pg_cron;
+--   CREATE EXTENSION IF NOT EXISTS pg_net;
+--   vault secrets: project_url, timeout_sweep_secret
+--   public.list_due_timeout_matches already applied
+--
+-- This file does not enable extensions by default. Review each statement.
+
+-- CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- CREATE EXTENSION IF NOT EXISTS pg_net;
+
+-- Example schedule after Vault secrets exist. Do not embed the secret here.
+--
+-- select cron.schedule(
+--   'online-timeout-sweep',
+--   '10 seconds',
+--   $$
+--   select net.http_post(
+--     url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url')
+--            || '/functions/v1/online-timeout-sweep',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'Authorization', 'Bearer ' || (
+--         select decrypted_secret from vault.decrypted_secrets where name = 'timeout_sweep_secret'
+--       )
+--     ),
+--     body := '{}'::jsonb,
+--     timeout_milliseconds := 8000
+--   );
+--   $$
+-- );

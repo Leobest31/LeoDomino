@@ -7,13 +7,16 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ADMIN_BACKEND_I18N_KEY,
+  NETWORK_REQUEST_TIMEOUT_MS,
   SERVICE_OUTAGE_I18N_KEY,
   SERVICE_OUTAGE_NETWORK_THRESHOLD,
+  deepText,
   emptyServiceHealthState,
   httpStatusFromError,
   isDomainGameplayError,
   isImmediateInfrastructureOutage,
   isInfrastructureOutageError,
+  isNetworkInfrastructureFailure,
   noteServiceFailure,
   noteServiceSuccess,
   planOutageHealthTick,
@@ -23,6 +26,7 @@ import {
 import { planTimeoutTick } from "./timeoutFreeze.js";
 import { isMatchOverView, onlineErrorKey } from "./onlineTable.js";
 import { ADMIN_ERROR, AdminError } from "./adminDashboard.js";
+import { GameplayClientError } from "./gameplay.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const hook = readFileSync(join(root, "src/hooks/useOnlineMatch.js"), "utf8");
@@ -114,7 +118,7 @@ const illegalTile = { code: "ILLEGAL_TILE", message: "illegal tile" };
     { phase: "playing", status: "playing", turnDeadlineAt: "2000-01-01T00:00:00.000Z" },
     { nowMs: Date.now(), serviceOutage: true }
   );
-  assert.equal(planned.action, "idle");
+  assert.equal(planned.action, "reconcile");
   assert.match(hook, /shouldSuppressTimeoutResolve/);
   assert.match(hook, /serviceOutage:/);
   console.log("  ✓ outage mode suppresses timeout resolution");
@@ -146,7 +150,6 @@ const illegalTile = { code: "ILLEGAL_TILE", message: "illegal tile" };
     scores: [0, 0],
   };
   assert.equal(isMatchOverView(aborted), true);
-  assert.match(page, /isOnlineMatchAborted/);
   assert.doesNotMatch(
     readFileSync(join(root, "src/online/serviceHealth.js"), "utf8"),
     /matchWinnerSeat\s*=\s*[01]|scores\s*=\s*\[|settle_match_global_rp|winner_new_rp/
@@ -197,6 +200,87 @@ const illegalTile = { code: "ILLEGAL_TILE", message: "illegal tile" };
   );
   assert.equal(refresh.action, "refresh");
   console.log("  ✓ outage health retry is conservative");
+}
+
+// ---------------------------------------------------------------------------
+// Root-cause regression: freeze incident (temporary network interruption
+// classified as an unrecognized error, leaving outage/recovery never armed).
+//
+// functions-js wraps every genuine network-level failure so the real
+// AbortError/TypeError lives under `.context` (FunctionsFetchError) or,
+// once gameplay.js re-wraps it, under `.cause.context` (GameplayClientError).
+// A wrapper's own `.name` ("FunctionsFetchError" / "GameplayClientError") is
+// never diagnostic. Before this fix, isNetworkInfrastructureFailure checked
+// only `.name` / `.cause.name` and missed both shapes.
+// ---------------------------------------------------------------------------
+
+{
+  assert.equal(NETWORK_REQUEST_TIMEOUT_MS, 15000);
+  console.log("  ✓ a shared bounded network timeout exists for every online RPC/Edge call");
+}
+
+{
+  // Exact shape gameplay.js's functions.invoke({ timeout }) produces when the
+  // client aborts a stalled request: functions-js throws FunctionsFetchError
+  // (name: "FunctionsFetchError", message: generic), whose .context is the
+  // real DOMException the fetch rejected with.
+  const rawFunctionsFetchError = {
+    name: "FunctionsFetchError",
+    message: "Failed to send a request to the Edge Function",
+    context: { name: "AbortError", message: "The user aborted a request." },
+  };
+  assert.equal(deepText(rawFunctionsFetchError, "name"), "AbortError");
+  assert.equal(isNetworkInfrastructureFailure(rawFunctionsFetchError), true);
+  const one = noteServiceFailure(emptyServiceHealthState(), rawFunctionsFetchError, 1000);
+  assert.equal(one.consecutiveNetworkFailures, 1);
+  const two = noteServiceFailure(one, rawFunctionsFetchError, 2000);
+  assert.equal(two.outage, true);
+  console.log("  ✓ raw FunctionsFetchError (network drop) is recognized via .context, not swallowed");
+}
+
+{
+  // Once gameplay.js's invoke() re-wraps that into GameplayClientError, the
+  // real cause moves one level deeper: error.cause.context, not error.cause.
+  const wrapped = new GameplayClientError(
+    "GAMEPLAY_FAILED",
+    "Failed to send a request to the Edge Function",
+    { name: "FunctionsFetchError", message: "Failed to send a request to the Edge Function", context: { name: "AbortError", message: "The operation was aborted." } }
+  );
+  assert.equal(wrapped.name, "GameplayClientError", "wrapper self-names — this is exactly the shadowing hazard");
+  assert.equal(deepText(wrapped, "name"), "AbortError");
+  assert.equal(isNetworkInfrastructureFailure(wrapped), true);
+  const one = noteServiceFailure(emptyServiceHealthState(), wrapped, 1000);
+  const two = noteServiceFailure(one, wrapped, 2000);
+  assert.equal(two.outage, true);
+  console.log("  ✓ GameplayClientError-wrapped abort is recognized via .cause.context, not shadowed by the wrapper's own name");
+}
+
+{
+  // AbortSignal.timeout()'s default abort reason is a TimeoutError DOMException
+  // whose message is "signal timed out" — must match despite the space.
+  const timeoutSignalAbort = { name: "TimeoutError", message: "signal timed out" };
+  assert.equal(isNetworkInfrastructureFailure(timeoutSignalAbort), true);
+  console.log("  ✓ AbortSignal.timeout()'s 'signal timed out' wording is recognized");
+}
+
+{
+  // Plain postgrest-js network rejection (no wrapper at all) must keep working.
+  const plainFetchFailure = { name: "TypeError", message: "Failed to fetch" };
+  assert.equal(isNetworkInfrastructureFailure(plainFetchFailure), true);
+  console.log("  ✓ unwrapped TypeError('Failed to fetch') still recognized (no regression)");
+}
+
+{
+  // A real domain rejection (wrapped the same way as any other gameplay.js
+  // error) must NOT be misclassified as a network outage just because it
+  // shares the GameplayClientError wrapper shape.
+  const wrongTurn = new GameplayClientError("WRONG_TURN", "It is not your turn.", {
+    context: { code: "WRONG_TURN" },
+  });
+  assert.equal(isDomainGameplayError(wrongTurn), true);
+  assert.equal(isNetworkInfrastructureFailure(wrongTurn), false);
+  assert.equal(noteServiceFailure(emptyServiceHealthState(), wrongTurn, 1000).outage, false);
+  console.log("  ✓ a wrapped domain error is not misclassified as a network outage");
 }
 
 console.log("\nserviceHealth tests OK\n");

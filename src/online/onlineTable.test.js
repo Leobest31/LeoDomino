@@ -29,6 +29,7 @@ import {
   legalMovesForPublicView,
   lockedRulesetId,
   mergeRealtimeSessionView,
+  needsPrivateHydration,
   onlineDragGate,
   opponentHandCount,
   opaqueReserveIds,
@@ -48,7 +49,6 @@ import {
   isViewerTurn,
 } from "./onlineTable.js";
 import {
-  HAITIAN_OPENING_TILE_ID,
   GameplayError,
   dealOnlineGame,
   projectGameView,
@@ -62,7 +62,7 @@ import {
   ONLINE_ACTION_PASS,
 } from "./gameAuthority.js";
 import { networkCallsForMove } from "./onlineMoveTrace.js";
-import { remainingTurnMs } from "./turnTimeout.js";
+import { remainingTurnMs, TURN_TIMEOUT_MS } from "./turnTimeout.js";
 import { placeTile } from "../game/board.js";
 import { createTile } from "../game/tiles.js";
 
@@ -643,10 +643,14 @@ function findDrawState(rulesetId) {
   const other = starter === 0 ? 1 : 0;
   const starterView = viewerOf(haitian, starter, 0);
   const otherView = viewerOf(haitian, other, 0);
-  assert.equal(starterView.mustPlayTileId, HAITIAN_OPENING_TILE_ID, "11. Haitian must play 6-6");
-  assert.deepEqual(draggableTileIds(starterView), [HAITIAN_OPENING_TILE_ID]);
+  // Mandatory opener is whatever the shared highest-double-else-highest rule
+  // actually dealt at this seed — not a hardcoded 6-6.
+  const openingTile = haitian.mustPlayTileId;
+  assert.ok(openingTile, "11. Haitian round 1 has a mandatory opener");
+  assert.equal(starterView.mustPlayTileId, openingTile);
+  assert.deepEqual(draggableTileIds(starterView), [openingTile]);
   assert.equal(
-    starterView.legalMoves.every((move) => move.tileId === HAITIAN_OPENING_TILE_ID),
+    starterView.legalMoves.every((move) => move.tileId === openingTile),
     true
   );
   assert.equal(isInteractableTurn(starterView), true);
@@ -656,13 +660,13 @@ function findDrawState(rulesetId) {
     () =>
       applyOnlineAction(haitian, {
         seat: other,
-        action: { type: ONLINE_ACTION_PLAY, tileId: HAITIAN_OPENING_TILE_ID, end: "right" },
+        action: { type: ONLINE_ACTION_PLAY, tileId: openingTile, end: "right" },
       }),
     (err) => err instanceof GameplayError && err.code === "WRONG_TURN"
   );
   const opened = applyOnlineAction(haitian, {
     seat: starter,
-    action: { type: ONLINE_ACTION_PLAY, tileId: HAITIAN_OPENING_TILE_ID, end: "right" },
+    action: { type: ONLINE_ACTION_PLAY, tileId: openingTile, end: "right" },
   }).state;
   assert.equal(opened.currentPlayer, other);
   const afterStarter = applyRealtimeThenViewer(starterView, opened, 1, starter);
@@ -751,6 +755,7 @@ function findDrawState(rulesetId) {
   assert.deepEqual(mergedA.board, [], "16. Realtime round 2 public board is empty");
   assert.equal(mergedA.round, 2);
   assert.deepEqual(mergedA.myHand, [], "16. stale round-1 hand is dropped on round change");
+  assert.equal(needsPrivateHydration(mergedA), true, "16. empty private hand with live counts is incoherent");
   const viewA = keepAuthoritativeView(mergedA, viewerOf(next.state, 0, 9));
   const viewB = viewerOf(next.state, 1, 9);
   assert.deepEqual(viewA.board, []);
@@ -761,6 +766,9 @@ function findDrawState(rulesetId) {
   assert.equal(viewA.version, viewB.version);
   assert.equal(viewA.myHand.length, 7);
   assert.equal(viewB.myHand.length, 7);
+  assert.equal(needsPrivateHydration(viewA), false);
+  const echoedA = mergeRealtimeSessionView(viewA, realtimeRow(next.state, 9));
+  assert.equal(echoedA.myHand.length, 7, "16. duplicate round-2 Realtime keeps hydrated hand");
 }
 
 {
@@ -1290,7 +1298,7 @@ function findDrawState(rulesetId) {
   assert.notEqual(wired.deadlineReceivedMono, 4);
   assert.equal(
     remainingTurnMs(wired, Date.parse("2026-08-29T12:00:00.000Z"), wired.deadlineReceivedMono),
-    60_000
+    TURN_TIMEOUT_MS
   );
   console.log("  ✓ asViewerSnapshot restamps browser monotonic origin (Edge mono cannot poison remaining)");
 }

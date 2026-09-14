@@ -21,12 +21,13 @@ const hook = read("hooks/useFriendChat.js");
 const en = read("i18n/locales/en.js");
 const ht = read("i18n/locales/ht.js");
 
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game"/);
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "leopipsStake" \| "findMatch" \| "friends" \| "chat" \| "game"/);
 assert.match(app, /<ChatPage/);
 assert.match(app, /phase === "chat" && playable/);
 assert.match(app, /onChat=\{\(\) => openChat\(null, "home"\)\}/);
 assert.match(home, /data-home-cta="liveChat"/);
 assert.match(home, /onChat\?\.\(\)/);
+assert.match(read("pages/LeoPipsAuthenticatedHome.jsx"), /onChat=\{\(\) => tap\(\(\) => onChat/);
 assert.doesNotMatch(profile, /data-chat|ChatPage|onOpenChat|liveChat/);
 assert.doesNotMatch(profile, /sendFriendMessage|list_friend_messages/);
 

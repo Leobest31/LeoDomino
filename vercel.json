@@ -5,6 +5,7 @@
     { "source": "/terms", "destination": "/terms/index.html" },
     { "source": "/terms/", "destination": "/terms/index.html" },
     { "source": "/support", "destination": "/support/index.html" },
-    { "source": "/support/", "destination": "/support/index.html" }
+    { "source": "/support/", "destination": "/support/index.html" },
+    { "source": "/((?!privacy(?:/|$)|terms(?:/|$)|support(?:/|$)).*)", "destination": "/index.html" }
   ]
 }

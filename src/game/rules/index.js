@@ -17,6 +17,10 @@ export { chooseStartingPlayer } from "./start.js";
 
 export { isDekabes } from "./dekabes.js";
 export {
+  CLASSIC_OPENING_TILE_ID,
+  chooseDoubleTwoStarter,
+} from "./classicStart.js";
+export {
   HAITIAN_OPENING_TILE_ID,
   chooseDoubleSixStarter,
 } from "./haitianStart.js";

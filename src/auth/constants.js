@@ -43,4 +43,6 @@ export const AUTH_ERROR = Object.freeze({
   DELETE_PENDING: "deletePending",
   DELETE_UNAVAILABLE: "deleteUnavailable",
   ACCOUNT_DELETED: "accountDeleted",
+  RECOVERY_INVALID: "recoveryInvalid",
+  RESET_UNAVAILABLE: "resetUnavailable",
 });

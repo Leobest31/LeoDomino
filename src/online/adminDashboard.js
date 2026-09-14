@@ -48,10 +48,6 @@ export const ADMIN_USER_FIELDS = Object.freeze([
   "avatarId",
   "createdAt",
   "deletedAt",
-  "rp",
-  "wins",
-  "losses",
-  "matchesPlayed",
   "inActiveMatch",
   "matchLastSeenAt",
   "presenceLastSeenAt",
@@ -65,7 +61,6 @@ export const ADMIN_LIVE_PLAYER_FIELDS = Object.freeze([
   "displayName",
   "username",
   "avatarId",
-  "rp",
   "lastSeenAt",
   "stale",
 ]);
@@ -92,6 +87,9 @@ export const ADMIN_LIVE_MATCH_FIELDS = Object.freeze([
   "handCountB",
   "reserveCount",
   "version",
+  "stakePips",
+  "finishedAt",
+  "finishReason",
 ]);
 
 export const ADMIN_SPECTATOR_STRIP_KEYS = Object.freeze([
@@ -136,34 +134,6 @@ export const OVERVIEW_CARD_IDS = Object.freeze([
   "activeMatchPlayers",
   "deletedAccounts",
   "globalOnlineUsers",
-]);
-
-export const ADMIN_TOP_RP_FIELDS = Object.freeze([
-  "playerId",
-  "displayName",
-  "username",
-  "avatarId",
-  "rp",
-  "wins",
-  "losses",
-  "matchesPlayed",
-  "rank",
-  "deletedAt",
-]);
-
-export const ADMIN_RP_EVENT_FIELDS = Object.freeze([
-  "matchId",
-  "opponent",
-  "result",
-  "rpBefore",
-  "rpDelta",
-  "rpAfter",
-  "settledAt",
-  "finishedAt",
-  "rated",
-  "rulesetId",
-  "finishReason",
-  "matchKind",
 ]);
 
 function clientOf(client) {
@@ -341,7 +311,6 @@ export function normalizeAdminUser(row) {
   const data = dropPrivateKeys(row);
   const playerId = asText(data.player_id ?? data.playerId ?? data.id);
   if (!playerId) return null;
-  const matchesPlayed = asInt(data.matches_played ?? data.matchesPlayed);
   const deletedAt = data.deleted_at ?? data.deletedAt ?? null;
   return {
     playerId,
@@ -351,10 +320,6 @@ export function normalizeAdminUser(row) {
     avatarId: asText(data.avatar_id ?? data.avatarId) || "",
     createdAt: asText(data.created_at ?? data.createdAt),
     deletedAt: deletedAt ? asText(deletedAt) : null,
-    rp: asInt(data.rp) ?? 1000,
-    wins: asInt(data.wins) ?? 0,
-    losses: asInt(data.losses) ?? 0,
-    matchesPlayed: matchesPlayed ?? 0,
     inActiveMatch: asBool(data.in_active_match ?? data.inActiveMatch) === true,
     matchLastSeenAt: (() => {
       const seen = data.match_last_seen_at ?? data.matchLastSeenAt ?? null;
@@ -500,7 +465,6 @@ export function normalizeAdminLivePlayer(row) {
     displayName: asText(data.display_name ?? data.displayName) || "",
     username: asText(data.username) || "",
     avatarId: asText(data.avatar_id ?? data.avatarId) || "",
-    rp: asInt(data.rp) ?? 1000,
     lastSeenAt: asText(data.last_seen_at ?? data.lastSeenAt),
     stale: asBool(data.stale) === true,
   };
@@ -539,6 +503,12 @@ export function normalizeAdminLiveMatch(row) {
     handCountB: asInt(data.hand_count_b ?? data.handCountB),
     reserveCount: asInt(data.reserve_count ?? data.reserveCount),
     version: asInt(data.version),
+    stakePips: (() => {
+      const n = asInt(data.stake_pips ?? data.stakePips);
+      return n === 20 || n === 50 || n === 100 || n === 150 ? n : null;
+    })(),
+    finishedAt: asText(data.finished_at ?? data.finishedAt),
+    finishReason: asText(data.finish_reason ?? data.finishReason),
   };
 }
 
@@ -664,159 +634,4 @@ export async function fetchAdminLiveMatchView(matchId, client) {
   const view = normalizeAdminSpectatorView(data);
   if (!view) throw new AdminError(ADMIN_ERROR.GENERIC);
   return view;
-}
-
-export function buildAdminTopRpPayload({ limit = ADMIN_PAGE_SIZE, offset = 0 } = {}) {
-  const safeLimit = Math.min(Math.max(Number(limit) || ADMIN_PAGE_SIZE, 1), 50);
-  const safeOffset = Math.max(Number(offset) || 0, 0);
-  return {
-    p_limit: safeLimit,
-    p_offset: safeOffset,
-  };
-}
-
-export function buildAdminRpHistoryPayload(playerId, { limit = ADMIN_PAGE_SIZE, offset = 0 } = {}) {
-  const safeLimit = Math.min(Math.max(Number(limit) || ADMIN_PAGE_SIZE, 1), 50);
-  const safeOffset = Math.max(Number(offset) || 0, 0);
-  return {
-    p_player_id: asText(playerId),
-    p_limit: safeLimit,
-    p_offset: safeOffset,
-  };
-}
-
-/**
- * @param {unknown} row
- */
-export function normalizeAdminTopRpPlayer(row) {
-  if (!row || typeof row !== "object") return null;
-  const data = dropPrivateKeys(row);
-  const playerId = asText(data.player_id ?? data.playerId);
-  if (!playerId) return null;
-  const rank = asInt(data.rank);
-  const deletedAt = data.deleted_at ?? data.deletedAt ?? null;
-  return {
-    playerId,
-    displayName: asText(data.display_name ?? data.displayName) || "",
-    username: asText(data.username) || "",
-    avatarId: asText(data.avatar_id ?? data.avatarId) || "",
-    rp: asInt(data.rp) ?? 1000,
-    wins: asInt(data.wins) ?? 0,
-    losses: asInt(data.losses) ?? 0,
-    matchesPlayed: asInt(data.matches_played ?? data.matchesPlayed) ?? 0,
-    rank: rank != null && rank > 0 ? rank : null,
-    deletedAt: deletedAt ? asText(deletedAt) : null,
-  };
-}
-
-/**
- * @param {unknown} row
- */
-export function normalizeAdminTopRpList(row) {
-  if (!row || typeof row !== "object") {
-    return { players: [], total: 0, limit: ADMIN_PAGE_SIZE, offset: 0 };
-  }
-  const data = dropPrivateKeys(row);
-  const raw = Array.isArray(data.players) ? data.players : [];
-  const players = raw.map(normalizeAdminTopRpPlayer).filter(Boolean);
-  return {
-    players,
-    total: asInt(data.total) ?? players.length,
-    limit: asInt(data.limit) ?? ADMIN_PAGE_SIZE,
-    offset: asInt(data.offset) ?? 0,
-  };
-}
-
-function normalizeAdminRpOpponent(row) {
-  if (!row || typeof row !== "object") return null;
-  const data = dropPrivateKeys(row);
-  const playerId = asText(data.player_id ?? data.playerId);
-  if (!playerId) return null;
-  return {
-    playerId,
-    displayName: asText(data.display_name ?? data.displayName) || "",
-    username: asText(data.username) || "",
-    avatarId: asText(data.avatar_id ?? data.avatarId) || "",
-  };
-}
-
-/**
- * Rated RP ledger event only. Unrated/friend rows and secret keys are dropped.
- * @param {unknown} row
- */
-export function normalizeAdminRpEvent(row) {
-  if (!row || typeof row !== "object") return null;
-  const data = dropPrivateKeys(row);
-  if (asBool(data.rated) !== true) return null;
-  const matchId = asText(data.match_id ?? data.matchId);
-  const settledAt = asText(data.settled_at ?? data.settledAt);
-  const result = asText(data.result);
-  if (!matchId || !settledAt) return null;
-  if (result !== "win" && result !== "loss") return null;
-  const opponent = normalizeAdminRpOpponent(data.opponent);
-  if (!opponent) return null;
-  const rpBefore = asInt(data.rp_before ?? data.rpBefore);
-  const rpDelta = asInt(data.rp_delta ?? data.rpDelta);
-  const rpAfter = asInt(data.rp_after ?? data.rpAfter);
-  if (rpBefore == null || rpDelta == null || rpAfter == null) return null;
-  const finishedAt = data.finished_at ?? data.finishedAt ?? null;
-  const event = {
-    matchId,
-    opponent,
-    result,
-    rpBefore,
-    rpDelta,
-    rpAfter,
-    settledAt,
-    finishedAt: finishedAt ? asText(finishedAt) : null,
-    rated: true,
-    rulesetId: asText(data.ruleset_id ?? data.rulesetId) || "",
-    finishReason: asText(data.finish_reason ?? data.finishReason) || "",
-    matchKind: asText(data.match_kind ?? data.matchKind) || "public",
-  };
-  for (const key of Object.keys(event)) {
-    if (!ADMIN_RP_EVENT_FIELDS.includes(key)) delete event[key];
-  }
-  return event;
-}
-
-/**
- * @param {unknown} row
- */
-export function normalizeAdminRpHistory(row) {
-  if (!row || typeof row !== "object") {
-    return { player: null, events: [], total: 0, limit: ADMIN_PAGE_SIZE, offset: 0 };
-  }
-  const data = dropPrivateKeys(row);
-  const player = normalizeAdminTopRpPlayer(data.player);
-  const raw = Array.isArray(data.events) ? data.events : [];
-  const events = raw.map(normalizeAdminRpEvent).filter(Boolean);
-  return {
-    player,
-    events,
-    total: asInt(data.total) ?? events.length,
-    limit: asInt(data.limit) ?? ADMIN_PAGE_SIZE,
-    offset: asInt(data.offset) ?? 0,
-  };
-}
-
-export async function fetchAdminTopRp(query = {}, client) {
-  if (!client && !isSupabaseConfigured()) {
-    throw new AdminError(ADMIN_ERROR.UNAVAILABLE);
-  }
-  const payload = buildAdminTopRpPayload(query);
-  const { data, error } = await clientOf(client).rpc("admin_list_top_rp", payload);
-  if (error) throwFromError(error);
-  return normalizeAdminTopRpList(data);
-}
-
-export async function fetchAdminPlayerRpHistory(playerId, query = {}, client) {
-  if (!client && !isSupabaseConfigured()) {
-    throw new AdminError(ADMIN_ERROR.UNAVAILABLE);
-  }
-  const payload = buildAdminRpHistoryPayload(playerId, query);
-  if (!payload.p_player_id) throw new AdminError(ADMIN_ERROR.GENERIC, "player required");
-  const { data, error } = await clientOf(client).rpc("admin_list_player_rp_history", payload);
-  if (error) throwFromError(error);
-  return normalizeAdminRpHistory(data);
 }

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./auth";
 import SplashPage from "./pages/SplashPage";
-import HomePage from "./pages/HomePage";
+import LeoPipsAuthenticatedHome from "./pages/LeoPipsAuthenticatedHome.jsx";
+import LeoPipsAuthenticatedStake from "./pages/LeoPipsAuthenticatedStake.jsx";
 import AuthPage from "./pages/AuthPage";
 import AccountDeletionPending from "./components/AccountDeletionPending.jsx";
 import GameStylePage from "./pages/GameStylePage";
@@ -23,13 +24,16 @@ import { capturePendingReferralFromWindow } from "./online/referrals.js";
 import { ONLINE_MODE, lockedRulesetId, readOnlineSession, clearOnlineSession } from "./online/onlineTable.js";
 import { useOwnFriendsPresence } from "./hooks/useFriends.js";
 import { usePlayerPresence } from "./hooks/usePlayerPresence.js";
+import { useAdminPlayerMessages } from "./hooks/useAdminPlayerMessages.js";
 import { probeAmIStaff } from "./online/adminDashboard.js";
 import { enterAdminLocation, goBackFromAdmin, isAdminLocation, leaveAdminLocation } from "./online/adminRoute.js";
 import AdminPage from "./pages/AdminPage.jsx";
+import { AdminErrorBoundary } from "./pages/AdminBoot.jsx";
 import ChallengePage from "./pages/ChallengePage.jsx";
+import AdminPlayerMessageOverlay from "./components/AdminPlayerMessageOverlay.jsx";
 import "./App.css";
 
-/** @typedef {"intro" | "home" | "gameStyle" | "findMatch" | "friends" | "chat" | "game" | "admin" | "challenge"} AppPhase */
+/** @typedef {"intro" | "home" | "gameStyle" | "leopipsStake" | "findMatch" | "friends" | "chat" | "game" | "admin" | "challenge"} AppPhase */
 
 /**
  * Startup: brand intro → Login (or Home if signed in) → Game Style → table.
@@ -38,8 +42,8 @@ import "./App.css";
  * Main Menu returns to Home when signed in.
  */
 function App() {
-  const { signedIn, authReady, authView, openLogin, session } = useAuth();
-  const playable = Boolean(signedIn && !session?.deletionPending);
+  const { signedIn, authReady, authView, openLogin, session, passwordRecoveryPending } = useAuth();
+  const playable = Boolean(signedIn && !session?.deletionPending && !passwordRecoveryPending);
   /** @type {[AppPhase, function]} */
   const [phase, setPhase] = useState("intro");
   const [splashExiting, setSplashExiting] = useState(false);
@@ -52,9 +56,12 @@ function App() {
   const recoveredOnlineRef = useRef(false);
   const friendInviteBusyRef = useRef(false);
   const [staffRole, setStaffRole] = useState(null);
+  /** UI/test state only. Never sent to createMatchRequest / acceptMatchRequest. */
+  const [leopipsPick, setLeopipsPick] = useState(null);
   const activeOnline = useActiveOnlineMatch({ enabled: playable });
   useOwnFriendsPresence();
   usePlayerPresence();
+  const adminDm = useAdminPlayerMessages();
 
   useEffect(() => {
     capturePendingReferralFromWindow();
@@ -65,11 +72,12 @@ function App() {
   }, [phase]);
 
   useEffect(() => {
-    if (!authReady || phase === "intro" || signedIn) return undefined;
+    if (!authReady || phase === "intro" || (signedIn && !passwordRecoveryPending)) return undefined;
     if (!authView) openLogin();
     if (
       phase === "game" ||
       phase === "gameStyle" ||
+      phase === "leopipsStake" ||
       phase === "findMatch" ||
       phase === "friends" ||
       phase === "chat" ||
@@ -77,11 +85,12 @@ function App() {
       phase === "challenge"
     ) {
       setMatchOptions(null);
+      setLeopipsPick(null);
       if (phase === "admin") leaveAdminLocation();
       setPhase("home");
     }
     return undefined;
-  }, [authReady, signedIn, phase, authView, openLogin]);
+  }, [authReady, signedIn, passwordRecoveryPending, phase, authView, openLogin]);
 
   useEffect(() => {
     if (!playable) {
@@ -239,6 +248,7 @@ function App() {
 
   const handleMainMenu = () => {
     setMatchOptions(null);
+    setLeopipsPick(null);
     setChatFocus(null);
     setChatReturnTo("home");
     setGameKey((key) => key + 1);
@@ -265,6 +275,7 @@ function App() {
     phase === "intro" ||
     phase === "home" ||
     phase === "gameStyle" ||
+    phase === "leopipsStake" ||
     phase === "findMatch" ||
     phase === "friends" ||
     phase === "chat" ||
@@ -286,10 +297,10 @@ function App() {
       {phase !== "intro" && session?.deletionPending ? <AccountDeletionPending /> : null}
 
       {phase === "home" && playable ? (
-        <HomePage
+        <LeoPipsAuthenticatedHome
           key={session?.playerId ?? "home"}
           onPlayVsLeoBest={() => setPhase("gameStyle")}
-          onFindMatch={() => setPhase("findMatch")}
+          onFindMatch={() => setPhase("leopipsStake")}
           onFriends={() => setPhase("friends")}
           onChat={() => openChat(null, "home")}
           onOpenChat={(focus) => openChat(focus, "home")}
@@ -302,10 +313,27 @@ function App() {
         />
       ) : null}
 
+      {phase === "leopipsStake" && playable ? (
+        <LeoPipsAuthenticatedStake
+          initialStyleId={leopipsPick?.styleId}
+          onBack={() => setPhase("home")}
+          onPlayWithFriends={() => setPhase("friends")}
+          onContinueToMatchmaking={({ styleId, stake }) => {
+            setLeopipsPick({ styleId, stake });
+            setPhase("findMatch");
+          }}
+        />
+      ) : null}
+
       {phase === "findMatch" && playable ? (
         <FindMatchPage
-          onBack={() => setPhase("home")}
-          onMainMenu={() => setPhase("home")}
+          lockedStyleId={leopipsPick?.styleId || ""}
+          lockedStake={leopipsPick?.stake ?? null}
+          onBack={() => setPhase(leopipsPick ? "leopipsStake" : "home")}
+          onMainMenu={() => {
+            setLeopipsPick(null);
+            setPhase("home");
+          }}
           onEnterMatch={handleEnterOnlineMatch}
         />
       ) : null}
@@ -355,7 +383,9 @@ function App() {
       ) : null}
 
       {phase === "admin" && playable ? (
-        <AdminPage onBack={handleAdminBack} />
+        <AdminErrorBoundary onBack={handleAdminBack}>
+          <AdminPage onBack={handleAdminBack} />
+        </AdminErrorBoundary>
       ) : null}
 
       {phase === "challenge" && playable ? (
@@ -378,6 +408,14 @@ function App() {
           key={gameKey}
           matchOptions={matchOptions}
           onMainMenu={handleMainMenu}
+        />
+      ) : null}
+
+      {playable ? (
+        <AdminPlayerMessageOverlay
+          open={Boolean(adminDm.message)}
+          messageText={adminDm.message?.messageText || ""}
+          onClose={adminDm.acknowledge}
         />
       ) : null}
 

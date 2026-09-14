@@ -26,9 +26,10 @@ const fr = read("i18n/locales/fr.js");
 const es = read("i18n/locales/es.js");
 const pt = read("i18n/locales/pt.js");
 
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game"/);
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "leopipsStake" \| "findMatch" \| "friends" \| "chat" \| "game"/);
 assert.match(app, /<FindMatchPage/);
-assert.match(app, /onFindMatch=\{\(\) => setPhase\("findMatch"\)\}/);
+assert.match(app, /<LeoPipsAuthenticatedStake/);
+assert.match(app, /onFindMatch=\{\(\) => setPhase\("leopipsStake"\)\}/);
 assert.match(app, /phase === "findMatch"/);
 
 {
@@ -38,6 +39,20 @@ assert.match(app, /phase === "findMatch"/);
   );
   assert.match(slice, /onFindMatch/);
   assert.doesNotMatch(slice, /showComingSoon/);
+}
+
+{
+  const liveHome = read("pages/LeoPipsAuthenticatedHome.jsx");
+  assert.match(liveHome, /onFindMatch/);
+  assert.match(liveHome, /if \(resumeOnline\) onEnterMatch/);
+  assert.doesNotMatch(liveHome, /LeoPipsStakePage|LEOPIPS_STAKE_TIERS|canEnterLeoPipsFindMatch/);
+  assert.doesNotMatch(liveHome, /acceptMatchRequest/);
+  assert.match(page, /lockedStyleId = ""/);
+  assert.match(page, /lockedStake = null/);
+  assert.match(app, /lockedStake=\{leopipsPick\?\.stake \?\? null\}/);
+  assert.match(page, /data-find-match-style-picker=\{lockedId \? "hidden" : "visible"\}/);
+  assert.match(page, /data-find-match-choose-style=\{lockedId \? "bypassed" : "visible"\}/);
+  assert.match(app, /lockedStyleId=\{leopipsPick\?\.styleId/);
 }
 
 assert.match(page, /listV1GameStyles/, "Find Match picker is Classic/Haitian/American");
@@ -51,6 +66,15 @@ assert.match(page, /visibilitychange/, "F. Find Match refreshes on visibilitycha
 assert.match(page, /addEventListener\("focus"/, "F. Find Match refreshes on focus");
 assert.match(page, /visibleFindMatchRequests/, "accepted requests cannot stay Waiting");
 assert.match(page, /shouldPromoteAcceptedToMatchReady/);
+assert.match(page, /FIND_MATCH_OPEN_POLL_MS/, "creator open-request poll fallback");
+assert.match(page, /shouldPollOpenRequest/);
+assert.match(page, /planOpenRequestPollTick/);
+assert.match(page, /refreshInFlightRef/);
+assert.match(page, /subscribeMatchRequests/, "Realtime remains the fast path");
+assert.match(page, /findMatchDiag|buildFindMatchDiagSnapshot/, "temporary phone-repro diag");
+assert.match(page, /noteFindMatchDiagTitleTap/, "hidden 5-tap title gesture");
+assert.match(page, /data-find-match-diag/);
+assert.doesNotMatch(page, /access_token|refresh_token|service_role/);
 
 {
   const home = read("pages/HomePage.jsx");
@@ -80,8 +104,14 @@ assert.doesNotMatch(page, /from\("match_requests"\)/, "no direct table writes in
     page.indexOf("const handleCreate"),
     page.indexOf("const handleAccept")
   );
+  assert.match(createBlock, /joinOrCreatePublicMatchRequest\(selectedId, lockedStakePips\)/);
+  assert.doesNotMatch(createBlock, /createMatchRequest\(selectedId, lockedStakePips\)/);
   assert.match(createBlock, /createMatchRequest\(selectedId\)/);
+  assert.match(createBlock, /joined\.outcome === "accepted"/);
+  assert.doesNotMatch(createBlock, /Hosted RPC not applied yet|fall through to insert/i);
 }
+assert.match(page, /liveAcceptedPending/);
+assert.doesNotMatch(page, /own\?\.status === "accepted" && !matched/);
 
 {
   const acceptBlock = page.slice(
@@ -89,7 +119,8 @@ assert.doesNotMatch(page, /from\("match_requests"\)/, "no direct table writes in
     page.indexOf("const handleCancel")
   );
   assert.match(acceptBlock, /acceptMatchRequest\(/);
-  assert.doesNotMatch(acceptBlock, /rulesetId|selectedId|styleId/);
+  assert.match(acceptBlock, /styleId: selectedId, stakePips: lockedStakePips/);
+  assert.doesNotMatch(acceptBlock, /p_stake_pips\s*:/);
   assert.match(acceptBlock, /canAcceptMatchRequest/);
   assert.match(acceptBlock, /isStaleMatchAcceptError/);
   assert.match(acceptBlock, /const key = errorMessageKey\(error\)/);
@@ -123,6 +154,21 @@ assert.match(fr, /rankedPairLimit: "Vous avez déjà joué 3 fois contre cet adv
 assert.match(es, /rankedPairLimit: "Ya jugaste 3 veces contra este rival en las últimas 24 horas\. Inténtalo de nuevo más tarde\."/);
 assert.match(pt, /rankedPairLimit: "Já jogou 3 vezes contra este adversário nas últimas 24 horas\. Tente novamente mais tarde\."/);
 assert.match(page, /findMatch\.styleLocked/);
+assert.match(page, /findMatch\.stakePips/);
+assert.match(page, /findMatch\.lobbyMismatch/);
+assert.match(page, /findMatch\.invalidStake/);
+assert.match(en, /stakePips: "\{\{n\}\} LEOPIPS"/);
+assert.match(ht, /stakePips: "\{\{n\}\} LEOPIPS"/);
+assert.match(fr, /stakePips: "\{\{n\}\} LEOPIPS"/);
+assert.match(es, /stakePips: "\{\{n\}\} LEOPIPS"/);
+assert.match(pt, /stakePips: "\{\{n\}\} LEOPIPS"/);
+assert.match(page, /data-find-match-lobby/);
+assert.match(page, /board\.source !== "lobby-rpc"/);
+assert.match(page, /request\.visibility !== "friend" && request\.stakePips != null/);
+assert.doesNotMatch(
+  page.slice(page.indexOf("const lobbyOk"), page.indexOf("const canAccept")),
+  /request\.stakePips == null/
+);
 assert.match(page, /findMatch\.enterTable/);
 
 assert.match(css, /max-width:\s*26\.5rem|width:\s*min\(100%,\s*26\.5rem\)/);
@@ -144,7 +190,13 @@ assert.deepEqual(
 );
 assert.equal(toFindMatchRulesetId("classic"), "legacy");
 assert.equal(canAcceptMatchRequest({ creatorId: "a", status: "open" }, "a"), false);
-assert.equal(canAcceptMatchRequest({ creatorId: "a", status: "open" }, "b"), true);
+assert.equal(
+  canAcceptMatchRequest(
+    { creatorId: "a", status: "open", waitingHeartbeatAt: new Date().toISOString() },
+    "b"
+  ),
+  true
+);
 assert.equal(
   canAcceptMatchRequest(
     { creatorId: "a", status: "open", expiresAt: "2020-01-01T00:00:00.000Z" },
@@ -153,5 +205,14 @@ assert.equal(
   false
 );
 assert.equal(isOwnMatchRequest({ creatorId: "a" }, "a"), true);
+
+assert.match(page, /touchMyOpenPublicRequest/);
+assert.match(page, /PUBLIC_REQUEST_HEARTBEAT_MS/);
+assert.match(page, /findMatchDocumentIsHidden\(\)/);
+assert.match(page, /cancelOwnOpenBestEffort/);
+assert.match(page, /case "CREATOR_UNAVAILABLE"/);
+assert.match(page, /case "CREATOR_UNAVAILABLE":\s*return "findMatch\.playerUnavailable"/);
+assert.doesNotMatch(page, /pagehide|beforeunload/, "brief background must not cancel; heartbeat TTL is the fallback");
+assert.match(en, /playerUnavailable: "Sorry, this player is no longer available\."/);
 
 console.log("  ✓ Find Match UI contract");

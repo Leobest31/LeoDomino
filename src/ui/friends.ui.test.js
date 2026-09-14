@@ -31,6 +31,8 @@ assert.match(app, /useOwnFriendsPresence/);
 assert.match(app, /onFriends=\{\(\) => setPhase\("friends"\)\}/);
 assert.match(home, /onPress=\{openFriends\}/);
 assert.match(home, /<NotificationsPanel[\s\S]*onOpenFriends/);
+assert.match(read("pages/LeoPipsAuthenticatedHome.jsx"), /onFriends/);
+assert.match(read("pages/LeoPipsAuthenticatedHome.jsx"), /<NotificationsPanel[\s\S]*onOpenFriends/);
 assert.doesNotMatch(profile, /data-profile-friends/);
 assert.doesNotMatch(profile, /onOpenFriends/);
 assert.doesNotMatch(home, /data-home-nav-item="friends"/);

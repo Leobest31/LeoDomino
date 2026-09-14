@@ -19,6 +19,7 @@ import {
   explainAllFivesRoundEnd,
   calculateAllFivesRoundPoints,
 } from "../rules/allFivesScoring.js";
+import { chooseStartingPlayer } from "../rules/start.js";
 
 /** Engine ruleset id. */
 export const AMERICAN_RULESET_ID = "american";
@@ -28,6 +29,7 @@ export const AMERICAN_MATCH_TARGET = 150;
 
 /**
  * Frozen config — Classic chassis + All Fives count / round-end policies.
+ * Opening stays highest-double (not Classic 2-2).
  */
 export const americanRuleset = Object.freeze({
   ...legacyRuleset,
@@ -39,6 +41,10 @@ export const americanRuleset = Object.freeze({
   summaryKey: "setup.gameStyle.americanSummary",
 
   supportedPlayerCounts: Object.freeze([2, 3, 4]),
+
+  /** American Round 1: highest double else highest (not Classic forced 2-2). */
+  round1Starter: "highestDoubleElseHighest",
+  redealUntilOpeningTile: false,
 
   /**
    * Mid-play count scoring via scorePlay; round-end uses All Fives
@@ -53,6 +59,7 @@ export const americanRuleset = Object.freeze({
 
   policies: Object.freeze({
     ...legacyRuleset.policies,
+    chooseStartingPlayer,
     scorePlay: allFivesScorePlay,
     explainPlayScore: explainAllFivesScore,
     explainRoundEnd: explainAllFivesRoundEnd,

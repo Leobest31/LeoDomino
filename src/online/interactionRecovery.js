@@ -4,9 +4,13 @@
  * beats stale local drag / end-choice state.
  */
 
-import { isMatchOverView } from "./onlineTable.js";
+import { isMatchOverView, needsPrivateHydration } from "./onlineTable.js";
+import { shouldClearTimeoutPending } from "./timeoutFreeze.js";
 
 export const UNHEALTHY_REALTIME_STATUSES = ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"];
+
+/** Statuses that mean the channel (re)attached and may have missed events. */
+export const REALTIME_RECONNECTED_STATUSES = ["SUBSCRIBED"];
 
 export function viewVersionOf(view) {
   const n = Number(view?.version);
@@ -34,17 +38,49 @@ export function shouldClearLocalInteraction(previous, next) {
   return false;
 }
 
-/** Drag may delay same-turn Realtime; it must not stash a newer turn/table. */
+/**
+ * True when an incoming same-version snapshot restamped the turn clock.
+ * Drag must not stash these — otherwise “Waiting for timeout…” can stick
+ * after the server (or hydrate) says the deadline is no longer due / advanced.
+ */
+export function isTimeoutClockRestamp(previous, incoming) {
+  if (!previous || !incoming) return false;
+  if (viewVersionOf(incoming) !== viewVersionOf(previous)) return false;
+  if (String(previous.turnDeadlineAt ?? "") !== String(incoming.turnDeadlineAt ?? "")) {
+    return true;
+  }
+  if (String(previous.serverNow ?? "") !== String(incoming.serverNow ?? "")) return true;
+  const prevMono = Number(previous.deadlineReceivedMono);
+  const nextMono = Number(incoming.deadlineReceivedMono);
+  if (
+    Number.isFinite(prevMono) &&
+    Number.isFinite(nextMono) &&
+    prevMono !== nextMono
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Drag may delay same-turn Realtime; it must not stash a newer turn/table/clock. */
 export function shouldBypassDragLock(previous, incoming) {
-  return shouldClearLocalInteraction(previous, incoming);
+  if (shouldClearLocalInteraction(previous, incoming)) return true;
+  if (shouldClearTimeoutPending(previous, incoming)) return true;
+  if (isTimeoutClockRestamp(previous, incoming)) return true;
+  return false;
 }
 
 export function isUnhealthyRealtimeStatus(status) {
   return UNHEALTHY_REALTIME_STATUSES.includes(status);
 }
 
+export function shouldRefreshAuthoritativeViewOnRealtimeStatus(status) {
+  return isUnhealthyRealtimeStatus(status) || REALTIME_RECONNECTED_STATUSES.includes(status);
+}
+
 export function shouldRefreshAuthoritativeViewOnResume(view) {
   if (!view || isMatchOverView(view)) return false;
+  if (needsPrivateHydration(view)) return true;
   return view.phase === "playing" || view.status === "playing";
 }
 

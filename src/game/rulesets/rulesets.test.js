@@ -200,12 +200,14 @@ function section(title) {
   section("createMatch/startMatch stores rulesetId");
 }
 
-// --- Legacy deal / opening / draw / pass / scoring unchanged ---
+// --- Legacy deal / draw / pass / scoring unchanged; opening is the shared
+//     highest-double-else-highest-tile rule (no fixed 2-2) ---
 {
   const state = startMatch({ seed: 42, playerIds: ["you", "rival"] });
   assert.equal(state.rulesetId, "legacy");
-  assert.ok(state.mustPlayTileId);
-  assert.ok(state.players[state.currentPlayer].hand.includes(state.mustPlayTileId));
+  assert.equal(state.mustPlayTileId, "5-5");
+  assert.ok(state.players[state.currentPlayer].hand.includes("5-5"));
+  assert.equal(resolveRuleset("legacy").round1Starter, "highestDoubleElseHighest");
 
   const actions = getAvailableActions(state);
   assert.equal(actions.canPlay, true);
@@ -220,6 +222,7 @@ function section(title) {
 
   // Round 2 free open preserves ruleset + deal size.
   let round = startMatch({ seed: 55, playerIds: ["a", "b"], targetScore: 500 });
+  assert.equal(round.mustPlayTileId, "6-6");
   round = playTile(round, round.mustPlayTileId);
   const fakeOver = {
     ...round,
@@ -233,7 +236,7 @@ function section(title) {
   assert.equal(nextRound.mustPlayTileId, null);
   assert.equal(nextRound.players[0].hand.length, 7);
   assert.equal(nextRound.players[1].hand.length, 7);
-  section("legacy deal 7, target 100, opening/next-round unchanged");
+  section("legacy deal 7, target 100, highest-double opening / next-round free");
 }
 
 // --- AI works under legacy ---

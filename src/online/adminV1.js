@@ -11,7 +11,6 @@ import {
   adminPresenceState,
   fetchAdminLiveMatches,
   fetchAdminOverview,
-  fetchAdminTopRp,
   fetchAdminUsers,
   overviewCardsFromPayload,
 } from "./adminDashboard.js";
@@ -22,10 +21,14 @@ export const ADMIN_V1_NAV = Object.freeze([
   "overview",
   "users",
   "liveMatches",
-  "globalRp",
+  "matchHistory",
+  "leopips",
+  "leopipsReferrals",
+  "matchmakingHealth",
   "reports",
   "challenge",
   "inviteWin",
+  "playerRankings",
   "league",
   "feedback",
   "audit",
@@ -41,10 +44,6 @@ export const ADMIN_USER_DETAIL_FIELDS = Object.freeze([
   "avatarId",
   "createdAt",
   "deletedAt",
-  "rp",
-  "wins",
-  "losses",
-  "matchesPlayed",
   "inActiveMatch",
   "matchLastSeenAt",
   "friendCount",
@@ -147,10 +146,6 @@ export function normalizeAdminUserDetail(row) {
     avatarId: asText(data.avatar_id ?? data.avatarId) || "",
     createdAt: asText(data.created_at ?? data.createdAt),
     deletedAt: deletedAt ? asText(deletedAt) : null,
-    rp: asInt(data.rp) ?? 1000,
-    wins: asInt(data.wins) ?? 0,
-    losses: asInt(data.losses) ?? 0,
-    matchesPlayed: asInt(data.matches_played ?? data.matchesPlayed) ?? 0,
     inActiveMatch: asBool(data.in_active_match ?? data.inActiveMatch) === true,
     matchLastSeenAt: matchLastSeenAt ? asText(matchLastSeenAt) : null,
     presenceLastSeenAt: (() => {
@@ -166,32 +161,10 @@ export function normalizeAdminUserDetail(row) {
 }
 
 export function normalizeAdminUserDetailPayload(row) {
-  if (!row || typeof row !== "object") return { player: null, recentRatedMatches: [] };
+  if (!row || typeof row !== "object") return { player: null };
   const data = dropPrivateKeys(row);
-  const recent = Array.isArray(data.recent_rated_matches ?? data.recentRatedMatches)
-    ? data.recent_rated_matches ?? data.recentRatedMatches
-    : [];
   return {
     player: normalizeAdminUserDetail(data.player),
-    recentRatedMatches: recent
-      .map((item) => {
-        if (!item || typeof item !== "object") return null;
-        const event = dropPrivateKeys(item);
-        if (asBool(event.rated) !== true) return null;
-        const matchId = asText(event.match_id ?? event.matchId);
-        const settledAt = asText(event.settled_at ?? event.settledAt);
-        if (!matchId || !settledAt) return null;
-        return {
-          matchId,
-          rated: true,
-          result: asText(event.result) === "loss" ? "loss" : "win",
-          rulesetId: asText(event.ruleset_id ?? event.rulesetId) || "",
-          finishReason: asText(event.finish_reason ?? event.finishReason) || "",
-          settledAt,
-          matchKind: asText(event.match_kind ?? event.matchKind) || "public",
-        };
-      })
-      .filter(Boolean),
   };
 }
 
@@ -360,6 +333,24 @@ export async function fetchAdminUserDetail(playerId, client) {
   return normalizeAdminUserDetailPayload(await rpc("admin_get_user", { p_player_id: id }, client));
 }
 
+/**
+ * Staff-only email for the player detail drawer. Drops every key except email.
+ * Does not use dropPrivateKeys (that strip would hide the one allowed field).
+ */
+export function normalizeAdminPlayerEmail(row) {
+  if (!row || typeof row !== "object") return { email: null };
+  const raw = row.email;
+  if (typeof raw !== "string") return { email: null };
+  const email = raw.trim();
+  return { email: email.length ? email : null };
+}
+
+export async function fetchAdminPlayerEmail(playerId, client) {
+  const id = asText(playerId);
+  if (!id) throw new AdminError(ADMIN_ERROR.GENERIC, "player required");
+  return normalizeAdminPlayerEmail(await rpc("admin_get_player_email", { p_player_id: id }, client));
+}
+
 export async function fetchAdminReports(query = {}, client) {
   const data = await rpc(
     "admin_list_reports",
@@ -521,7 +512,7 @@ export function formatAdminClipboardReport(input = {}) {
       const account = adminAccountStatus(user);
       const presence = adminPresenceState(user);
       lines.push(
-        `- ${playerClip(user)} | RP ${user.rp ?? "—"} | ${user.wins ?? 0}W/${user.losses ?? 0}L | account ${account} | presence ${presence} | created ${user.createdAt || "—"}`
+        `- ${playerClip(user)} | account ${account} | presence ${presence} | created ${user.createdAt || "—"}`
       );
     }
     if (!(users.users || []).length) lines.push("- none");
@@ -540,21 +531,6 @@ export function formatAdminClipboardReport(input = {}) {
       );
     }
     if (!(live.matches || []).length) lines.push("- none");
-  }
-  lines.push("");
-
-  lines.push("== Top RP ==");
-  const top = input.topRp;
-  if (!top || top === "unavailable") {
-    lines.push("unavailable");
-  } else {
-    lines.push(`total: ${top.total ?? 0}`);
-    for (const player of top.players || []) {
-      lines.push(
-        `- #${player.rank ?? "—"} ${playerClip(player)} | RP ${player.rp ?? "—"} | ${player.wins ?? 0}W/${player.losses ?? 0}L | rated matches ${player.matchesPlayed ?? 0}`
-      );
-    }
-    if (!(top.players || []).length) lines.push("- none");
   }
   lines.push("");
 
@@ -605,11 +581,10 @@ export function formatAdminClipboardReport(input = {}) {
 }
 
 export async function fetchAdminClipboardReport({ role } = {}, client) {
-  const [overview, users, liveMatches, topRp, reports, challenge, league] = await Promise.allSettled([
+  const [overview, users, liveMatches, reports, challenge, league] = await Promise.allSettled([
     fetchAdminOverview(client),
     fetchAdminUsers({ limit: ADMIN_PAGE_SIZE, offset: 0 }, client),
     fetchAdminLiveMatches({ limit: ADMIN_PAGE_SIZE, offset: 0 }, client),
-    fetchAdminTopRp({ limit: ADMIN_PAGE_SIZE, offset: 0 }, client),
     fetchAdminReports({ limit: ADMIN_PAGE_SIZE, offset: 0 }, client),
     fetchAdminChallenge(client),
     fetchAdminLeague(client),
@@ -635,7 +610,6 @@ export async function fetchAdminClipboardReport({ role } = {}, client) {
     overview: overviewValue,
     users: settled(users),
     liveMatches: settled(liveMatches),
-    topRp: settled(topRp),
     reports: settled(reports),
     challenge: challengeValue,
     league: settled(league),

@@ -5,11 +5,15 @@
 
 .leopips-home {
   overflow-x: hidden;
-  --home-status-h: clamp(52px, calc(var(--home-vvh) * 0.074), 62px);
+  /* The rank card is now a 4-tier insignia (crest+LVL+XP row, divider,
+     nameplate, progress+copy) with XP merged in — it genuinely needs this
+     room to read as a real rank card rather than a squeezed strip. The
+     wallet pill beside it stays its natural, smaller height. */
+  --home-status-h: clamp(90px, calc(var(--home-vvh) * 0.128), 104px);
 }
 
 .leopips-home .home__stat--pips {
-  flex: 1.15 1 0;
+  flex: 0.85 1 0;
   gap: 8px;
 }
 
@@ -20,14 +24,12 @@
   filter: drop-shadow(0 0 6px rgba(255, 184, 0, 0.35));
 }
 
-.leopips-home .home__stat--pips .home__stat-copy,
-.leopips-home [data-leopips-home-xp] .home__stat-copy {
+.leopips-home .home__stat--pips .home__stat-copy {
   min-width: 0;
   gap: 2px;
 }
 
-.leopips-home .home__stat--pips .home__stat-next,
-.leopips-home [data-leopips-home-xp] .home__stat-next {
+.leopips-home .home__stat--pips .home__stat-next {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: 10px;
@@ -39,9 +41,23 @@
   line-height: 17px;
 }
 
+.leopips-home .leopips-home__level-sub {
+  display: block;
+  font-size: 8px;
+  line-height: 9px;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(232, 220, 180, 0.78);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .leopips-home .home__stat--level {
-  flex: 0 0 88px;
-  width: 88px;
+  flex: 1.35 1 0;
+  width: auto;
+  min-width: 0;
 }
 
 .leopips-home .home__stat-value--lvl {
@@ -49,14 +65,331 @@
   line-height: 14px;
 }
 
-.leopips-home [data-leopips-home-xp] {
-  flex: 1 1 0;
+/**
+ * Premium BRONZE / GOLD / DIAMOND rank insignia — CSS-only.
+ * Composition: heraldic-shield crest (existing lion+crown brand art, framed
+ * in a layered bronze bevel) + LVL + XP on one row, a refined gold divider,
+ * a thick sculpted bronze nameplate carrying the rank name, and a
+ * dimensional progress rail with live "wins to next LVL" copy.
+ * No new images; the only artwork used is the existing homeLeoBestLion crop.
+ */
+.leopips-home__rank-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 5px 8px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(205, 140, 70, 0.4);
+  background: radial-gradient(120% 140% at 0% 0%, #2c1c0c 0%, #150d05 38%, #060402 78%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 214, 150, 0.22),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 3px 7px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.5);
 }
 
-.leopips-home [data-leopips-home-xp] .home__stat-value {
+/* Double-edge frame: a second, thinner inset border for a machined-plaque
+   look rather than a single flat rectangle outline. */
+.leopips-home__rank-card::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  z-index: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 210, 140, 0.14);
+  pointer-events: none;
+}
+
+/* Rank-tinted edge glow. Bronze/gold/diamond metal families kept consistent
+   with the rest of the app's rank language. */
+.leopips-home__rank-card[data-progression-rank="BRONZE"] {
+  border-color: rgba(224, 150, 80, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 214, 150, 0.28),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 3px 7px rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(205, 127, 50, 0.28),
+    0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.leopips-home__rank-card[data-progression-rank="GOLD"] {
+  border-color: rgba(245, 197, 66, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 180, 0.3),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 3px 7px rgba(0, 0, 0, 0.5),
+    0 0 12px rgba(245, 197, 66, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.leopips-home__rank-card[data-progression-rank="DIAMOND"] {
+  border-color: rgba(147, 197, 253, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(220, 240, 255, 0.3),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 3px 7px rgba(0, 0, 0, 0.5),
+    0 0 12px rgba(59, 130, 246, 0.32),
+    0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+/* Soft diagonal reflected-light sweep — pure gradient, no artwork. */
+.leopips-home__rank-card-sheen {
+  position: absolute;
+  inset: -40% -20%;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.1) 48%,
+    rgba(255, 255, 255, 0.03) 54%,
+    transparent 64%
+  );
+  pointer-events: none;
+}
+
+.leopips-home__crest-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+/* Heraldic-shield crest frame — a clip-path silhouette (not a circle/coin)
+   with a layered bronze gradient bevel: bright metal catching light near
+   the top, recessed dark bronze toward the base, plus inset highlight and
+   shadow bands for real sculpted depth. */
+.leopips-home__crest-frame {
+  position: relative;
+  flex-shrink: 0;
+  width: 28px;
+  height: 33px;
+  clip-path: polygon(4% 0%, 96% 0%, 96% 54%, 50% 100%, 4% 54%);
+  background: linear-gradient(
+    170deg,
+    #fbe3b4 0%,
+    #e4ab5c 14%,
+    #b97a34 32%,
+    #7a4a1e 54%,
+    #3d2410 76%,
+    #180d05 100%
+  );
+  box-shadow:
+    inset 0 2px 2px rgba(255, 236, 195, 0.6),
+    inset 0 -5px 7px rgba(0, 0, 0, 0.75),
+    inset 3px 0 3px rgba(0, 0, 0, 0.3),
+    inset -3px 0 3px rgba(255, 220, 160, 0.2);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 5px rgba(205, 140, 70, 0.4));
+}
+
+.leopips-home__crest-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    128deg,
+    rgba(255, 255, 255, 0.4) 0%,
+    transparent 26%,
+    transparent 68%,
+    rgba(0, 0, 0, 0.32) 100%
+  );
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.leopips-home__crest-lion {
+  position: absolute;
+  inset: 2.5px;
+  z-index: 1;
+  width: calc(100% - 5px);
+  height: calc(100% - 5px);
+  object-fit: cover;
+  object-position: center 28%;
+  transform: scale(1.85);
+}
+
+.leopips-home__crest-fallback {
+  position: absolute;
+  inset: 2.5px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  background: #140b04;
+}
+
+.leopips-home__lvl-num {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  background: linear-gradient(180deg, #fff3d6 0%, #ffd98a 45%, #e0a53c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.65));
+  white-space: nowrap;
+}
+
+.leopips-home__lvl-tag {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(255, 224, 170, 0.68);
+  -webkit-text-fill-color: rgba(255, 224, 170, 0.68);
+}
+
+/* Refined gold divider — thin, soft-faded ends, subtle glow, and a small
+   center ornament so it reads as intentional, not a plain rule line. */
+.leopips-home__divider {
+  position: relative;
+  z-index: 1;
+  display: block;
+  height: 2px;
+  margin: 4px 0 3px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 205, 110, 0.78) 25%,
+    rgba(255, 236, 185, 1) 50%,
+    rgba(255, 205, 110, 0.78) 75%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 6px rgba(255, 200, 110, 0.65),
+    0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+.leopips-home__divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: linear-gradient(135deg, #fff3d6, #e0a53c);
+  box-shadow: 0 0 5px rgba(255, 210, 140, 0.9);
+}
+
+/* Bronze nameplate/banner — thicker sculpted plate, not a thin flat strip. */
+.leopips-home__nameplate {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 3px;
+  padding: 2.5px 14px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-align: center;
+  color: #2c1a08;
+  text-shadow: 0 1px 0 rgba(255, 224, 170, 0.5);
+  background: linear-gradient(180deg, #f6d4a3 0%, #d68e42 20%, #a35f22 52%, #6b3d12 82%, #48280c 100%);
+  clip-path: polygon(4% 0%, 96% 0%, 100% 50%, 96% 100%, 4% 100%, 0% 50%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 240, 210, 0.7),
+    inset 0 -4px 5px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 2px 3px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leopips-home__rank-card[data-progression-rank="GOLD"] .leopips-home__nameplate {
+  color: #4a3405;
+  background: linear-gradient(180deg, #fff6c9 0%, #f5c542 20%, #c99614 52%, #8a6508 82%, #5c4305 100%);
+}
+
+.leopips-home__rank-card[data-progression-rank="DIAMOND"] .leopips-home__nameplate {
+  color: #0b1f3d;
+  background: linear-gradient(180deg, #f2fbff 0%, #93c5fd 20%, #3b82f6 52%, #1d4ed8 82%, #14337a 100%);
+}
+
+.leopips-home__progress-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.leopips-home__progress-row .leopips-home__level-sub {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Recessed dark groove, always visible at its edge — never blends into the
+   card background even at 0% fill — with a dimensional emerald fill. */
+.leopips-home__rank-progress.home__mini-progress {
+  position: relative;
+  flex: 0 1 40%;
+  min-width: 22px;
+  height: 7px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #050302 0%, #100a05 100%);
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(255, 205, 130, 0.22);
+}
+
+.leopips-home__rank-progress.home__mini-progress > span {
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -2px 2px rgba(0, 0, 0, 0.3),
+    0 0 5px rgba(0, 230, 118, 0.4);
+}
+
+.leopips-home__rank-progress.home__mini-progress > span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, transparent 55%);
+  mix-blend-mode: overlay;
+}
+
+.leopips-home__xp-copy {
+  position: relative;
+  z-index: 1;
+  margin-left: auto;
+  gap: 0;
+  text-align: right;
+}
+
+.leopips-home__xp-copy .home__stat-next {
+  font-size: 7.5px;
+  line-height: 9px;
+  letter-spacing: 0.1em;
+  color: rgba(232, 220, 180, 0.7);
+}
+
+.leopips-home__xp-copy .home__stat-value {
   font-size: 12px;
   line-height: 14px;
   white-space: nowrap;
+  color: #ffe08a;
+  text-shadow: 0 0 6px rgba(255, 200, 100, 0.35);
 }
 
 .leopips-home .leopips-home__season-hero {
@@ -144,9 +477,34 @@
 }
 
 @media (max-width: 384px) {
-  .leopips-home .home__stat--level {
-    flex-basis: 78px;
-    width: 78px;
+  .leopips-home__rank-card {
+    padding: 4px 6px 5px;
+  }
+
+  .leopips-home__crest-frame {
+    width: 25px;
+    height: 29px;
+  }
+
+  .leopips-home__crest-row {
+    gap: 6px;
+  }
+
+  .leopips-home__lvl-num {
+    font-size: 15px;
+  }
+
+  .leopips-home__xp-copy .home__stat-value {
+    font-size: 11px;
+  }
+
+  .leopips-home__nameplate {
+    padding: 2px 9px;
+    font-size: 8px;
+  }
+
+  .leopips-home__level-sub {
+    font-size: 7px;
   }
 
   .leopips-home .home__stat--pips .home__stat-value {

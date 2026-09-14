@@ -11,6 +11,15 @@ export const DESTINATION_HIT_PADDING_MIN = 40;
 export const DESTINATION_HIT_PADDING_RATIO = 0.55;
 /** Finger tap vs drag: stay under this distance to treat pointerup as a tap. */
 export const DESTINATION_TAP_SLOP_PX = 20;
+/**
+ * Cancel-safety padding around the table felt. NOT a destination — this file's
+ * per-end hit-testing still never uses a felt-wide drop zone to pick WHICH end
+ * plays. This constant only answers a different, coarser question: "did the
+ * player drop anywhere near the table at all, or did they clearly drag away
+ * to cancel?" Used solely to gate whether a missing/unmeasurable per-end
+ * target should recover the legal move or be treated as an intentional cancel.
+ */
+export const TABLE_CANCEL_ZONE_PAD_PX = 48;
 
 const OUTWARD_FACES = new Set(["E", "W", "N", "S"]);
 
@@ -257,4 +266,32 @@ export function destinationHighlightMap(legalEnds, layout) {
     if (id) map[end] = id;
   }
   return map;
+}
+
+/**
+ * Cancel-safety classifier: does this drop point look like a genuine attempt
+ * to play on the table, or a clear drag-away-to-cancel?
+ *
+ * This is deliberately coarse and table-wide (unlike pickTargetDestination,
+ * which never uses a felt-wide zone to choose a destination). It answers a
+ * different question and is used only to gate whether a legal move with an
+ * unresolved/unmeasurable per-end target should still recover automatically.
+ *
+ * Fails OPEN toward recoverability: a legal move must never become
+ * unplayable merely because DOM geometry is missing, stale, or unmeasurable
+ * — including the table rect itself. Only a drop point that positively,
+ * measurably lands well outside the table is treated as a cancel. No
+ * timestamps or client-trust decisions are involved; this is pure 2D
+ * geometry local to the client's own rendering, with zero bearing on server
+ * authority (the server independently validates whatever is submitted).
+ *
+ * @param {number} clientX
+ * @param {number} clientY
+ * @param {{ left: number, top: number, right: number, bottom: number } | null | undefined} tableRect
+ * @param {number} [pad]
+ * @returns {boolean} true = plausible play attempt (recover); false = cancel
+ */
+export function isPlausiblePlayDrop(clientX, clientY, tableRect, pad = TABLE_CANCEL_ZONE_PAD_PX) {
+  if (!tableRect) return true;
+  return contains(tableRect, clientX, clientY, pad);
 }

@@ -16,6 +16,7 @@ import {
   applyAdvanceRound,
   applyOnlineForfeit,
   applyTimeoutResolution,
+  pickTimeoutAutoPlayMove,
   assertViewHidesOpponent,
   createServerSeed,
   dealOnlineGame,
@@ -46,6 +47,10 @@ function view(state, seat, version = 0) {
 {
   const { state } = deal("legacy");
   assert.equal(state.rulesetId, "legacy");
+  // Same seed as the Haitian deal below -> same real highest double (6-6),
+  // not a fixed 2-2. Shared highest-double-else-highest opening rule.
+  assert.equal(state.mustPlayTileId, "6-6");
+  assert.ok(state.players[state.currentPlayer].hand.includes("6-6"));
   assert.equal(state.players[0].hand.length, 7);
   assert.equal(state.players[1].hand.length, 7);
   assert.equal(state.reserve.length, 14);
@@ -310,19 +315,19 @@ function view(state, seat, version = 0) {
   let found = null;
   for (let seed = 1; seed <= 400; seed += 1) {
     const dealt = deal("legacy", seed);
-    if (dealt.state.mustPlayTileId !== "6-6") continue;
+    if (dealt.state.mustPlayTileId !== "2-2") continue;
     const opener = dealt.state.currentPlayer;
     const other = opener === 0 ? 1 : 0;
     if (!dealt.state.players[other].hand.includes("2-6")) continue;
     found = { ...dealt, opener, other, seed };
     break;
   }
-  assert.ok(found, "need a Classic deal where 6-6 opens and the opponent holds 2-6");
+  assert.ok(found, "need a Classic deal where 2-2 opens and the opponent holds 2-6");
   const opened = applyOnlineAction(found.state, {
     seat: found.opener,
-    action: { type: ONLINE_ACTION_PLAY, tileId: "6-6", end: "right" },
+    action: { type: ONLINE_ACTION_PLAY, tileId: "2-2", end: "right" },
   }).state;
-  assert.equal(opened.board[0].id, "6-6");
+  assert.equal(opened.board[0].id, "2-2");
   assert.equal(opened.currentPlayer, found.other);
   const viewOpener = view(opened, found.opener, 1);
   const viewOther = view(opened, found.other, 1);
@@ -345,7 +350,7 @@ function view(state, seat, version = 0) {
     bothA.board.map((tile) => tile.id),
     bothB.board.map((tile) => tile.id)
   );
-  console.log("  ✓ 6-6 opening transfers turn; 2-6 is legal and plays");
+  console.log("  ✓ 2-2 opening transfers turn; 2-6 is legal and plays");
 }
 
 {
@@ -397,37 +402,46 @@ function view(state, seat, version = 0) {
     assert.ok(state.players[seat].hand.includes(forced));
 
     const first = applyTimeoutResolution(state, { timeoutStrikes: [0, 0] });
-    assert.equal(first.state.roundResult.reason, "timeout_pass");
-    assert.equal(first.resetTurnDeadline, true, `${rulesetId} timeout skip stamps a new deadline`);
+    assert.equal(first.state.roundResult.reason, "timeout_auto");
+    assert.equal(first.safePayload.autoPlay.tileId, forced);
+    assert.equal(first.resetTurnDeadline, true, `${rulesetId} timeout auto-play stamps a new deadline`);
     assert.notEqual(first.state.currentPlayer, seat);
     assert.equal(first.state.mustPlayTileId, null, `${rulesetId} opener lock does not follow the next seat`);
     assert.equal(state.mustPlayTileId, forced, `${rulesetId} timeout must not rewrite the uncommitted opening state`);
+    assert.ok(first.state.board.length > 0, `${rulesetId} auto-plays the opening tile`);
 
     const nextSeat = first.state.currentPlayer;
     const nextActions = getAvailableActions(first.state);
-    assert.equal(nextActions.canPlay, true, `${rulesetId} next player can play after opener timeout`);
-    assert.ok(nextActions.legalMoves.length > 0);
+    assert.ok(
+      nextActions.canPlay || nextActions.canDraw || nextActions.canPass,
+      `${rulesetId} next player has a legal action after opener auto-play`
+    );
 
     const nextView = view(first.state, nextSeat, 1);
     assert.equal(nextView.currentSeat, nextSeat);
     assert.equal(nextView.mustPlayTileId, null);
-    assert.equal(nextView.canPlay, true);
-    assert.ok(nextView.legalMoves.length > 0);
-
-    const move = nextView.legalMoves[0];
-    const played = applyOnlineAction(first.state, {
-      seat: nextSeat,
-      action: { type: ONLINE_ACTION_PLAY, tileId: move.tileId, end: move.end },
-    });
-    assert.equal(played.actionType, ONLINE_ACTION_PLAY);
-    assert.ok(played.state.board.length > 0);
+    if (nextView.canPlay) {
+      assert.ok(nextView.legalMoves.length > 0);
+      const move = nextView.legalMoves[0];
+      const played = applyOnlineAction(first.state, {
+        seat: nextSeat,
+        action: { type: ONLINE_ACTION_PLAY, tileId: move.tileId, end: move.end },
+      });
+      assert.equal(played.actionType, ONLINE_ACTION_PLAY);
+      assert.ok(played.state.board.length > first.state.board.length);
+    }
 
     const again = applyTimeoutResolution(first.state, { timeoutStrikes: first.timeoutStrikes });
-    assert.equal(again.state.roundResult.reason, "timeout_pass");
+    assert.ok(again.safePayload.autoPlay || again.safePayload.autoPass || again.safePayload.autoDraw);
     assert.notEqual(again.state.currentPlayer, nextSeat);
     assert.equal(again.state.mustPlayTileId, null);
+    const picked = pickTimeoutAutoPlayMove(first.state);
+    if (picked && again.safePayload.autoPlay) {
+      assert.equal(again.safePayload.autoPlay.tileId, picked.tileId);
+      assert.equal(again.safePayload.autoPlay.end, picked.end);
+    }
   }
-  console.log("  ✓ starter timeout clears mustPlayTileId; next player can play immediately (legacy/haitian/american)");
+  console.log("  ✓ starter timeout auto-plays the opening tile; next player can play immediately (legacy/haitian/american)");
 }
 
 {
@@ -436,15 +450,18 @@ function view(state, seat, version = 0) {
   assert.equal(getAvailableActions(state).canPlay, true);
   const first = applyTimeoutResolution(state, { timeoutStrikes: [0, 0] });
   assert.equal(first.timeoutStrikes[seat], 1);
-  assert.equal(first.state.roundResult.reason, "timeout_pass");
+  assert.equal(first.state.roundResult.reason, "timeout_auto");
   assert.equal(first.finishReason, null);
   assert.notEqual(first.state.currentPlayer, seat);
+  assert.ok(first.safePayload.autoPlay);
 
   const secondState = { ...first.state, currentPlayer: seat, phase: "playing" };
   const second = applyTimeoutResolution(secondState, { timeoutStrikes: first.timeoutStrikes });
   assert.equal(second.timeoutStrikes[seat], 2);
-  assert.equal(second.state.roundResult.reason, "timeout_pass");
+  assert.notEqual(second.finishReason, "timeout");
+  assert.notEqual(second.state.phase, "matchOver");
 
+  const beforeThirdBoard = second.state.board.slice();
   const thirdState = { ...second.state, currentPlayer: seat, phase: "playing" };
   const third = applyTimeoutResolution(thirdState, { timeoutStrikes: second.timeoutStrikes });
   assert.equal(third.timeoutStrikes[seat], 3);
@@ -452,10 +469,13 @@ function view(state, seat, version = 0) {
   assert.equal(third.state.phase, "matchOver");
   assert.equal(third.state.matchWinner, seat === 0 ? 1 : 0);
   assert.equal(third.state.roundResult.reason, "timeout");
+  assert.equal(third.safePayload.autoPlay, null);
+  assert.equal(third.safePayload.autoPass, false);
+  assert.deepEqual(third.state.board, beforeThirdBoard);
 
   const again = applyTimeoutResolution(third.state, { timeoutStrikes: third.timeoutStrikes });
   assert.equal(again.idempotent, true);
-  console.log("  ✓ timeout strikes then authoritative timeout loss");
+  console.log("  ✓ timeout strikes auto-play then authoritative timeout loss on strike 3");
 }
 
 {
@@ -484,18 +504,81 @@ function view(state, seat, version = 0) {
     }
   }
   assert.ok(blocked, "expected an unplayable constructed hand");
-  const strikesBefore = [1, 2];
+  // A seat with no legal play at all (must draw/pass/skip) did not fail to
+  // act on an available option — it must not accrue a timeout strike.
+  const strikesBefore = [1, 1];
   const resolved = applyTimeoutResolution(blocked, { timeoutStrikes: strikesBefore });
-  assert.deepEqual(resolved.timeoutStrikes, strikesBefore);
-  assert.equal(resolved.safePayload.strike, 0);
+  assert.deepEqual(resolved.timeoutStrikes, strikesBefore, "blocked timeout adds no strike");
+  assert.equal(resolved.safePayload.strike, 0, "safePayload.strike is 0 while blocked");
+  assert.notEqual(resolved.finishReason, "timeout");
   assert.notEqual(resolved.state.roundResult?.reason, "timeout_pass");
+  assert.ok(resolved.safePayload.autoPass || resolved.state.phase !== "playing");
   assert.ok(
     resolved.state.phase !== "playing" ||
       getAvailableActions(resolved.state).canPass ||
       getAvailableActions(resolved.state).canPlay ||
       getAvailableActions(resolved.state).canDraw
   );
-  console.log("  ✓ no legal move does not add a timeout strike");
+
+  // Repeated blocked turns must never escalate to strike 3 or a loss.
+  const stillBlocked = { ...resolved.state, currentPlayer: seat, phase: "playing", mustPlayTileId: null };
+  if (getAvailableActions(stillBlocked).canPlay === false) {
+    const again = applyTimeoutResolution(stillBlocked, { timeoutStrikes: resolved.timeoutStrikes });
+    assert.deepEqual(again.timeoutStrikes, strikesBefore, "repeated blocked turn adds no strike");
+    assert.notEqual(again.finishReason, "timeout", "repeated blocked turn cannot cause a loss");
+    assert.notEqual(again.state.phase, "matchOver");
+  }
+  console.log("  ✓ no legal tile timeout adds no strike; repeated blocked turns never reach strike 3");
+}
+
+{
+  // Blocked with a reserve available: draws automatically until a legal tile
+  // surfaces (or the reserve empties), and still adds no strike.
+  const { state } = deal("legacy");
+  const move = getAvailableActions(state).legalMoves[0];
+  const afterPlay = applyOnlineAction(state, {
+    seat: state.currentPlayer,
+    action: { type: "play", tileId: move.tileId, end: move.end },
+  }).state;
+  const seat = afterPlay.currentPlayer;
+  const ALL_TILES = [];
+  for (let i = 0; i <= 6; i += 1) {
+    for (let j = i; j <= 6; j += 1) ALL_TILES.push(`${i}-${j}`);
+  }
+  let blockedTile = null;
+  let matchTile = null;
+  for (const tileId of ALL_TILES) {
+    const trial = {
+      ...afterPlay,
+      mustPlayTileId: null,
+      players: afterPlay.players.map((player, index) =>
+        index === seat ? { ...player, hand: [tileId] } : player
+      ),
+    };
+    const canPlay = getAvailableActions(trial).canPlay;
+    if (!canPlay && !blockedTile) blockedTile = tileId;
+    if (canPlay && !matchTile) matchTile = tileId;
+    if (blockedTile && matchTile) break;
+  }
+  assert.ok(blockedTile && matchTile, "expected both a blocked and a matching tile");
+  const drawable = {
+    ...afterPlay,
+    mustPlayTileId: null,
+    reserve: [matchTile],
+    players: afterPlay.players.map((player, index) =>
+      index === seat ? { ...player, hand: [blockedTile] } : player
+    ),
+  };
+  assert.equal(getAvailableActions(drawable).canPlay, false);
+  assert.equal(getAvailableActions(drawable).canDraw, true);
+  const strikesBefore = [1, 1];
+  const resolved = applyTimeoutResolution(drawable, { timeoutStrikes: strikesBefore });
+  assert.deepEqual(resolved.timeoutStrikes, strikesBefore, "no strike while blocked, even with a reserve draw");
+  assert.equal(resolved.safePayload.strike, 0);
+  assert.equal(resolved.safePayload.autoDraw, 1);
+  assert.ok(resolved.safePayload.autoPlay, "drawn tile becomes playable and is auto-played");
+  assert.equal(resolved.state.roundResult?.reason, "timeout_auto");
+  console.log("  ✓ blocked with reserve available draws automatically; no unfair strike");
 }
 
 {
@@ -513,7 +596,7 @@ function view(state, seat, version = 0) {
 
   const resolved = applyTimeoutResolution(lockedOnWaiter, { timeoutStrikes: [0, 0] });
   assert.equal(resolved.state.mustPlayTileId, null);
-  assert.notEqual(resolved.state.roundResult?.reason, "timeout_pass");
+  assert.equal(resolved.timeoutStrikes[other], 0, "locked-open timeout with no legal action adds no strike");
   const after = getAvailableActions(resolved.state);
   assert.ok(
     resolved.state.phase !== "playing" || after.canPlay || after.canDraw || after.canPass,
@@ -524,6 +607,7 @@ function view(state, seat, version = 0) {
   const second = applyTimeoutResolution(resolved.state, { timeoutStrikes: resolved.timeoutStrikes });
   assert.ok(
     second.state.roundResult?.reason === "timeout_pass" ||
+      second.state.roundResult?.reason === "timeout_auto" ||
       second.state.phase !== "playing" ||
       getAvailableActions(second.state).canPlay,
     "locked-open timeout cannot ping-pong a dead opener lock"
@@ -561,12 +645,13 @@ function view(state, seat, version = 0) {
     players: afterPlay.players.map((player) => ({ ...player, hand: [deadTile] })),
   };
   const resolved = applyTimeoutResolution(blockedTable, { timeoutStrikes: [0, 0] });
-  assert.equal(resolved.safePayload.strike, 0);
-  assert.notEqual(resolved.state.roundResult?.reason, "timeout_pass");
+  assert.equal(resolved.safePayload.strike, 0, "true blocked position adds no strike");
+  assert.deepEqual(resolved.timeoutStrikes, [0, 0]);
+  assert.ok(resolved.safePayload.autoPass || resolved.state.phase !== "playing");
   assert.ok(
     resolved.state.phase === "roundOver" ||
       resolved.state.phase === "matchOver" ||
-      getAvailableActions(resolved.state).canPass,
+      resolved.safePayload.autoPass,
     "true blocked timeout uses pass/round-end, not skip ping-pong"
   );
   console.log("  ✓ true blocked position still resolves normally");

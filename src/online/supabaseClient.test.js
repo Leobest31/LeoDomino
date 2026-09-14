@@ -39,6 +39,8 @@ const liveImports = [
   "src/main.jsx",
   "src/App.jsx",
   "src/pages/HomePage.jsx",
+  "src/pages/LeoPipsAuthenticatedHome.jsx",
+  "src/pages/LeoPipsAuthenticatedStake.jsx",
   "src/pages/AuthPage.jsx",
   "src/pages/GamePage.jsx",
   "src/pages/FindMatchPage.jsx",

@@ -19,7 +19,7 @@ const homeHook = read("hooks/usePublicChallengeSchedule.js");
 const style = read("pages/GameStylePage.jsx");
 const page = read("pages/GamePage.jsx");
 
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game" \| "admin" \| "challenge"/, "App phases are Home-first");
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "leopipsStake" \| "findMatch" \| "friends" \| "chat" \| "game" \| "admin" \| "challenge"/, "App phases are Home-first");
 assert.doesNotMatch(app, /GameSetupPage/, "obsolete Setup is not the live hub");
 assert.match(app, /setPhase\("home"\)/, "splash and Main Menu return to Home");
 assert.match(app, /onPlayVsLeoBest=\{\(\) => setPhase\("gameStyle"\)\}/, "Play vs LeoBest opens Game Style");
@@ -28,7 +28,7 @@ assert.match(app, /onPlayVsLeoBest=\{\(\) => setPhase\("gameStyle"\)\}/, "Play v
   const styleEnd = app.indexOf("/>", styleStart) + 2;
   const styleMount = app.slice(styleStart, styleEnd);
   assert.match(styleMount, /onPlay=\{handlePlay\}/, "Game Style Play starts the match");
-  const homeStart = app.indexOf("<HomePage");
+  const homeStart = app.indexOf("<LeoPipsAuthenticatedHome");
   const homeEnd = app.indexOf("/>", homeStart) + 2;
   const homeMount = app.slice(homeStart, homeEnd);
   assert.doesNotMatch(homeMount, /handlePlay/, "Home does not start a match directly");
@@ -53,7 +53,7 @@ assert.match(home, /data-home-nav-item="menu"/, "Menu is a bottom-nav destinatio
 assert.match(home, /handlePlayOnline/, "Play Online has a dedicated Find Match handler");
 assert.match(home, /useFindMatchAvailability/, "Home Find Match light uses live availability");
 assert.match(home, /data-find-match-available/, "Home Find Match button has an availability light");
-assert.match(app, /onFindMatch=\{\(\) => setPhase\("findMatch"\)\}/, "Find Match opens matchmaking");
+assert.match(app, /onFindMatch=\{\(\) => setPhase\("leopipsStake"\)\}/, "Find Match opens LeoPips stake then existing matchmaking");
 assert.match(app, /<FindMatchPage/, "Find Match page is mounted");
 assert.match(home, /ProfilePanel/, "Home opens player profile from the avatar");
 assert.match(home, /openProfile/, "signed-in avatar opens Profile");
@@ -78,7 +78,9 @@ assert.match(app, /deletionPending/, "pending Auth deletion is a blocked playabl
   const config = read("i18n/config.js");
   assert.doesNotMatch(authPage, /closeAuth/, "logged-out users cannot dismiss Login onto Home");
   assert.match(authPage, /auth__forgot/, "forgot-password copy is visible");
-  assert.doesNotMatch(authPage, /resetPassword|forgotPassword\(/, "forgot password does not pretend to work");
+  assert.match(authPage, /openForgot|requestPasswordReset/, "forgot password opens a real reset flow");
+  assert.match(authPage, /auth\.forgotSent/, "forgot password uses non-enumerating success copy");
+  assert.match(authPage, /authView === "reset"|data-auth-mode=\{authMode\}/, "Set New Password mode exists");
   assert.match(authPage, /PASSWORD_MIN_LENGTH/, "password rules use the current length requirement");
   assert.match(authPage, /LanguageSwitcher/, "Login uses the existing language selector");
   assert.match(authPage, /authEarthNight/, "Login uses the realistic night Earth asset");
@@ -101,7 +103,7 @@ assert.match(app, /deletionPending/, "pending Auth deletion is a blocked playabl
   assert.match(provider, /setAuthView\("login"\)/, "logout returns immediately to Login");
   assert.match(config, /FIRST_LAUNCH_LOCALE = "en"/, "first-ever launch defaults to English");
 }
-assert.match(app, /"intro" \| "home" \| "gameStyle" \| "findMatch" \| "friends" \| "chat" \| "game"/, "App phases stay Home-first");
+assert.match(app, /"intro" \| "home" \| "gameStyle" \| "leopipsStake" \| "findMatch" \| "friends" \| "chat" \| "game"/, "App phases stay Home-first");
 assert.match(home, /id="online"/, "Find Match card exists");
 assert.match(home, /data-home-cta="liveChat"/, "Home has a Live Chat entry");
 assert.match(home, /data-home-cta="notifications"/, "Home bell opens notifications");

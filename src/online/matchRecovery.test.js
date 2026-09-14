@@ -123,13 +123,13 @@ beginCase();
   );
   assert.equal(
     shouldPromoteAcceptedToMatchReady({ status: "open" }, LIVE),
-    false,
-    "E. open request stays waiting until accepted"
+    true,
+    "J. occupancy wins over stale own.status === open"
   );
   assert.equal(
-    shouldPromoteAcceptedToMatchReady({ status: "accepted" }, null),
+    shouldPromoteAcceptedToMatchReady({ status: "cancelled" }, LIVE),
     false,
-    "E. accepted without occupancy does not invent Match Ready"
+    "cancelled own does not promote"
   );
 }
 
@@ -139,15 +139,21 @@ beginCase();
     occupancyUnknown: false,
     occupancyMatch: null,
     lastKnown: null,
-    acceptedMatchId: "m-stale-ready",
+    acceptedMatchId: LIVE.id,
     hydratedAcceptedMatch: LIVE,
   });
-  assert.equal(occupancyNone.kind, "clear", "G. occupancy-none still prevents stale Match Ready recovery");
-  assert.equal(occupancyNone.source, "occupancy_none");
+  assert.equal(occupancyNone.kind, "resume", "creator race: accepted hydrate resumes when occupancy lags");
+  assert.equal(occupancyNone.source, "accepted_hydrate");
+  assert.equal(occupancyNone.match?.id, LIVE.id);
+  assert.equal(
+    shouldPromoteAcceptedToMatchReady({ status: "accepted", matchId: LIVE.id }, LIVE),
+    true,
+    "accepted + resumable hydrate promotes Match Ready"
+  );
   assert.equal(
     shouldPromoteAcceptedToMatchReady({ status: "accepted", matchId: LIVE.id }, null),
     false,
-    "G. occupancy-none must not promote leftover accepted rows"
+    "accepted without resumable hydrate does not invent Match Ready"
   );
 }
 
@@ -198,8 +204,11 @@ beginCase();
     acceptedMatchId: "m-old",
     hydratedAcceptedMatch: { id: "m-old", status: "playing" },
   });
-  assert.equal(afterTerminal.kind, "clear", "8. after terminal occupancy, Find Match is not Match Ready");
-  assert.equal(afterTerminal.match, null);
+  // Occupancy cleared but hydrate still looks playable: keep Match Ready for the
+  // accepted id (creator seat lag). Terminal rows fail canRecoverMatch separately.
+  assert.equal(afterTerminal.kind, "resume", "8. accepted hydrate keeps the same match when seats lag");
+  assert.equal(afterTerminal.source, "accepted_hydrate");
+  assert.equal(afterTerminal.match?.id, "m-old");
   assert.equal(isNotedTerminalMatch("m-old"), false, "8. occupancy-none does not invent a terminal note");
   assert.equal(
     isActiveMatchLockError(new MatchmakingError("PLAYER_BUSY")),
@@ -325,7 +334,7 @@ beginCase();
 }
 
 {
-  assert.equal(TURN_TIMEOUT_MS, 60_000, "17. 60-second turn timeout unchanged");
+  assert.equal(TURN_TIMEOUT_MS, 30_000, "17. 30-second turn timeout");
   assert.equal(JOIN_GRACE_MS, 3 * 60 * 1000, "18. 3-minute join timeout unchanged");
 }
 
@@ -343,6 +352,7 @@ beginCase();
   const hook = read("hooks/useActiveOnlineMatch.js");
   const matchHook = read("hooks/useOnlineMatch.js");
   const home = read("pages/HomePage.jsx");
+  const liveHome = read("pages/LeoPipsAuthenticatedHome.jsx");
   const invites = read("hooks/useFriendMatchInvites.js");
   const matchmaking = read("online/matchmaking.js");
 
@@ -375,6 +385,7 @@ beginCase();
   assert.match(matchHook, /clearOnlineSession\(\)/);
 
   assert.match(home, /canRecoverMatch\(activeOnlineMatch\)/);
+  assert.match(liveHome, /canRecoverMatch\(activeOnlineMatch\)/);
   assert.match(invites, /canRecoverMatch\(match\)/);
   assert.match(matchmaking, /isMissingActiveMatchRow/);
   assert.match(matchmaking, /isImmediateInfrastructureOutage\(error\)/);

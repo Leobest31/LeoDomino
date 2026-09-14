@@ -14,6 +14,7 @@ import {
   IconUserPlus,
 } from "../components/Icon";
 import { AUTH_ERROR, DEFAULT_AVATAR_ID, PASSWORD_MIN_LENGTH, isCloudAuth, useAuth } from "../auth";
+import { passwordResetRedirectTo } from "../auth/passwordRecovery.js";
 import { PLAYER_AVATARS } from "../auth/avatars.media.js";
 import CountryPicker from "../components/CountryPicker";
 import { authEarthNight, authLeoEmblem } from "../assets";
@@ -50,6 +51,10 @@ function errorKey(code) {
       return "auth.errorCredentials";
     case AUTH_ERROR.CRYPTO:
       return "auth.errorCrypto";
+    case AUTH_ERROR.RECOVERY_INVALID:
+      return "auth.errorRecoveryInvalid";
+    case AUTH_ERROR.RESET_UNAVAILABLE:
+      return "auth.errorResetUnavailable";
     default:
       return "auth.errorGeneric";
   }
@@ -75,30 +80,58 @@ function FieldIcon({ name }) {
 function AuthPage() {
   const { t } = useI18n();
   const { play, unlock } = useAudio();
-  const { authView, busy, createAccount, login, openCreate, openLogin } = useAuth();
+  const {
+    authView,
+    busy,
+    createAccount,
+    login,
+    openCreate,
+    openLogin,
+    openForgot,
+    requestPasswordReset,
+    updatePassword,
+  } = useAuth();
   const isCreate = authView === "create";
+  const isForgot = authView === "forgot";
+  const isReset = authView === "reset";
   const [values, setValues] = useState(EMPTY);
   const [fieldError, setFieldError] = useState({});
   const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
   const [reveal, setReveal] = useState({ password: false, confirmPassword: false });
 
   useEffect(() => {
     setValues(EMPTY);
     setFieldError({});
     setFormError("");
+    setFormSuccess("");
     setReveal({ password: false, confirmPassword: false });
     document.querySelector("[data-auth='true']")?.scrollTo(0, 0);
   }, [authView]);
 
-  const title = isCreate ? t("auth.createTitle") : t("auth.loginTitle");
-  const subtitle = isCreate ? t("auth.subtitleCreate") : t("auth.subtitleLogin");
+  const title = isReset
+    ? t("auth.resetTitle")
+    : isForgot
+      ? t("auth.forgotTitle")
+      : isCreate
+        ? t("auth.createTitle")
+        : t("auth.loginTitle");
+  const subtitle = isReset
+    ? t("auth.subtitleReset")
+    : isForgot
+      ? t("auth.subtitleForgot")
+      : isCreate
+        ? t("auth.subtitleCreate")
+        : t("auth.subtitleLogin");
   const ruleLengthMet = values.password.length >= PASSWORD_MIN_LENGTH;
   const ruleMixMet = /[A-Za-z]/.test(values.password) && /\d/.test(values.password);
+  const authMode = isReset ? "reset" : isForgot ? "forgot" : isCreate ? "create" : "login";
 
   const setField = (name, value) => {
     setValues((prev) => ({ ...prev, [name]: value }));
     setFieldError((prev) => ({ ...prev, [name]: "" }));
     setFormError("");
+    setFormSuccess("");
   };
 
   const applyError = (error) => {
@@ -116,7 +149,18 @@ function AuthPage() {
     unlock();
     play("button");
     setFormError("");
+    setFormSuccess("");
     try {
+      if (isForgot) {
+        await requestPasswordReset(values.email);
+        setFormSuccess("auth.forgotSent");
+        return;
+      }
+      if (isReset) {
+        await updatePassword(values.password, values.confirmPassword);
+        setFormSuccess("auth.resetSuccess");
+        return;
+      }
       if (isCreate) {
         await createAccount(values);
       } else {
@@ -137,7 +181,31 @@ function AuthPage() {
     openLogin();
   };
 
+  const goForgot = () => {
+    play("button");
+    openForgot();
+  };
+
   const fields = useMemo(() => {
+    if (isForgot) {
+      return [{ name: "email", type: "email", autoComplete: "email", label: t("auth.email") }];
+    }
+    if (isReset) {
+      return [
+        {
+          name: "password",
+          type: "password",
+          autoComplete: "new-password",
+          label: t("auth.newPassword"),
+        },
+        {
+          name: "confirmPassword",
+          type: "password",
+          autoComplete: "new-password",
+          label: t("auth.confirmPassword"),
+        },
+      ];
+    }
     const list = [
       { name: "email", type: "email", autoComplete: "email", label: t("auth.email") },
     ];
@@ -162,10 +230,10 @@ function AuthPage() {
       });
     }
     return list;
-  }, [isCreate, t]);
+  }, [isCreate, isForgot, isReset, t]);
 
   return (
-    <div className="auth" data-auth="true" data-auth-mode={isCreate ? "create" : "login"}>
+    <div className="auth" data-auth="true" data-auth-mode={authMode}>
       <div className="auth__shell">
         <div className="auth__frame">
           <div className="auth__atmosphere" aria-hidden="true">
@@ -186,7 +254,18 @@ function AuthPage() {
                 draggable={false}
               />
             </div>
-            <main className="auth__card" aria-label={isCreate ? t("auth.ariaCreate") : t("auth.ariaLogin")}>
+            <main
+              className="auth__card"
+              aria-label={
+                isReset
+                  ? t("auth.ariaReset")
+                  : isForgot
+                    ? t("auth.ariaForgot")
+                    : isCreate
+                      ? t("auth.ariaCreate")
+                      : t("auth.ariaLogin")
+              }
+            >
               <h1 className="auth__title">{title}</h1>
               <p className="auth__lead">{subtitle}</p>
               <div className="auth__mark" aria-hidden="true">
@@ -321,7 +400,7 @@ function AuthPage() {
                     </Fragment>
                   );
                 })}
-                {isCreate ? (
+                {isCreate || isReset ? (
                   <ul className="auth__rules" aria-label={t("auth.passwordRules")}>
                     <li className={`auth__rule${ruleLengthMet ? " is-met" : ""}`}>
                       <span className="auth__check" aria-hidden="true" />
@@ -332,38 +411,78 @@ function AuthPage() {
                       <span>{t("auth.ruleLetterNumber")}</span>
                     </li>
                   </ul>
-                ) : (
-                  <p className="auth__forgot" aria-disabled="true">
+                ) : null}
+                {!isCreate && !isForgot && !isReset ? (
+                  <button type="button" className="auth__forgot" onClick={goForgot}>
                     {t("auth.forgot")}
+                  </button>
+                ) : null}
+                {formSuccess ? (
+                  <p
+                    className="auth__success"
+                    role="status"
+                    data-auth-reset-redirect={
+                      isForgot ? passwordResetRedirectTo() : undefined
+                    }
+                  >
+                    {t(formSuccess)}
                   </p>
-                )}
+                ) : null}
                 {formError ? (
                   <p className="auth__error auth__error--form" role="alert">
                     {t(errorKey(formError))}
                   </p>
                 ) : null}
-                <button type="submit" className="auth__submit" disabled={busy}>
-                  {isCreate ? t("auth.createCta") : t("auth.loginCta")}
-                </button>
+                {isReset && formSuccess ? (
+                  <button type="button" className="auth__submit" onClick={goLogin}>
+                    {t("auth.returnToLogin")}
+                  </button>
+                ) : (
+                  <button type="submit" className="auth__submit" disabled={busy}>
+                    {isReset
+                      ? t("auth.resetCta")
+                      : isForgot
+                        ? t("auth.forgotCta")
+                        : isCreate
+                          ? t("auth.createCta")
+                          : t("auth.loginCta")}
+                  </button>
+                )}
               </form>
-              <div className="auth__divider">
-                <span className="auth__divider-line" aria-hidden="true" />
-                <span className="auth__divider-text">{t("auth.divider")}</span>
-                <span className="auth__divider-line" aria-hidden="true" />
-              </div>
-              {isCreate ? (
+              {isForgot || (isReset && formSuccess) ? (
                 <p className="auth__switch">
-                  <span>{t("auth.haveAccount")}</span>
-                  {" "}
                   <button type="button" className="auth__link" onClick={goLogin}>
-                    {t("auth.switchToLogin")}
+                    {t("auth.returnToLogin")}
                   </button>
                 </p>
               ) : (
-                <button type="button" className="auth__secondary" onClick={goCreate}>
-                  <IconUserPlus className="auth__cta-icon" />
-                  <span>{t("auth.createCta")}</span>
-                </button>
+                <>
+                  <div className="auth__divider">
+                    <span className="auth__divider-line" aria-hidden="true" />
+                    <span className="auth__divider-text">{t("auth.divider")}</span>
+                    <span className="auth__divider-line" aria-hidden="true" />
+                  </div>
+                  {isCreate ? (
+                    <p className="auth__switch">
+                      <span>{t("auth.haveAccount")}</span>
+                      {" "}
+                      <button type="button" className="auth__link" onClick={goLogin}>
+                        {t("auth.switchToLogin")}
+                      </button>
+                    </p>
+                  ) : isReset ? (
+                    <p className="auth__switch">
+                      <button type="button" className="auth__link" onClick={goLogin}>
+                        {t("auth.returnToLogin")}
+                      </button>
+                    </p>
+                  ) : (
+                    <button type="button" className="auth__secondary" onClick={goCreate}>
+                      <IconUserPlus className="auth__cta-icon" />
+                      <span>{t("auth.createCta")}</span>
+                    </button>
+                  )}
+                </>
               )}
               <p className="auth__secure">
                 <IconShield className="auth__secure-icon" />

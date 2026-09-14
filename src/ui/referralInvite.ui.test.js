@@ -11,6 +11,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(root, rel), "utf8");
 
 const home = read("pages/HomePage.jsx");
+const liveHome = read("pages/LeoPipsAuthenticatedHome.jsx");
 const profile = read("components/ProfilePanel.jsx");
 const app = read("App.jsx");
 const main = read("main.jsx");
@@ -25,6 +26,10 @@ assert.match(home, /useReferralInvite/);
 assert.match(home, /id="friend"/);
 assert.match(home, /onPress=\{showComingSoon\}/);
 assert.doesNotMatch(home, /id="friend"[\s\S]{0,200}inviteFriends/);
+
+assert.match(liveHome, /useReferralInvite/);
+assert.match(liveHome, /referral\.inviteFriends/);
+assert.doesNotMatch(liveHome, /_leopips_credit_referral_reward/);
 
 assert.match(profile, /data-referral="true"/);
 assert.match(profile, /data-referral-code="true"/);
@@ -49,13 +54,35 @@ assert.match(home, /referral\.noticeNonce/);
 assert.match(home, /void referral\.inviteFriends\(\)/);
 assert.match(home, /referral\.noticeNonce > 0/);
 assert.match(referrals, /VITE_PUBLIC_APP_URL/);
+assert.match(referrals, /TESTERS_PUBLIC_APP_ORIGIN|leodomino-testers\.vercel\.app/);
+assert.match(referrals, /isEphemeralShareHost/);
 assert.match(referrals, /apply_referral_code/);
 assert.match(referrals, /AbortError/);
 assert.match(referrals, /execCommand/);
 assert.match(referrals, /globalThis\.location/);
 assert.match(referrals, /canShare/);
-assert.doesNotMatch(referrals, /trycloudflare/i);
+assert.match(referrals, /trycloudflare\.com/);
+assert.doesNotMatch(referrals, /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
 assert.doesNotMatch(referrals, /SERVICE_ROLE|service_role/i);
+
+const vercel = read("../vercel.json");
+assert.match(vercel, /destination": "\/index\.html"/);
+assert.match(vercel, /privacy/);
+assert.match(vercel, /terms/);
+assert.match(vercel, /support/);
+
+// Live anonymous deep-link probe (routing only; no auth/DB).
+{
+  const base = "https://leodomino-testers.vercel.app";
+  const paths = ["/", "/invite", "/invite?ref=ABCD2345"];
+  for (const path of paths) {
+    const res = await fetch(`${base}${path}`, { redirect: "manual" });
+    assert.equal(res.status, 200, `${path} must not 404`);
+    const html = await res.text();
+    assert.match(html, /assets\/index-[A-Za-z0-9_-]+\.js/, `${path} must serve SPA shell`);
+    assert.doesNotMatch(html, /NOT_FOUND|Log in to Vercel/i);
+  }
+}
 assert.doesNotMatch(en, /trycloudflare/i);
 assert.match(en, /shareText: "Play LeoDomino with me!"/);
 assert.match(en, /inviteFriends: "Invite Friends"/);

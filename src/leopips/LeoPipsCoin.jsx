@@ -2,7 +2,7 @@ import { leoPipsCoinSrc } from "./leopipsAssets.js";
 import "./LeoPipsCoin.css";
 
 /**
- * Isolated LeoPips medallion. Not mounted by the live App.
+ * LeoPips medallion. Used by isolated preview and the live victory overlay.
  */
 function LeoPipsCoin({
   stake = 100,

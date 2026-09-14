@@ -1,23 +1,25 @@
 /**
  * LeoPips economy — isolated from live Global RP / Find Match.
  *
- * Do NOT import this from App.jsx, FindMatchPage, OnlineGamePage, or
- * matchmaking.js until an explicit owner switch of the live Play Online path.
+ * FindMatchPage, OnlineGamePage, and matchmaking.js must not import this.
+ * Authenticated testers may use the stake UI; stake values stay local until
+ * the owner activates hosted LeoPips settlement.
  *
  * Hosted SQL, Edge, and the testers URL stay on the current Elo RP online flow.
  *
- * Settlement (local spec only — no hosted ledger yet):
- *   Normal: both stake S. Pot = 2S. Winner receives 2S (net +S). Loser -S.
- *   Abandon: abandoner -S. Opponent receives S back + S/2 (net +S/2).
- *            House retains S/2 of the abandoner's stake. Do not 50/50 the pot.
+ * Settlement (local helpers mirror authoritative hosted SQL):
+ *   Normal completed: winner receives pot 2S; loser +0; house 0.
+ *   Forfeit / abandon / timeout-win: winner +1.5S; loser +0; house retains 0.5S.
+ *   These helpers never debit wallets — server settlement is authoritative.
  *
- * Timeout (30s, local constants only — no hosted deductions yet):
+ * Timeout (30s):
  *   Strike 1: auto-play, -5 LeoPips.
  *   Strike 2: auto-play, another -5 (cumulative -10).
  *   Strike 3: match loss. Do NOT deduct a third -5.
  *
  * Referral (UI/architecture only — do not change hosted Invite & Win):
- *   Later: +100 LeoPips per validated referral (new player + one real match).
+ *   +100 LeoPips to the inviter after 3 qualifying completed online matches.
+ *   Friend-match counting is an owner decision and is not invented here.
  */
 
 export const LEOPIPS_CURRENCY = "LEOPIPS";
@@ -45,6 +47,9 @@ export const LEOPIPS_BIG_WIN_PAYOUT = 300;
 
 /** Planned credit per validated referral. Hosted Invite & Win is unchanged. */
 export const LEOPIPS_REFERRAL_REWARD = 100;
+
+/** Required completed qualifying online matches before +100. Not the Invite & Win 10-match prize. */
+export const LEOPIPS_REFERRAL_QUALIFYING_MATCHES = 3;
 
 /** Isolated Home preview only. Promotional USD prize — not a LeoPips amount. */
 export const LEOPIPS_TOP_REFERRAL_USD = 63;
@@ -171,6 +176,11 @@ export function canEnterLeoPipsFindMatch(availableBalance) {
   return canAffordLeoPipsStake(availableBalance, LEOPIPS_MIN_FIND_MATCH_STAKE);
 }
 
+/** UI gating only. Does not debit or change matchmaking. */
+export function leoPipsEnabledStakes(availableBalance) {
+  return LEOPIPS_STAKE_TIERS.filter((stake) => canAffordLeoPipsStake(availableBalance, stake));
+}
+
 export function isLeoPipsBigWin(payout) {
   return Number(payout) >= LEOPIPS_BIG_WIN_PAYOUT;
 }
@@ -214,51 +224,51 @@ export function settleLeoPipsNormalWin(stake) {
 }
 
 /**
- * Voluntary abandon of an active match.
- * Abandoner loses full stake S.
- * Opponent receives own S back + 50% of abandoner's S (total 1.5S, net +S/2).
- * House retains 50% of the abandoner's stake (S/2).
- * Do not 50/50 the whole pot.
+ * Authoritative loss after gameplay start and successful debit:
+ * forfeit, abandon, or third-timeout match loss.
+ * Winner/opponent +1.5S; abandoner/loser +0; house retains 0.5S.
+ * Local/sim/display only — does not override server settlement.
  */
 export function settleLeoPipsAbandon(stake) {
   const s = Number(stake);
   if (!isAllowedLeoPipsStake(s)) {
     throw new Error("invalid LeoPips stake");
   }
-  const abandonShare = s / 2;
+  const pot = leoPipsPot(s);
+  const winnerPayout = (s * 3) / 2;
+  const houseRetention = s / 2;
   return {
-    kind: "abandon",
+    kind: "authoritative_loss",
     stake: s,
-    pot: leoPipsPot(s),
+    pot,
+    winnerPayout,
+    winnerNet: winnerPayout - s,
+    loserNet: -s,
+    loserRefund: 0,
     abandonerNet: -s,
-    opponentPayout: s + abandonShare,
-    opponentNet: abandonShare,
-    houseRetention: abandonShare,
+    opponentPayout: winnerPayout,
+    opponentNet: winnerPayout - s,
+    houseRetention,
+    bigWin: winnerPayout >= LEOPIPS_BIG_WIN_PAYOUT,
+    authoritative: true,
+    ownerDecisionRequired: false,
   };
 }
 
 /**
  * Per 30s turn-timeout auto-play: -5 LeoPips on strikes 1 and 2.
  * Strike 3 is match loss and must not call this for a third deduction.
- * Floor when available < 5 is an owner decision.
+ * Authoritative timeout penalties apply even when balance is below 5.
  */
 export function settleLeoPipsTimeoutPenalty(availableBalance) {
-  const balance = clampLeoPipsBalance(availableBalance);
-  if (balance < LEOPIPS_TIMEOUT_PENALTY) {
-    return {
-      kind: "timeout_penalty",
-      amount: LEOPIPS_TIMEOUT_PENALTY,
-      applied: false,
-      reason: "insufficient_balance_floor_unresolved",
-      nextBalance: balance,
-    };
-  }
+  const balance = Number(availableBalance);
+  const current = Number.isFinite(balance) ? balance : 0;
   return {
     kind: "timeout_penalty",
     amount: LEOPIPS_TIMEOUT_PENALTY,
     applied: true,
     reason: null,
-    nextBalance: balance - LEOPIPS_TIMEOUT_PENALTY,
+    nextBalance: current - LEOPIPS_TIMEOUT_PENALTY,
   };
 }
 
@@ -272,7 +282,7 @@ export function settleLeoPipsTimeoutStrike(strike, availableBalance) {
       applied: false,
       matchLoss: true,
       cumulative: leoPipsCumulativeTimeoutPenalty(LEOPIPS_TIMEOUT_PENALTY_STRIKES.length),
-      nextBalance: clampLeoPipsBalance(availableBalance),
+      nextBalance: Number.isFinite(Number(availableBalance)) ? Number(availableBalance) : 0,
     };
   }
   const penalty = settleLeoPipsTimeoutPenalty(availableBalance);

@@ -13,6 +13,7 @@ import {
   homeIconMenuNav,
   homeIconShield,
   homeIconTrophy,
+  homeLeoBestLion,
   homeLock3d,
   homeNavPlayGlow,
   homeOnlineDot,
@@ -35,15 +36,51 @@ import {
   clampLeoPipsBalance,
   formatLeoPipsAmount,
 } from "./leopipsEconomy.js";
+import { progressionWinProgress } from "./leopipsProgress.js";
+import { leoPipsHomeLevelSubText } from "./leoPipsHomeLevelSubText.js";
 import "../pages/HomePage.css";
 import "./LeoPipsHomePage.css";
 
+function walletLabel(isolated, walletStatus, balance) {
+  if (isolated) return formatLeoPipsAmount(clampLeoPipsBalance(balance));
+  if (walletStatus === "loading") return LEOPIPS_COPY.walletLoading;
+  if (walletStatus === "ready") return formatLeoPipsAmount(clampLeoPipsBalance(balance));
+  return LEOPIPS_COPY.walletUnavailable;
+}
+
 /**
- * Isolated LeoPips Home preview. Reuses the live Home visual standard.
- * Not imported by App.jsx or the real HomePage.
+ * LeoPips Home visual. Isolated preview by default.
+ * Authenticated tester App supplies live callbacks and a server wallet.
  */
-function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
-  const available = clampLeoPipsBalance(balance);
+function LeoPipsHomePage({
+  isolated = true,
+  balance = 0,
+  walletStatus = "ready",
+  level = null,
+  lifetimeXp = null,
+  qualifyingWins = null,
+  progressionRank = null,
+  avatarSrc,
+  inboxBadge,
+  chatBadge,
+  canResume = false,
+  resumeLabel = LEOPIPS_COPY.resumeMatch,
+  findMatchLabel = LEOPIPS_COPY.findMatch,
+  onPlayOnline,
+  onPlayVsLeoBest,
+  onFriends,
+  onChat,
+  onNotifications,
+  onProfile,
+  onSettings,
+  onChallenge,
+  onInviteFriends,
+  onNavPlay,
+  onResume,
+  onOpenStore,
+  statusNotice = "",
+}) {
+  const availableLabel = walletLabel(isolated, walletStatus, balance);
   const [notice, setNotice] = useState("");
   const homeRef = useRef(null);
 
@@ -70,12 +107,48 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
   }, []);
 
   useEffect(() => {
+    if (statusNotice) setNotice(statusNotice);
+  }, [statusNotice]);
+
+  useEffect(() => {
     if (!notice) return undefined;
     const timer = window.setTimeout(() => setNotice(""), 2200);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const previewOnly = () => setNotice(LEOPIPS_COPY.previewNotice);
+  const fallbackNotice = isolated ? LEOPIPS_COPY.previewNotice : LEOPIPS_COPY.comingSoonNotice;
+  const previewOnly = () => setNotice(fallbackNotice);
+  const run = (fn) => {
+    if (typeof fn === "function") fn();
+    else previewOnly();
+  };
+
+  const bellBadge = isolated ? "3" : inboxBadge;
+  const chatCount = isolated ? "" : chatBadge;
+  const avatar = avatarSrc || homeAvatarLion;
+  const showResume = Boolean(!isolated && canResume && onResume);
+  const liveWins = qualifyingWins == null ? 0 : Number(qualifyingWins) || 0;
+  const liveProgress = progressionWinProgress(
+    isolated ? LEOPIPS_HOME_PREVIEW.level * 10 : liveWins
+  );
+  const liveLevel = isolated
+    ? LEOPIPS_HOME_PREVIEW.level
+    : level == null
+      ? liveProgress.level
+      : Number(level) || 0;
+  const liveRank = isolated ? null : progressionRank || liveProgress.rank;
+  const liveXp = isolated
+    ? LEOPIPS_HOME_PREVIEW.xp
+    : lifetimeXp == null
+      ? 0
+      : Number(lifetimeXp) || 0;
+  const levelText = `LVL ${liveLevel}`;
+  const xpText = formatLeoPipsAmount(liveXp);
+  const winFill = liveProgress.maxed ? 100 : liveProgress.fillPercent;
+  const divisionText = isolated ? LEOPIPS_HOME_PREVIEW.division : LEOPIPS_COPY.progressComingSoon;
+  const seasonText = isolated ? LEOPIPS_COPY.seasonN : LEOPIPS_COPY.progressComingSoon;
+  const leagueFill = isolated ? LEOPIPS_HOME_PREVIEW.leagueFill : 0;
+  const leaguePct = isolated ? `${LEOPIPS_HOME_PREVIEW.leagueFill}%` : LEOPIPS_COPY.progressPending;
 
   return (
     <main
@@ -83,7 +156,7 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
       className="home leopips-home"
       data-home="true"
       data-leopips-home="true"
-      data-leopips-isolated="true"
+      data-leopips-isolated={isolated ? "true" : "false"}
       aria-label={LEOPIPS_COPY.homeAria}
     >
       <div className="home__atmosphere" aria-hidden="true">
@@ -96,7 +169,7 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
           <button
             type="button"
             className="home__menu-btn"
-            onClick={previewOnly}
+            onClick={() => run(onSettings)}
             aria-label={LEOPIPS_COPY.settings}
           >
             <HomeGlyph src={homeIconMenu} size={36} />
@@ -117,40 +190,56 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
             <button
               type="button"
               className="home__icon-btn"
-              onClick={previewOnly}
+              data-home-cta="liveChat"
+              onClick={() => run(onChat)}
               aria-label={LEOPIPS_COPY.liveChat}
             >
               <IconChat className="home__chat-glyph" />
+              {chatCount ? (
+                <span className="home__badge" data-home-chat-badge="true">
+                  {chatCount}
+                </span>
+              ) : null}
             </button>
             <button
               type="button"
               className="home__icon-btn"
-              onClick={previewOnly}
+              data-home-cta="notifications"
+              onClick={() => run(onNotifications)}
               aria-label={LEOPIPS_COPY.notifications}
             >
               <span className="home__bell-glyph">
                 <HomeGlyph src={homeIconBell} size={18} />
               </span>
-              <span className="home__badge">3</span>
+              {bellBadge ? (
+                <span className="home__badge" data-home-badge="true">
+                  {bellBadge}
+                </span>
+              ) : null}
             </button>
             <button
               type="button"
               className="home__avatar-btn"
-              onClick={previewOnly}
+              data-home-cta="account"
+              onClick={() => run(onProfile)}
               aria-label={LEOPIPS_COPY.profile}
             >
-              <img className="home__avatar-img" src={homeAvatarLion} alt="" draggable={false} />
+              <img className="home__avatar-img" src={avatar} alt="" draggable={false} />
               <img className="home__online-dot" src={homeOnlineDot} alt="" aria-hidden="true" draggable={false} />
             </button>
           </div>
         </header>
 
         <section className="home__status" aria-label={LEOPIPS_COPY.statusAria}>
-          <div className="home__stat home__stat--pill home__stat--pips" data-leopips-home-wallet="true">
+          <div
+            className="home__stat home__stat--pill home__stat--pips"
+            data-leopips-home-wallet="true"
+            data-leopips-wallet-status={isolated ? "preview" : walletStatus}
+          >
             <LeoPipsCoin stake={100} size={24} className="leopips-home__wallet-coin" />
             <div className="home__stat-copy">
               <span className="home__stat-next">{LEOPIPS_COPY.currency}</span>
-              <span className="home__stat-value">{formatLeoPipsAmount(available)}</span>
+              <span className="home__stat-value">{availableLabel}</span>
             </div>
             <button
               type="button"
@@ -162,22 +251,70 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
               +
             </button>
           </div>
-          <div className="home__stat home__stat--level" data-leopips-home-level="true">
-            <span className="home__stat-row">
-              <span className="home__stat-glyph home__stat-glyph--14">
-                <HomeGlyph src={homeIconShield} size={14} />
+          <div
+            className="home__stat home__stat--level leopips-home__rank-card"
+            data-leopips-home-level="true"
+            data-leopips-level-fixture={isolated ? "true" : "false"}
+            data-progression-level={liveLevel}
+            data-progression-rank={liveRank || "none"}
+            data-progression-xp={liveXp}
+            aria-label={levelText}
+          >
+            <span className="leopips-home__rank-card-sheen" aria-hidden="true" />
+            <span className="leopips-home__crest-row">
+              <span className="leopips-home__crest-frame" aria-hidden="true">
+                {liveRank ? (
+                  <img
+                    className="leopips-home__crest-lion"
+                    src={homeLeoBestLion}
+                    alt=""
+                    draggable={false}
+                  />
+                ) : (
+                  <span className="leopips-home__crest-fallback">
+                    <HomeGlyph src={homeIconShield} size={13} />
+                  </span>
+                )}
               </span>
-              <span className="home__stat-value home__stat-value--lvl">{LEOPIPS_COPY.levelLabel}</span>
+              <span className="leopips-home__lvl-num" data-leopips-lvl-num="true">
+                <span className="leopips-home__lvl-tag">LVL</span>
+                {liveLevel}
+              </span>
+              <span
+                className="home__stat-copy leopips-home__xp-copy"
+                data-leopips-home-xp="true"
+                data-leopips-xp-fixture={isolated ? "true" : "false"}
+              >
+                <span className="home__stat-next">{LEOPIPS_COPY.xpLabel}</span>
+                <span className="home__stat-value home__stat-value--lvl">{xpText}</span>
+              </span>
             </span>
-            <span className="home__mini-progress home__mini-progress--emerald" aria-hidden="true">
-              <span style={{ width: `${LEOPIPS_HOME_PREVIEW.xpFill}%` }} />
+            {liveRank ? (
+              <>
+                <span className="leopips-home__divider" aria-hidden="true" />
+                <span className="leopips-home__nameplate" data-leopips-rank-name="true">
+                  {liveRank}
+                </span>
+              </>
+            ) : null}
+            <span className="leopips-home__progress-row">
+              <span
+                className="home__mini-progress home__mini-progress--emerald leopips-home__rank-progress"
+                aria-hidden="true"
+                data-leopips-win-progress="true"
+              >
+                <span style={{ width: `${winFill}%` }} />
+              </span>
+              <span className="leopips-home__level-sub" data-leopips-level-sub="true">
+                {leoPipsHomeLevelSubText({
+                  maxed: liveProgress.maxed,
+                  rank: liveRank,
+                  winsInLevel: liveProgress.winsInLevel,
+                  nextLevel: liveProgress.nextLevel,
+                  copy: LEOPIPS_COPY,
+                })}
+              </span>
             </span>
-          </div>
-          <div className="home__stat home__stat--pill" data-leopips-home-xp="true">
-            <div className="home__stat-copy">
-              <span className="home__stat-next">{LEOPIPS_COPY.xpLabel}</span>
-              <span className="home__stat-value home__stat-value--lvl">{LEOPIPS_COPY.xpProgress}</span>
-            </div>
           </div>
         </section>
 
@@ -187,19 +324,23 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
               <div className="home__league-art">
                 <LeagueStars />
                 <LeagueEmblem />
-                <p className="home__division-name">{LEOPIPS_HOME_PREVIEW.division}</p>
-                <p className="home__eyebrow">{LEOPIPS_COPY.seasonN}</p>
+                <p className="home__division-name">{divisionText}</p>
+                <p className="home__eyebrow">{seasonText}</p>
               </div>
               <div className="home__league-copy">
                 <h2 className="home__progress-label">{LEOPIPS_COPY.yourProgress}</h2>
                 <p className="leopips-home__season-hero">{LEOPIPS_COPY.leagueProgress}</p>
-                <div className="home__progress" aria-hidden="true">
+                <div
+                  className="home__progress"
+                  aria-hidden="true"
+                  data-leopips-league-fixture={isolated ? "true" : "false"}
+                >
                   <span className="home__progress-meta-row">
-                    <span className="home__progress-meta">{LEOPIPS_COPY.seasonN}</span>
-                    <span className="home__progress-pct">{LEOPIPS_HOME_PREVIEW.leagueFill}%</span>
+                    <span className="home__progress-meta">{seasonText}</span>
+                    <span className="home__progress-pct">{leaguePct}</span>
                   </span>
                   <span className="home__progress-track">
-                    <span className="home__progress-fill" style={{ width: `${LEOPIPS_HOME_PREVIEW.leagueFill}%` }} />
+                    <span className="home__progress-fill" style={{ width: `${leagueFill}%` }} />
                   </span>
                 </div>
                 <button
@@ -237,7 +378,8 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
                 <button
                   type="button"
                   className="home__cta home__cta--emerald home__cta--inline home__cta--chevron"
-                  onClick={previewOnly}
+                  data-home-cta="playVsLeoBest"
+                  onClick={() => run(onPlayVsLeoBest)}
                 >
                   {LEOPIPS_COPY.play}
                 </button>
@@ -245,14 +387,25 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
             </div>
           </article>
 
+          {showResume ? (
+            <button
+              type="button"
+              className="home__resume"
+              data-home-cta="resume"
+              onClick={() => run(onResume)}
+            >
+              {resumeLabel}
+            </button>
+          ) : null}
+
           <section className="home__modes" aria-label="Play modes">
             <ModeCard
               id="online"
               icon={<HomeGlyph src={homeEarthGlobe} size={40} className="home-mode__earth" />}
               title={LEOPIPS_COPY.playOnline}
               subtitle={LEOPIPS_COPY.playOnlineSub}
-              action={LEOPIPS_COPY.findMatch}
-              onPress={() => onPlayOnline?.()}
+              action={findMatchLabel}
+              onPress={() => run(onPlayOnline)}
               chip="LEOPIPS"
             />
             <ModeCard
@@ -262,7 +415,7 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
               title={LEOPIPS_COPY.playFriend}
               subtitle={LEOPIPS_COPY.friendSub}
               action={LEOPIPS_COPY.invite}
-              onPress={previewOnly}
+              onPress={() => run(onFriends)}
             />
             <ModeCard
               id="private"
@@ -308,12 +461,12 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
             type="button"
             className="home__invite-friends"
             data-home-cta="inviteFriends"
-            onClick={previewOnly}
+            onClick={() => run(onInviteFriends)}
           >
             {LEOPIPS_COPY.referralInvite}
           </button>
 
-          <button type="button" className="home__live-chat" onClick={previewOnly}>
+          <button type="button" className="home__live-chat" onClick={() => run(onChat)}>
             {LEOPIPS_COPY.liveChat}
           </button>
 
@@ -322,7 +475,7 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
             className="home__card home__card--promo home__challenge-launch"
             id="challenge"
             data-home-card="challenge"
-            onClick={previewOnly}
+            onClick={() => run(onChallenge)}
           >
             <span className="home__tourney">
               <span className="home__tourney-icon">
@@ -365,7 +518,12 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
             <HomeGlyph src={homeIconAward} size={20} />
             <span>{LEOPIPS_COPY.navLeague}</span>
           </button>
-          <button type="button" className="home__nav-item home__nav-item--play" onClick={previewOnly}>
+          <button
+            type="button"
+            className="home__nav-item home__nav-item--play"
+            data-home-nav-item="play"
+            onClick={() => run(onNavPlay || onPlayVsLeoBest)}
+          >
             <span className="home__nav-play" aria-hidden="true">
               <img className="home__nav-play-img" src={homeNavPlayGlow} alt="" draggable={false} />
             </span>
@@ -374,14 +532,25 @@ function LeoPipsHomePage({ balance = 0, onPlayOnline }) {
           <button
             type="button"
             className="home__nav-item"
-            onClick={() => document.getElementById("store")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            data-home-nav-item="store"
+            onClick={() =>
+              run(
+                onOpenStore ||
+                  (() => document.getElementById("store")?.scrollIntoView({ behavior: "smooth", block: "center" }))
+              )
+            }
           >
             <span className="home__nav-glyph">
               <HomeGlyph src={homeIconCart} size={20} />
             </span>
             <span>{LEOPIPS_COPY.navStore}</span>
           </button>
-          <button type="button" className="home__nav-item" onClick={previewOnly}>
+          <button
+            type="button"
+            className="home__nav-item"
+            data-home-nav-item="menu"
+            onClick={() => run(onSettings)}
+          >
             <span className="home__nav-glyph">
               <HomeGlyph src={homeIconMenuNav} size={20} />
             </span>

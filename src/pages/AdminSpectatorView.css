@@ -54,11 +54,6 @@
   padding: 0.35rem 0.55rem 0.45rem;
 }
 
-.admin-spectator__rp {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-}
-
 .admin-spectator .game-page__dock .opponent-panel {
   width: 100%;
 }

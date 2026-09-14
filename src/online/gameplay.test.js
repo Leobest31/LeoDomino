@@ -15,6 +15,7 @@ import {
   resolveTurnTimeout,
   subscribeGameSession,
 } from "./gameplay.js";
+import { NETWORK_REQUEST_TIMEOUT_MS } from "./serviceHealth.js";
 
 function mockClient(handler) {
   const captured = {};
@@ -114,6 +115,67 @@ function mockClient(handler) {
   assert.equal(typeof client.captured.subscribeStatus, "function");
   assert.doesNotMatch(JSON.stringify(client.captured), /game_secrets/);
   stop();
+}
+
+// ---------------------------------------------------------------------------
+// Freeze-incident regression: a stalled/dropped Edge Function request must
+// settle as a catchable error within a bounded time, never hang forever.
+// A hung invoke() is indistinguishable from a legitimately in-flight one and
+// permanently wedges every caller that guards against concurrent refreshes
+// (useOnlineMatch's refreshInFlightRef).
+// ---------------------------------------------------------------------------
+
+{
+  let capturedInit = null;
+  const client = {
+    functions: {
+      async invoke(name, init) {
+        capturedInit = init;
+        return { data: { version: 0 }, error: null };
+      },
+    },
+  };
+  await getGameView("match-1", client);
+  assert.equal(capturedInit.timeout, NETWORK_REQUEST_TIMEOUT_MS);
+  console.log("  ✓ every invoke() call requests a bounded timeout from functions.invoke");
+}
+
+{
+  // Mirrors functions-js's own real behavior (verified against the installed
+  // @supabase/functions-js source): when a `timeout` option is supplied, a
+  // fetch that never resolves on its own still settles — as {data:null,
+  // error} — once the timeout elapses, never as an unbounded hang. The mock
+  // uses a short delay standing in for the real NETWORK_REQUEST_TIMEOUT_MS
+  // (proven forwarded by the previous test) so this test stays fast; if
+  // gameplay.js ever stops passing `timeout` at all, this mock's Promise
+  // never resolves and the test times out, failing loudly.
+  const client = {
+    functions: {
+      invoke(name, init) {
+        return new Promise((resolve) => {
+          if (!init.timeout) return; // never resolves — reproduces the pre-fix hang
+          setTimeout(() => {
+            resolve({
+              data: null,
+              error: {
+                name: "FunctionsFetchError",
+                message: "Failed to send a request to the Edge Function",
+                context: { name: "AbortError", message: "The user aborted a request." },
+              },
+            });
+          }, 20);
+        });
+      },
+    },
+  };
+  const startedAt = Date.now();
+  await assert.rejects(
+    () => getGameView("match-1", client),
+    (err) => err instanceof GameplayClientError
+  );
+  const elapsedMs = Date.now() - startedAt;
+  assert.ok(elapsedMs < 2000, `settled at ${elapsedMs}ms, not hung`);
+  console.log("  ✓ a stalled request settles (rejects) once the client's own timeout elapses, never hangs");
 }
 
 {

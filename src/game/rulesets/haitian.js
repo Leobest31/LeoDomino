@@ -1,5 +1,6 @@
 /**
- * Haitian ruleset — verified V1 regional style (match points, Dekabès, 6-6 open).
+ * Haitian ruleset — verified V1 regional style (match points, Dekabès,
+ * highest-double round-1 open — no fixed tile).
  * Engine id is "haitian"; UI exposes 🇭🇹 Haitian / Ayisyen.
  */
 
@@ -11,12 +12,12 @@ import {
   calculateHaitianRoundPoints,
   isHaitianMatchWon,
 } from "../rules/haitianScoring.js";
-import { chooseDoubleSixStarter } from "../rules/haitianStart.js";
+import { chooseStartingPlayer } from "../rules/start.js";
 
 /** Engine ruleset id. */
 export const HAITIAN_RULESET_ID = "haitian";
 
-/** Match target for Haitian shutout win (must also hold opponent at 0). */
+/** Match target: first player to this many won parts wins. */
 export const HAITIAN_MATCH_TARGET = 4;
 
 /**
@@ -48,11 +49,14 @@ export const haitianRuleset = Object.freeze({
   partnerships: null,
 
   // —— Opening ——
-  /** Round 1: seat holding 6-6 must open with it. */
-  round1Starter: "doubleSix",
+  /**
+   * Round 1: highest double across both hands opens (else highest tile by
+   * normal ranking). Shared by legacy/Haitian/American — no fixed tile.
+   */
+  round1Starter: "highestDoubleElseHighest",
   forceOpeningTile: true,
-  /** Re-deal when 6-6 sits in the reserve (2p) so Round 1 can open legally. */
-  redealUntilOpeningTile: true,
+  /** The highest-double/highest-tile chooser always finds a starter — never redeal. */
+  redealUntilOpeningTile: false,
   laterRoundStarter: "previousWinner",
   freeOpenAfterRound1: true,
 
@@ -74,15 +78,15 @@ export const haitianRuleset = Object.freeze({
   roundScoreMode: "matchPoints",
   defaultTargetScore: HAITIAN_MATCH_TARGET,
   /**
-   * Shutout-to-target: afterRoundScoreUpdate resets opponents, then
-   * isMatchWon requires winner >= target AND all opponents at 0 (4–0).
+   * First-to-target: scores accumulate (no reset). Dekabès is one part.
+   * isMatchWon: winner score >= 4. Finals may be 4–0 through 4–3.
    */
-  matchWinMode: "shutoutToTarget",
+  matchWinMode: "firstToReach",
   /** HUD: show seat score as "X / 4". */
   hudScoreFormat: "ofTarget",
 
   policies: Object.freeze({
-    chooseStartingPlayer: chooseDoubleSixStarter,
+    chooseStartingPlayer,
     calculateRoundPoints: calculateHaitianRoundPoints,
     afterRoundScoreUpdate: applyHaitianAfterRoundScoreUpdate,
     isMatchWon: isHaitianMatchWon,

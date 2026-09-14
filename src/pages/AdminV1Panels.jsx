@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconClose } from "../components/Icon";
-import { ADMIN_PAGE_SIZE, adminErrorI18nKey } from "../online/adminDashboard.js";
+import { ADMIN_PAGE_SIZE, ADMIN_PRESENCE_POLL_MS, adminErrorI18nKey } from "../online/adminDashboard.js";
 import {
   ADMIN_CHALLENGE_STATUSES,
   ADMIN_REPORT_STATUSES,
@@ -502,21 +502,61 @@ function ChallengePanel({ t, formatNumber, formatWhen, canMutate }) {
 
 function InviteWinPanel({ t, formatNumber, formatWhen }) {
   const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    void (async () => {
-      try {
-        setData(await fetchAdminInviteWin());
-      } catch (err) {
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
+    try {
+      setData(await fetchAdminInviteWin());
+      if (silent) setError("");
+    } catch (err) {
+      if (!silent) {
+        setData(null);
         setError(errorMessageKey(err));
       }
-    })();
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+    const poll = window.setInterval(() => {
+      void load(true);
+    }, ADMIN_PRESENCE_POLL_MS);
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return;
+      void load(true);
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(poll);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [load]);
+
   return (
     <div data-admin-invite-win="true">
       <header className="admin-page__header">
         <h2>{t("admin.inviteWin")}</h2>
+        <button
+          type="button"
+          className="admin-page__btn admin-page__btn--ghost"
+          disabled={loading}
+          onClick={() => void load()}
+        >
+          {t("admin.retry")}
+        </button>
       </header>
+      <p className="admin-page__hint" data-admin-invite-win-legacy-hint="true">
+        {t("admin.inviteWinLegacyHint")}
+      </p>
       {error ? <p className="admin-page__error">{t(error)}</p> : null}
       {!data?.season ? <p className="admin-page__empty">{t("admin.noInviteSeason")}</p> : null}
       {data?.season ? (

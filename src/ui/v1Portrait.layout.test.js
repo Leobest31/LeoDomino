@@ -77,7 +77,7 @@ function advance(state) {
   const settings = read("components/SettingsPanel.jsx");
   const page = read("pages/GamePage.jsx");
   assert.doesNotMatch(app, /GameSetupPage/, "App no longer mounts Setup as the hub");
-  assert.match(app, /HomePage/, "App mounts Home after splash");
+  assert.match(app, /LeoPipsAuthenticatedHome/, "App mounts Home after splash");
   assert.match(app, /onPlayVsLeoBest/, "Home Play vs LeoBest opens Game Style");
   assert.match(app, /setPhase\("gameStyle"\)/, "PLAY does not start a match immediately");
   assert.doesNotMatch(home, /PLAYER_COUNTS/, "Home has no 3/4 player chips");

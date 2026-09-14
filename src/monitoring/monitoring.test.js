@@ -124,6 +124,10 @@ assert.equal(safe.ruleset, "haitian");
 assert.equal(safe.matchVersion, 4);
 assert.equal(safe.actionName, "play");
 assert.equal(safe.backendErrorCode, "MALFORMED_PROJECTION");
+assert.equal(
+  pickSafeMetadata({ actionName: "hydrate", failureStage: "hydrate", matchId: "11111111-2222-3333-4444-555555555555" }).failureStage,
+  "hydrate"
+);
 assert.equal(safe.opponentHand, undefined);
 assert.equal(safe.gameState, undefined);
 assert.equal(safe.password, undefined);

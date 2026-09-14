@@ -19,6 +19,7 @@ function PlayerPanel({
   hiddenIds,
   enteringIds,
   tilesOnly = false,
+  hydrating = false,
 }) {
   const { t } = useI18n();
   const resolvedName = name ?? t("game.you");
@@ -28,8 +29,10 @@ function PlayerPanel({
 
   return (
     <section
-      className={`player-panel${isTurn ? " player-panel--turn" : ""}`}
+      className={`player-panel${isTurn ? " player-panel--turn" : ""}${hydrating ? " player-panel--hydrating" : ""}`}
       aria-label={t("game.handAria", { name: resolvedName })}
+      aria-busy={hydrating ? "true" : undefined}
+      data-hand-hydrating={hydrating ? "true" : undefined}
     >
       {tilesOnly ? null : (
       <div className="player-panel__title" aria-hidden="true">
@@ -67,7 +70,9 @@ function PlayerPanel({
 
       <div className="player-panel__tray" data-hand-scroll>
         <ul className="player-panel__hand" ref={handRef} data-hand-root="player">
-          {tiles.map((tile, index) => {
+          {hydrating
+            ? null
+            : tiles.map((tile, index) => {
             const entering = enteringIds?.has(tile.id);
             const interactable = handTileIsInteractable({
               isTurn: Boolean(onSelectTile || onTilePointerDown),

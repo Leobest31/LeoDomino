@@ -31,15 +31,18 @@ export function canRecoverMatch(match, storage = globalThis.sessionStorage) {
 }
 
 /**
- * Creator whose request is already accepted must leave Waiting and enter
- * Match Ready when occupancy has a resumable match. Occupancy-none and
+ * Occupancy is server truth for Match Ready.
+ * A stale local own.status === "open" must not keep YOUR REQUEST / Cancel
+ * after getMyActiveMatch returns a resumable match. Occupancy-none and
  * terminal matches must not take this path.
  *
  * @param {object|null|undefined} own
  * @param {object|null|undefined} occupancyMatch
  */
 export function shouldPromoteAcceptedToMatchReady(own, occupancyMatch) {
-  return own?.status === "accepted" && canRecoverMatch(occupancyMatch);
+  if (!canRecoverMatch(occupancyMatch)) return false;
+  if (!own) return true;
+  return own.status === "accepted" || own.status === "open";
 }
 
 /**
@@ -62,9 +65,10 @@ export function isMissingActiveMatchRow(error) {
  * occupancyUnknown: getMyActiveMatch threw (outage / unknown).
  * occupancyMatch: getMyActiveMatch result when the call succeeded (null = none).
  * lastKnown: in-page Match Ready snapshot.
- * hydratedAcceptedMatch: own accepted request hydrate — ONLY consulted when
- * occupancy is unknown. Authoritative occupancy-none must not reopen a match
- * from a leftover accepted match_request row.
+ * hydratedAcceptedMatch: own accepted request hydrate. Consulted when occupancy
+ * is unknown OR when occupancy is none but the creator's request is accepted
+ * (seat rows may lag briefly after accept). Noted-terminal / non-resumable
+ * hydrates still clear.
  *
  * @param {{
  *   occupancyUnknown?: boolean,
@@ -88,6 +92,17 @@ export function decideMatchRecovery(input = {}) {
   if (!occupancyUnknown) {
     if (canRecoverMatch(occupancyMatch)) {
       return { kind: "resume", match: occupancyMatch, source: "occupancy" };
+    }
+    // Creator race: request is accepted and match row exists, but active_match_players
+    // may not list the creator yet. Prefer hydrated accepted match over a hard clear.
+    if (acceptedMatchId && canRecoverMatch(hydratedAcceptedMatch)) {
+      return { kind: "resume", match: hydratedAcceptedMatch, source: "accepted_hydrate" };
+    }
+    if (acceptedMatchId && hydratedAcceptedMatch === undefined) {
+      // Caller did not hydrate yet — keep last known Match Ready if any.
+      if (canRecoverMatch(lastKnown)) {
+        return { kind: "keep", match: lastKnown, source: "accepted_pending_hydrate" };
+      }
     }
     return { kind: "clear", match: null, source: "occupancy_none" };
   }

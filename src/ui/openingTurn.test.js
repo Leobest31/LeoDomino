@@ -200,8 +200,20 @@ function assertForcedOpening(rulesetId, expectedTile = null) {
 }
 
 assertForcedOpening("legacy");
-assertForcedOpening("haitian", HAITIAN_OPENING_TILE_ID);
+// Haitian shares the same highest-double-else-highest rule now — no fixed
+// 6-6 expectation. HAITIAN_OPENING_TILE_ID is still exercised below for the
+// specific case where a hand genuinely holds 6-6.
+assertForcedOpening("haitian");
 assertForcedOpening("american");
+
+{
+  // Seed 12 deals 6-6 as the real highest double — confirms it is still
+  // (correctly) mandatory whenever a hand genuinely holds it.
+  const state = deal("haitian", 12);
+  assert.ok(state.players.some((p) => p.hand.includes(HAITIAN_OPENING_TILE_ID)));
+  assert.equal(state.mustPlayTileId, HAITIAN_OPENING_TILE_ID);
+  console.log("  ✓ Haitian: 6-6 stays mandatory whenever a hand actually holds it");
+}
 
 {
   const online = read("pages/OnlineGamePage.jsx");

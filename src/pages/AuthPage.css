@@ -466,12 +466,30 @@
 
 .auth__forgot {
   margin: -0.08rem 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #1ee67a;
+  font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
   text-align: right;
-  cursor: default;
+  cursor: pointer;
   user-select: none;
+}
+
+.auth__forgot:hover,
+.auth__forgot:focus-visible {
+  text-decoration: underline;
+}
+
+.auth__success {
+  margin: 0.2rem 0 0;
+  color: #7dffb0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .auth__rules {

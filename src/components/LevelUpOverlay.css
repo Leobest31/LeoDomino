@@ -1,0 +1,302 @@
+.level-up-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  pointer-events: auto;
+}
+
+.level-up-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(30, 58, 120, 0.45), rgba(2, 6, 18, 0.92)),
+    #020612;
+}
+
+.level-up-overlay__card {
+  position: relative;
+  width: min(22rem, 100%);
+  border-radius: 1.25rem;
+  border: 2px solid #d4a017;
+  background:
+    linear-gradient(160deg, #0b1630 0%, #06101f 55%, #03070f 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 224, 150, 0.18),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 214, 102, 0.25),
+    0 0 40px rgba(212, 160, 23, 0.35),
+    0 24px 48px rgba(0, 0, 0, 0.55);
+  padding: 1.6rem 1.35rem 1.5rem;
+  text-align: center;
+  color: #f8f1d8;
+  overflow: hidden;
+  animation: level-up-pop 420ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.level-up-overlay__sparkles {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255, 215, 100, 0.55) 0 1.5px, transparent 2px),
+    radial-gradient(circle at 80% 25%, rgba(255, 240, 180, 0.45) 0 1.5px, transparent 2px),
+    radial-gradient(circle at 30% 80%, rgba(255, 200, 80, 0.4) 0 1.5px, transparent 2px),
+    radial-gradient(circle at 70% 75%, rgba(255, 230, 140, 0.5) 0 1.5px, transparent 2px);
+  pointer-events: none;
+  opacity: 0.85;
+  animation: level-up-sparkle 1.8s ease-in-out infinite alternate;
+}
+
+.level-up-overlay__crown {
+  margin: 0;
+  font-size: 1.75rem;
+  color: #f5c542;
+  text-shadow: 0 0 18px rgba(245, 197, 66, 0.7);
+}
+
+.level-up-overlay__kicker {
+  margin: 0.35rem 0 0;
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: 1.55rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: #f5c542;
+  text-shadow: 0 0 20px rgba(245, 197, 66, 0.55);
+}
+
+.level-up-overlay__congrats {
+  margin: 0.35rem 0 0.9rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  color: #ffe9a8;
+}
+
+.level-up-overlay__badge-wrap {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0.2rem;
+}
+
+/* Soft pulsing gold halo behind the shield — celebration effect, CSS only. */
+.level-up-overlay__badge-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -0.6rem -1.2rem auto;
+  top: -0.35rem;
+  height: 8.6rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 205, 90, 0.32) 0%, rgba(255, 205, 90, 0) 68%);
+  filter: blur(2px);
+  animation: level-up-halo 2.4s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Heraldic-shield crest — same silhouette/material language as the Home
+   rank card, scaled up: layered bronze gradient, bright metal catching
+   light near the top, deep recessed bronze/black toward the point. */
+.level-up-overlay__shield {
+  position: relative;
+  z-index: 1;
+  width: 6.5rem;
+  height: 7.6rem;
+  clip-path: polygon(4% 0%, 96% 0%, 96% 54%, 50% 100%, 4% 54%);
+  background: linear-gradient(
+    170deg,
+    #fbe3b4 0%,
+    #e4ab5c 12%,
+    #b97a34 28%,
+    #7a4a1e 50%,
+    #3d2410 74%,
+    #150b04 100%
+  );
+  box-shadow:
+    inset 0 3px 4px rgba(255, 236, 195, 0.6),
+    inset 0 -10px 16px rgba(0, 0, 0, 0.75),
+    inset 6px 0 8px rgba(0, 0, 0, 0.3),
+    inset -6px 0 8px rgba(255, 220, 160, 0.2);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 22px rgba(212, 160, 23, 0.4));
+}
+
+.level-up-overlay__shield-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    128deg,
+    rgba(255, 255, 255, 0.38) 0%,
+    transparent 28%,
+    transparent 68%,
+    rgba(0, 0, 0, 0.3) 100%
+  );
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.level-up-overlay__rank-lion {
+  position: absolute;
+  inset: 5px;
+  z-index: 1;
+  width: calc(100% - 10px);
+  height: calc(100% - 10px);
+  object-fit: cover;
+  object-position: center 28%;
+  transform: scale(1.85);
+}
+
+.level-up-overlay__shield-fallback {
+  position: absolute;
+  inset: 5px;
+  z-index: 1;
+  background: #140b04;
+}
+
+.level-up-overlay__lvl-label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.level-up-overlay__lvl-tag {
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  color: rgba(255, 224, 170, 0.82);
+  text-shadow: 0 0 10px rgba(255, 200, 60, 0.4);
+}
+
+.level-up-overlay__lvl-number {
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: 2.15rem;
+  font-weight: 700;
+  line-height: 1;
+  background: linear-gradient(180deg, #fff6dd 0%, #ffe08a 45%, #d99a2e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 14px rgba(255, 200, 60, 0.5)) drop-shadow(0 2px 1px rgba(0, 0, 0, 0.5));
+}
+
+/* Refined gold divider, matching the Home card language. */
+.level-up-overlay__divider {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 60%;
+  height: 1px;
+  margin: 0.7rem auto 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 205, 110, 0.55) 30%,
+    rgba(255, 225, 160, 0.9) 50%,
+    rgba(255, 205, 110, 0.55) 70%,
+    transparent 100%
+  );
+  box-shadow: 0 0 6px rgba(255, 200, 110, 0.5);
+}
+
+.level-up-overlay__divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: linear-gradient(135deg, #fff3d6, #e0a53c);
+  box-shadow: 0 0 4px rgba(255, 210, 140, 0.75);
+}
+
+/* Thick sculpted bronze nameplate — same ribbon language as Home, scaled up. */
+.level-up-overlay__nameplate {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: fit-content;
+  max-width: 90%;
+  margin: 0.6rem auto 0;
+  padding: 0.35rem 1.4rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-align: center;
+  color: #2c1a08;
+  text-shadow: 0 1px 0 rgba(255, 224, 170, 0.5);
+  background: linear-gradient(180deg, #f6d4a3 0%, #d68e42 20%, #a35f22 52%, #6b3d12 82%, #48280c 100%);
+  clip-path: polygon(4% 0%, 96% 0%, 100% 50%, 96% 100%, 4% 100%, 0% 50%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 240, 210, 0.7),
+    inset 0 -5px 6px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 3px 5px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes level-up-halo {
+  from {
+    opacity: 0.7;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+.level-up-overlay__welcome {
+  margin: 0.55rem 0 1.1rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: #f3e6c0;
+}
+
+.level-up-overlay__continue {
+  appearance: none;
+  border: 1px solid #d4a017;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f0d060, #c99614);
+  color: #1a1206;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.7rem 1.4rem;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+}
+
+.level-up-overlay__continue:active {
+  transform: translateY(1px);
+}
+
+@keyframes level-up-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes level-up-sparkle {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 0.95;
+  }
+}

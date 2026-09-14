@@ -159,7 +159,7 @@ function blockedState(scores = [0, 0]) {
   assert.equal(isPlayerCountSupported(american, 2), true);
   assert.equal(isPlayerCountSupported(american, 3), true);
   assert.equal(isPlayerCountSupported(american, 4), true);
-  assert.equal(american.policies.chooseStartingPlayer, resolveRuleset("legacy").policies.chooseStartingPlayer);
+  assert.equal(american.policies.chooseStartingPlayer, chooseStartingPlayer);
   assert.equal(typeof american.policies.scorePlay, "function");
   assert.equal(american.policies.calculateRoundPoints, calculateAllFivesRoundPoints);
   assert.notEqual(american.policies.calculateRoundPoints, calculateRoundPoints);
@@ -374,7 +374,7 @@ function blockedState(scores = [0, 0]) {
   });
   assert.equal(haitian.rulesetId, "haitian");
   assert.equal(haitian.targetScore, 4);
-  assert.equal(resolveRuleset("haitian").matchWinMode, "shutoutToTarget");
+  assert.equal(resolveRuleset("haitian").matchWinMode, "firstToReach");
   assert.equal(resolveRuleset("haitian").roundScoreMode, "matchPoints");
   assert.deepEqual(resolveRuleset("haitian").supportedPlayerCounts, [2, 4]);
   section("Classic + Haitian behavior unchanged regression");

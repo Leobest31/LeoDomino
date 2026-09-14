@@ -1,6 +1,6 @@
 /**
  * Pre-start join grace — 3 minutes after accept, before both players have
- * joined. Distinct from the 60-second in-match turn timeout.
+ * joined. Distinct from the 30-second in-match turn timeout.
  *
  * Authoritative expiry lives in SQL (resolve_join_timeout). These helpers
  * classify state and format UX. They must never invent a winner, RP change,

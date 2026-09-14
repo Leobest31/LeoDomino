@@ -1,35 +1,27 @@
 /**
  * Haitian match-point scoring — not Classic pip totals.
  *
- * Round awards:
- *   Normal win / blocked win → +1
- *   Dekabès → +2
+ * Round awards (each is exactly one won part):
+ *   Normal win / blocked win / Dekabès → +1
  *
- * After each round (reset rule):
- *   Opponent(s) reset to 0, then the winner receives the round points.
- *   Scores cannot both be non-zero after a round under this rule.
+ * Scores accumulate. There is no opponent reset to zero.
  *
- * Match win (4–0 shutout):
- *   Winner score >= target (default 4) AND every opponent is at 0.
- *   Points are applied first (no cap); e.g. 3–0 + Dekabès → 5–0 still wins.
+ * Match win: first player to reach target (default 4).
+ * Valid finals include 4–0, 4–1, 4–2, and 4–3.
  */
 
-import { ROUND_END_REASON } from "./constants.js";
-
 /**
- * @param {object} options
+ * @param {object} [options]
  * @param {string} [options.reason]
  * @param {boolean} [options.isDekabes]
  * @returns {number}
  */
-export function calculateHaitianRoundPoints({ reason, isDekabes } = {}) {
-  if (isDekabes || reason === ROUND_END_REASON.DEKABES) return 2;
+export function calculateHaitianRoundPoints() {
   return 1;
 }
 
 /**
- * Reset every non-winner to 0, then add round points to the winner.
- * Winner streak accumulates; only opponents are wiped.
+ * Add round points to the winner only. Opponent scores are left unchanged.
  *
  * @param {object} options
  * @param {number[]} options.scores
@@ -42,15 +34,14 @@ export function applyHaitianAfterRoundScoreUpdate({
   winnerIndex,
   points,
 }) {
-  const next = scores.map((score, index) => (index === winnerIndex ? score : 0));
+  const next = scores.slice();
   next[winnerIndex] += points;
   return next;
 }
 
 /**
- * Haitian match is won only on a shutout at/above target (e.g. 4–0).
- * score >= target alone is not enough when any opponent is non-zero
- * (legacy/migration scores may briefly look like that until the next round).
+ * Haitian match is won when the round winner reaches the target (first to 4).
+ * Opponent score may be 0, 1, 2, or 3.
  *
  * @param {object} options
  * @param {number[]} options.scores
@@ -59,10 +50,5 @@ export function applyHaitianAfterRoundScoreUpdate({
  * @returns {boolean}
  */
 export function isHaitianMatchWon({ scores, winnerIndex, targetScore }) {
-  const winnerScore = scores[winnerIndex] ?? 0;
-  if (winnerScore < targetScore) return false;
-  for (let i = 0; i < scores.length; i += 1) {
-    if (i !== winnerIndex && scores[i] !== 0) return false;
-  }
-  return true;
+  return (scores[winnerIndex] ?? 0) >= targetScore;
 }

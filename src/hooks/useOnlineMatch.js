@@ -31,9 +31,11 @@ import {
   isRealtimeSessionEvent,
   isRoundOverView,
   applyForfeitTerminalFields,
+  hasCoherentInteraction,
   keepAuthoritativeView,
   lockedRulesetId,
   mergeRealtimeSessionView,
+  needsPrivateHydration,
   occupancyTouchMissed,
   ONLINE_ACTION_TIMEOUT_MS,
   onlineErrorKey,
@@ -43,6 +45,17 @@ import {
   shouldReleaseBusy,
   viewVersion,
 } from "../online/onlineTable.js";
+import {
+  documentIsHidden,
+  emptyPrivateHydrationState,
+  notePrivateHydrationFailure,
+  notePrivateHydrationSuccess,
+  planPlayingHydrateTick,
+  planPrivateHydration,
+  PLAYING_HYDRATE_POLL_MS,
+  PRIVATE_HYDRATION_TICK_MS,
+} from "../online/playingHydrate.js";
+import { onlineActionDiag } from "../online/onlineActionDiag.js";
 import { createOnlineMoveTrace, isOnlineMoveTraceEnabled } from "../online/onlineMoveTrace.js";
 import { isTurnDeadlineExpired } from "../online/turnTimeout.js";
 import {
@@ -50,10 +63,13 @@ import {
   isRetryableTimeoutError,
   nextTimeoutRetryAt,
   planTimeoutTick,
+  shouldClearTimeoutPending,
   timeoutResolveKey,
+  TIMEOUT_PENDING_RECONCILE_MS,
 } from "../online/timeoutFreeze.js";
 import {
   emptyServiceHealthState,
+  NETWORK_REQUEST_TIMEOUT_MS,
   noteServiceFailure,
   noteServiceSuccess,
   planOutageHealthTick,
@@ -62,10 +78,22 @@ import {
   shouldSuppressTimeoutResolve,
   stampOutageRetry,
 } from "../online/serviceHealth.js";
+
+/**
+ * Defense in depth only: every network call reachable from refreshView is
+ * already bounded by NETWORK_REQUEST_TIMEOUT_MS, so this guard should never
+ * actually fire. If some future call site regresses that (or an unforeseen
+ * environment stalls a promise with no rejection at all), one hung refresh
+ * must not be able to permanently disable every recovery path that shares
+ * this in-flight guard — reconciliation, the outage retry loop, visibility/
+ * online resume, and the realtime status handler all funnel through here.
+ */
+const STALE_REFRESH_GUARD_MS = NETWORK_REQUEST_TIMEOUT_MS * 2 + 5000;
 import {
   documentIsVisible,
   isUnhealthyRealtimeStatus,
   shouldBypassDragLock,
+  shouldRefreshAuthoritativeViewOnRealtimeStatus,
   shouldRefreshAuthoritativeViewOnResume,
 } from "../online/interactionRecovery.js";
 
@@ -85,13 +113,16 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
   const busyRef = useRef(false);
   const inFlightBaseVersionRef = useRef(-1);
   const refreshInFlightRef = useRef(false);
+  const refreshInFlightSinceRef = useRef(0);
   const refreshQueuedRef = useRef(false);
   const roundAdvanceAtVersionRef = useRef(-1);
   const timeoutInFlightRef = useRef(false);
   const timeoutRetryAtRef = useRef(0);
   const timeoutAttemptRef = useRef(0);
   const timeoutAttemptedKeyRef = useRef("");
+  const timeoutReconcileAtRef = useRef(0);
   const serviceHealthRef = useRef(emptyServiceHealthState());
+  const privateHydrationRef = useRef(emptyPrivateHydrationState());
 
   matchIdRef.current = matchId;
 
@@ -119,6 +150,12 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       setBusy(false);
     }
     if (kept === viewRef.current) return kept;
+    if (shouldClearTimeoutPending(viewRef.current, kept)) {
+      timeoutAttemptRef.current = 0;
+      timeoutRetryAtRef.current = 0;
+      timeoutAttemptedKeyRef.current = "";
+      timeoutReconcileAtRef.current = 0;
+    }
     viewRef.current = kept;
     setView(kept);
     if (isMatchOverView(kept)) {
@@ -149,10 +186,24 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     const id = matchIdRef.current;
     if (!id) return null;
     if (refreshInFlightRef.current) {
-      refreshQueuedRef.current = true;
-      return null;
+      const stuckForMs = Date.now() - refreshInFlightSinceRef.current;
+      if (stuckForMs < STALE_REFRESH_GUARD_MS) {
+        refreshQueuedRef.current = true;
+        return null;
+      }
+      // The previous attempt's own bounded network timeout should already
+      // have released this guard via `finally`. It did not — do not let a
+      // single stuck promise disable recovery permanently.
+      onlineActionDiag("stale_refresh_guard_reset", {
+        matchId: id,
+        clientKnownVersion: viewVersion(viewRef.current),
+        actionType: "refresh",
+        failureStage: "stale_refresh_guard_reset",
+      });
+      refreshInFlightRef.current = false;
     }
     refreshInFlightRef.current = true;
+    refreshInFlightSinceRef.current = Date.now();
     let last = null;
     try {
       do {
@@ -178,6 +229,47 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     }
   }, [applyView, markServiceResult]);
 
+  const hydratePrivateHand = useCallback((options = {}) => {
+    const current = viewRef.current;
+    if (isMatchOverView(current)) {
+      privateHydrationRef.current = notePrivateHydrationSuccess();
+      return;
+    }
+    if (!needsPrivateHydration(current)) {
+      if (privateHydrationRef.current.attempt || privateHydrationRef.current.lastFailed) {
+        privateHydrationRef.current = notePrivateHydrationSuccess();
+      }
+      return;
+    }
+    const planned = planPrivateHydration(current, privateHydrationRef.current, {
+      nowMs: Date.now(),
+      hidden: documentIsHidden(),
+      immediate: Boolean(options.immediate),
+      refreshInFlight: refreshInFlightRef.current,
+    });
+    if (planned.action !== "refresh") return;
+    void refreshView({ force: true })
+      .then((last) => {
+        if (unmountedRef.current) return;
+        if (!needsPrivateHydration(viewRef.current)) {
+          privateHydrationRef.current = notePrivateHydrationSuccess();
+          return;
+        }
+        if (last == null && refreshInFlightRef.current) return;
+        privateHydrationRef.current = notePrivateHydrationFailure(
+          privateHydrationRef.current,
+          Date.now()
+        );
+      })
+      .catch(() => {
+        if (unmountedRef.current) return;
+        privateHydrationRef.current = notePrivateHydrationFailure(
+          privateHydrationRef.current,
+          Date.now()
+        );
+      });
+  }, [refreshView]);
+
   const boot = useCallback(async () => {
     const id = matchIdRef.current;
     if (!id) {
@@ -198,9 +290,11 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     pendingViewRef.current = null;
     inFlightBaseVersionRef.current = -1;
     refreshInFlightRef.current = false;
+    refreshInFlightSinceRef.current = 0;
     refreshQueuedRef.current = false;
     roundAdvanceAtVersionRef.current = -1;
     serviceHealthRef.current = emptyServiceHealthState();
+    privateHydrationRef.current = emptyPrivateHydrationState();
     setServiceOutage(false);
     try {
       let next;
@@ -276,7 +370,18 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     if (!matchId || status !== "ready") return undefined;
     const refreshIfPlaying = () => {
       if (!documentIsVisible()) return;
+      hydratePrivateHand({ immediate: true });
       if (!shouldRefreshAuthoritativeViewOnResume(viewRef.current)) return;
+      onlineActionDiag("resume_reconcile", {
+        matchId: matchIdRef.current,
+        clientKnownVersion: viewVersion(viewRef.current),
+        serverTurn: viewRef.current?.currentSeat,
+        turnDeadlineAt: viewRef.current?.turnDeadlineAt,
+        connectivity: "resume",
+        reconcileTriggered: true,
+        actionType: "resume",
+        failureStage: "resume_reconcile",
+      });
       void refreshView({ force: true }).catch(() => {
         /* keep last authoritative view */
       });
@@ -284,13 +389,20 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     const onVisibility = () => {
       if (document.visibilityState === "visible") refreshIfPlaying();
     };
+    const onOnline = () => refreshIfPlaying();
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", refreshIfPlaying);
+    window.addEventListener("pageshow", refreshIfPlaying);
+    window.addEventListener("online", onOnline);
+    document.addEventListener("resume", refreshIfPlaying);
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("focus", refreshIfPlaying);
+      window.removeEventListener("pageshow", refreshIfPlaying);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("resume", refreshIfPlaying);
     };
-  }, [matchId, status, refreshView]);
+  }, [matchId, status, refreshView, hydratePrivateHand]);
 
   useEffect(() => {
     if (!matchId || status !== "ready") return undefined;
@@ -306,6 +418,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       } catch {
         /* still consider refresh */
       }
+      hydratePrivateHand();
       if (
         serviceHealthRef.current.outage ||
         !shouldRefreshViewerAfterRealtime(previous, merged, {
@@ -321,8 +434,17 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     };
     const onStatus = (channelStatus) => {
       if (cancelled) return;
-      if (!isUnhealthyRealtimeStatus(channelStatus)) return;
+      if (!shouldRefreshAuthoritativeViewOnRealtimeStatus(channelStatus)) return;
       if (!documentIsVisible()) return;
+      hydratePrivateHand({ immediate: true });
+      onlineActionDiag("realtime_status_reconcile", {
+        matchId: matchIdRef.current,
+        clientKnownVersion: viewVersion(viewRef.current),
+        connectivity: isUnhealthyRealtimeStatus(channelStatus) ? "realtime_unhealthy" : "realtime_subscribed",
+        reconcileTriggered: true,
+        actionType: channelStatus,
+        failureStage: "realtime_status_reconcile",
+      });
       void refreshView({ force: true }).catch(() => {
         /* keep last authoritative view */
       });
@@ -336,7 +458,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       cancelled = true;
       stop();
     };
-  }, [matchId, refreshView, status, applyView]);
+  }, [matchId, refreshView, status, applyView, hydratePrivateHand]);
 
   const runAction = useCallback(
     async (submit, traceKind = "action") => {
@@ -349,6 +471,21 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       inFlightBaseVersionRef.current = viewVersion(current);
       setBusy(true);
       setErrorKey("");
+      addSafeBreadcrumb("online action submit", {
+        screen: "onlineTable",
+        matchId: current.matchId,
+        matchVersion: viewVersion(current),
+        actionName: traceKind,
+        failureStage: "client_submit",
+      });
+      onlineActionDiag("client_submit", {
+        matchId: current.matchId,
+        expectedVersion: viewVersion(current),
+        clientKnownVersion: viewVersion(current),
+        serverTurn: current.currentSeat,
+        actionType: traceKind,
+        failureStage: "client_submit",
+      });
       const trace = createOnlineMoveTrace(traceKind);
       trace.mark("submitStarted");
       let timeoutId = 0;
@@ -399,18 +536,37 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
           try {
             await refreshView();
             trace.mark("staleRefreshed");
+            // Not a successful commit of *this* submit. Callers must roll back any
+            // local play affordance and rely on the refreshed authoritative view.
             trace.finish({ outcome: "stale" });
-            return true;
+            return false;
           } catch {
             /* fall through */
           }
         }
         markServiceResult(error);
+        addSafeBreadcrumb("online action rejected", {
+          screen: "onlineTable",
+          matchId: matchIdRef.current,
+          matchVersion: viewVersion(viewRef.current),
+          actionName: traceKind,
+          backendErrorCode: error?.code,
+          failureStage: "rejected",
+        });
+        onlineActionDiag("rejected", {
+          matchId: matchIdRef.current,
+          expectedVersion: viewVersion(current),
+          serverVersion: viewVersion(viewRef.current),
+          clientKnownVersion: viewVersion(current),
+          serverTurn: viewRef.current?.currentSeat,
+          actionType: traceKind,
+          failureStage: "rejected",
+        });
         setErrorKey(
           serviceHealthRef.current.outage ? SERVICE_OUTAGE_I18N_KEY : onlineErrorKey(error)
         );
         try {
-          await refreshView();
+          await refreshView({ force: !hasCoherentInteraction(viewRef.current) });
         } catch {
           /* keep previous view */
         }
@@ -421,6 +577,16 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
           busyRef.current = false;
           inFlightBaseVersionRef.current = -1;
           setBusy(false);
+          if (
+            !unmountedRef.current &&
+            viewRef.current &&
+            !isMatchOverView(viewRef.current) &&
+            !hasCoherentInteraction(viewRef.current)
+          ) {
+            void refreshView({ force: true }).catch(() => {
+              /* keep last authoritative view */
+            });
+          }
         }
       }
     },
@@ -492,21 +658,75 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     timeoutAttemptedKeyRef.current = attemptKey;
     const matchIdForRequest = current.matchId;
     const expectedVersion = current.version;
+    onlineActionDiag("timeout_resolve", {
+      matchId: matchIdForRequest,
+      expectedVersion,
+      clientKnownVersion: expectedVersion,
+      serverTurn: current.currentSeat,
+      turnDeadlineAt: current.turnDeadlineAt,
+      timeoutDue: true,
+      connectivity: typeof navigator !== "undefined" && navigator.onLine === false ? "offline" : "online",
+      actionType: "timeout",
+      failureStage: "timeout_resolve",
+    });
+    let timeoutId = 0;
     try {
-      const next = asViewerSnapshot(
-        await resolveTurnTimeout(matchIdForRequest, expectedVersion)
-      );
+      const timed = await Promise.race([
+        resolveTurnTimeout(matchIdForRequest, expectedVersion).then((payload) => ({ payload })),
+        new Promise((resolve) => {
+          timeoutId = window.setTimeout(
+            () => resolve({ timeout: true }),
+            ONLINE_ACTION_TIMEOUT_MS
+          );
+        }),
+      ]);
+      if (timeoutId) window.clearTimeout(timeoutId);
       if (unmountedRef.current) return false;
+      if (timed?.timeout) {
+        timeoutAttemptRef.current += 1;
+        timeoutRetryAtRef.current = nextTimeoutRetryAt(timeoutAttemptRef.current, Date.now());
+        markServiceResult({ name: "TimeoutError", timeout: true, message: "timeout" });
+        onlineActionDiag("timeout_resolve_hung", {
+          matchId: matchIdForRequest,
+          expectedVersion,
+          clientKnownVersion: viewVersion(viewRef.current),
+          turnDeadlineAt: viewRef.current?.turnDeadlineAt,
+          timeoutDue: true,
+          connectivity: "hung",
+          actionType: "timeout",
+          failureStage: "timeout_resolve_hung",
+        });
+        try {
+          await refreshView({ force: true });
+        } catch {
+          /* keep last authoritative view */
+        }
+        return false;
+      }
+      const next = asViewerSnapshot(timed.payload);
       applyView(next, { force: true });
       timeoutAttemptRef.current = 0;
       timeoutRetryAtRef.current = 0;
       timeoutAttemptedKeyRef.current = "";
       return true;
     } catch (error) {
+      if (timeoutId) window.clearTimeout(timeoutId);
       timeoutAttemptRef.current += 1;
       timeoutRetryAtRef.current = nextTimeoutRetryAt(timeoutAttemptRef.current, Date.now());
+      onlineActionDiag("timeout_resolve_rejected", {
+        matchId: matchIdForRequest,
+        expectedVersion,
+        serverVersion: viewVersion(viewRef.current),
+        clientKnownVersion: expectedVersion,
+        turnDeadlineAt: viewRef.current?.turnDeadlineAt,
+        timeoutDue: true,
+        staleRejected: error?.code === "STALE_VERSION",
+        casConflict: error?.code === "STALE_VERSION",
+        actionType: "timeout",
+        failureStage: error?.code || "timeout_resolve_rejected",
+      });
       try {
-        await refreshView();
+        await refreshView({ force: true });
       } catch {
         /* keep last authoritative view */
       }
@@ -553,9 +773,40 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
         inFlight: timeoutInFlightRef.current,
         retryNotBefore: timeoutRetryAtRef.current,
         attemptedKey: timeoutAttemptedKeyRef.current,
+        lastReconcileAt: timeoutReconcileAtRef.current,
         nowMs: Date.now(),
         serviceOutage: shouldSuppressTimeoutResolve(serviceHealthRef.current),
+        outageRetryNotBefore: serviceHealthRef.current?.retryNotBefore,
       });
+      if (planned.clearPending) {
+        timeoutAttemptRef.current = 0;
+        timeoutRetryAtRef.current = 0;
+        timeoutAttemptedKeyRef.current = "";
+        timeoutReconcileAtRef.current = 0;
+      }
+      if (planned.action === "reconcile") {
+        onlineActionDiag("timeout_reconcile", {
+          matchId: current?.matchId,
+          clientKnownVersion: viewVersion(current),
+          serverTurn: current?.currentSeat,
+          turnDeadlineAt: current?.turnDeadlineAt,
+          timeoutDue: true,
+          reconcileTriggered: true,
+          connectivity:
+            typeof navigator !== "undefined" && navigator.onLine === false ? "offline" : "online",
+          actionType: "reconcile",
+          failureStage: "timeout_reconcile",
+        });
+        void refreshView({ force: true })
+          .then(() => {
+            timeoutReconcileAtRef.current = Date.now();
+          })
+          .catch(() => {
+            // Failed fetch: allow a sooner retry than the full soft-lock window.
+            timeoutReconcileAtRef.current = Date.now() - Math.floor(TIMEOUT_PENDING_RECONCILE_MS / 2);
+          });
+        return;
+      }
       if (planned.action === "resolve") void resolveTimeout();
     };
     tick();
@@ -568,7 +819,53 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onVis);
     };
-  }, [status, turnDeadlineAt, roundPhase, roundVersion, resolveTimeout]);
+  }, [status, turnDeadlineAt, roundPhase, roundVersion, resolveTimeout, refreshView]);
+
+  useEffect(() => {
+    if (status !== "ready") return undefined;
+    const tick = () => {
+      const planned = planPlayingHydrateTick(viewRef.current, {
+        hidden: documentIsHidden(),
+        busy: busyRef.current,
+        dragLocked: dragLockRef.current,
+      });
+      if (planned.action !== "refresh") return;
+      if (planned.reason === "private_hand_missing") {
+        hydratePrivateHand();
+        return;
+      }
+      addSafeBreadcrumb("online hydrate poll", {
+        screen: "onlineTable",
+        matchId: matchIdRef.current,
+        matchVersion: viewVersion(viewRef.current),
+        actionName: "hydrate",
+        failureStage: "hydrate",
+      });
+      onlineActionDiag("hydrate", {
+        matchId: matchIdRef.current,
+        expectedVersion: viewVersion(viewRef.current),
+        clientKnownVersion: viewVersion(viewRef.current),
+        serverTurn: viewRef.current?.currentSeat,
+        actionType: planned.reason,
+        failureStage: "hydrate",
+      });
+      void refreshView({ force: Boolean(planned.force) }).catch(() => {
+        /* keep last authoritative view */
+      });
+    };
+    tick();
+    const intervalId = window.setInterval(tick, PLAYING_HYDRATE_POLL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [status, refreshView, hydratePrivateHand]);
+
+  const privateHydrationKey = `${view?.version}:${view?.round}:${Array.isArray(view?.handCounts) ? view.handCounts.join(",") : ""}:${Array.isArray(view?.myHand) ? view.myHand.length : "x"}`;
+  useEffect(() => {
+    if (status !== "ready") return undefined;
+    const tick = () => hydratePrivateHand();
+    tick();
+    const intervalId = window.setInterval(tick, PRIVATE_HYDRATION_TICK_MS);
+    return () => window.clearInterval(intervalId);
+  }, [status, hydratePrivateHand, privateHydrationKey]);
 
   useEffect(() => {
     if (status !== "ready" || !serviceOutage) return undefined;
@@ -576,6 +873,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
       const planned = planOutageHealthTick(serviceHealthRef.current, Date.now());
       if (planned.action !== "refresh") return;
       serviceHealthRef.current = stampOutageRetry(serviceHealthRef.current, Date.now());
+      hydratePrivateHand({ immediate: true });
       void refreshView().catch(() => {
         /* keep last authoritative view */
       });
@@ -583,7 +881,7 @@ export function useOnlineMatch({ matchId, rulesetId } = {}) {
     tick();
     const intervalId = window.setInterval(tick, 1000);
     return () => window.clearInterval(intervalId);
-  }, [status, serviceOutage, refreshView]);
+  }, [status, serviceOutage, refreshView, hydratePrivateHand]);
 
   const setDragLock = useCallback(
     (locked) => {

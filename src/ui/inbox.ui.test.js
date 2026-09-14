@@ -11,6 +11,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(root, rel), "utf8");
 
 const home = read("pages/HomePage.jsx");
+const liveHome = read("pages/LeoPipsAuthenticatedHome.jsx");
 const panel = read("components/NotificationsPanel.jsx");
 const adapter = read("online/friendChat.js");
 const en = read("i18n/locales/en.js");
@@ -26,6 +27,11 @@ assert.match(home, /useFriendMatchInvites/);
 assert.match(home, /useFriendChat/);
 assert.match(home, /<NotificationsPanel/);
 assert.doesNotMatch(home, /CREATE TABLE.*notifications/i);
+assert.match(liveHome, /inboxBadgeCount/);
+assert.match(liveHome, /useFriendsBoard\(\{ watchOnline: false \}\)/);
+assert.match(liveHome, /useFriendMatchInvites/);
+assert.match(liveHome, /useFriendChat/);
+assert.match(liveHome, /<NotificationsPanel/);
 
 assert.match(panel, /data-inbox="true"/);
 assert.match(panel, /data-inbox-friend-request/);

@@ -105,7 +105,7 @@ function ordinaryWinStateB(scores) {
   };
 }
 
-/** Dekabès setup: ends 3 and 5, final tile 3-5. */
+/** Dekabès setup: ends 3 and 5, final tile 3-5. Seat 0 to play. */
 function dekabesWinState(scores) {
   const t33 = createTile(3, 3);
   const t36 = createTile(3, 6);
@@ -140,6 +140,19 @@ function dekabesWinState(scores) {
   };
 }
 
+/** Seat 1 Dekabès — same board, B to play 3-5. */
+function dekabesWinStateB(scores) {
+  const state = dekabesWinState(scores);
+  return {
+    ...state,
+    players: [
+      { id: "a", hand: ["0-1"] },
+      { id: "b", hand: ["3-5"] },
+    ],
+    currentPlayer: 1,
+  };
+}
+
 // --- Registry ---
 {
   assert.equal(isKnownRulesetId("haitian"), true);
@@ -151,10 +164,10 @@ function dekabesWinState(scores) {
   assert.equal(haitian.defaultTargetScore, 4);
   assert.equal(haitian.defaultTargetScore, HAITIAN_MATCH_TARGET);
   assert.equal(haitian.roundScoreMode, "matchPoints");
-  assert.equal(haitian.matchWinMode, "shutoutToTarget");
+  assert.equal(haitian.matchWinMode, "firstToReach");
   assert.equal(typeof haitian.policies.afterRoundScoreUpdate, "function");
   assert.equal(typeof haitian.policies.isMatchWon, "function");
-  assert.equal(haitian.round1Starter, "doubleSix");
+  assert.equal(haitian.round1Starter, "highestDoubleElseHighest");
   assert.equal(haitian.hudScoreFormat, "ofTarget");
   assert.deepEqual(haitian.supportedPlayerCounts, [2, 4]);
   assert.equal(isPlayerCountSupported(haitian, 2), true);
@@ -211,18 +224,29 @@ function dekabesWinState(scores) {
   section("unsupported 3-player Haitian cannot start");
 }
 
-// --- Opening 6-6 ---
+// --- Opening: highest double across both hands (not a fixed 6-6) ---
 {
   const state = haitianMatch({ seed: 42 });
+  // Seed 42 deals 5-5 as the real highest double — same shared rule and
+  // same deal as legacy/American at this seed (see roundOpening.test.js).
+  assert.equal(state.mustPlayTileId, "5-5");
+  const holder = state.players[state.currentPlayer];
+  assert.ok(holder.hand.includes("5-5"));
+  assert.throws(() => playTile(state, holder.hand.find((id) => id !== "5-5")), /Must open/);
+  const after = playTile(state, "5-5");
+  assert.equal(after.board[0].id, "5-5");
+  assert.equal(after.mustPlayTileId, null);
+  section("first round requires the real highest double (5-5 at seed 42, not a fixed 6-6)");
+}
+
+// --- A deal where 6-6 genuinely is the highest double still forces it ---
+{
+  const state = haitianMatch({ seed: 55 });
   assert.equal(state.mustPlayTileId, HAITIAN_OPENING_TILE_ID);
   assert.equal(state.mustPlayTileId, "6-6");
   const holder = state.players[state.currentPlayer];
   assert.ok(holder.hand.includes("6-6"));
-  assert.throws(() => playTile(state, holder.hand.find((id) => id !== "6-6")), /Must open/);
-  const after = playTile(state, "6-6");
-  assert.equal(after.board[0].id, "6-6");
-  assert.equal(after.mustPlayTileId, null);
-  section("first round requires 6-6 opener");
+  section("when a hand actually holds 6-6, it is still (correctly) the mandatory opener");
 }
 
 // --- Subsequent round free open ---
@@ -271,9 +295,9 @@ function dekabesWinState(scores) {
 {
   assert.equal(calculateHaitianRoundPoints({ reason: ROUND_END_REASON.DOMINO }), 1);
   assert.equal(calculateHaitianRoundPoints({ reason: ROUND_END_REASON.BLOCKED }), 1);
-  assert.equal(calculateHaitianRoundPoints({ reason: ROUND_END_REASON.DEKABES }), 2);
-  assert.equal(calculateHaitianRoundPoints({ isDekabes: true }), 2);
-  section("Haitian scoring: win/blocked +1, Dekabès +2");
+  assert.equal(calculateHaitianRoundPoints({ reason: ROUND_END_REASON.DEKABES }), 1);
+  assert.equal(calculateHaitianRoundPoints({ isDekabes: true }), 1);
+  section("Haitian scoring: win/blocked/Dekabès each +1");
 }
 
 // --- Normal win +1 (not pip totals) ---
@@ -324,7 +348,7 @@ function dekabesWinState(scores) {
   section("normal Haitian win = +1 (not Classic pip scoring)");
 }
 
-// --- Dekabès +2 (classic bridge: ends 3 and 5, final tile 3-5) ---
+// --- Dekabès +1 (classic bridge: ends 3 and 5, final tile 3-5) ---
 {
   const t33 = createTile(3, 3);
   const t36 = createTile(3, 6);
@@ -364,10 +388,10 @@ function dekabesWinState(scores) {
   };
   const after = playTile(state, "3-5", END.LEFT);
   assert.equal(after.roundResult.reason, ROUND_END_REASON.DEKABES);
-  assert.equal(after.roundResult.points, 2);
+  assert.equal(after.roundResult.points, 1);
   assert.equal(after.roundResult.dekabes, true);
-  assert.deepEqual(after.scores, [3, 0]);
-  section("Dekabès = +2 match points");
+  assert.deepEqual(after.scores, [2, 0]);
+  section("Dekabès = +1 match point");
 }
 
 // --- Ordinary double-out is +1, not Dekabès ---
@@ -458,7 +482,7 @@ function dekabesWinState(scores) {
   section("blocked Haitian win = +1 for lowest pips");
 }
 
-// --- Reset rule: winner keeps streak; opponent wiped ---
+// --- Accumulate: no opponent reset ---
 {
   assert.deepEqual(
     applyHaitianAfterRoundScoreUpdate({
@@ -466,7 +490,7 @@ function dekabesWinState(scores) {
       winnerIndex: 1,
       points: 1,
     }),
-    [0, 1]
+    [1, 1]
   );
   assert.deepEqual(
     applyHaitianAfterRoundScoreUpdate({
@@ -474,119 +498,142 @@ function dekabesWinState(scores) {
       winnerIndex: 1,
       points: 1,
     }),
-    [0, 1]
+    [2, 1]
   );
   assert.deepEqual(
     applyHaitianAfterRoundScoreUpdate({
-      scores: [3, 0],
+      scores: [3, 2],
+      winnerIndex: 0,
+      points: 1,
+    }),
+    [4, 2]
+  );
+  assert.deepEqual(
+    applyHaitianAfterRoundScoreUpdate({
+      scores: [3, 3],
       winnerIndex: 1,
       points: 1,
     }),
-    [0, 1]
+    [3, 4]
   );
   assert.deepEqual(
     applyHaitianAfterRoundScoreUpdate({
-      scores: [0, 1],
-      winnerIndex: 0,
+      scores: [2, 1, 0, 1],
+      winnerIndex: 2,
       points: 1,
     }),
-    [1, 0]
+    [2, 1, 1, 1]
   );
-  assert.deepEqual(
-    applyHaitianAfterRoundScoreUpdate({
-      scores: [0, 2],
-      winnerIndex: 0,
-      points: 1,
-    }),
-    [1, 0]
-  );
-  assert.deepEqual(
-    applyHaitianAfterRoundScoreUpdate({
-      scores: [0, 3],
-      winnerIndex: 0,
-      points: 1,
-    }),
-    [1, 0]
-  );
-  // A=3 B=0, B Dekabès +2 → 0–2
-  assert.deepEqual(
-    applyHaitianAfterRoundScoreUpdate({
-      scores: [3, 0],
-      winnerIndex: 1,
-      points: 2,
-    }),
-    [0, 2]
-  );
-  // Migration-like both non-zero: next round still applies reset going forward.
-  assert.deepEqual(
-    applyHaitianAfterRoundScoreUpdate({
-      scores: [2, 1],
-      winnerIndex: 0,
-      points: 1,
-    }),
-    [3, 0]
-  );
-  section("Haitian afterRoundScoreUpdate resets opponent then awards winner");
+  section("Haitian afterRoundScoreUpdate accumulates; no opponent reset");
 }
 
 {
-  // A=1 B=0, B wins → 0–1
   const after = playTile(ordinaryWinStateB([1, 0]), "1-2", END.RIGHT);
   assert.equal(after.phase, PHASE.ROUND_OVER);
   assert.equal(after.matchWinner, null);
-  assert.deepEqual(after.scores, [0, 1]);
-  section("A 1–0, B wins → 0–1 (1→0)");
+  assert.deepEqual(after.scores, [1, 1]);
+  section("1. A 1–0, B wins → 1–1 (no reset)");
 }
 
 {
-  // A=2 B=0, B wins → 0–1 (explicit 2→0 reset)
   const after = playTile(ordinaryWinStateB([2, 0]), "1-2", END.RIGHT);
   assert.equal(after.phase, PHASE.ROUND_OVER);
   assert.equal(after.matchWinner, null);
-  assert.deepEqual(after.scores, [0, 1]);
-  section("A 2–0, B wins → 0–1 (2→0)");
+  assert.deepEqual(after.scores, [2, 1]);
+  section("2. A 2–0, B wins → 2–1");
 }
 
 {
-  // A=3 B=0, B wins → 0–1 (explicit 3→0 reset)
-  const after = playTile(ordinaryWinStateB([3, 0]), "1-2", END.RIGHT);
-  assert.equal(after.phase, PHASE.ROUND_OVER);
-  assert.equal(after.matchWinner, null);
-  assert.deepEqual(after.scores, [0, 1]);
-  section("A 3–0, B wins → 0–1 (3→0)");
+  const after = playTile(ordinaryWinState([3, 2]), "1-2", END.RIGHT);
+  assert.equal(after.phase, PHASE.MATCH_OVER);
+  assert.equal(after.matchWinner, 0);
+  assert.deepEqual(after.scores, [4, 2]);
+  section("3. A 3–2, A wins → 4–2 match over");
 }
 
 {
-  // A=0 B=1, A wins → 1–0
-  const after = playTile(ordinaryWinState([0, 1]), "1-2", END.RIGHT);
-  assert.equal(after.phase, PHASE.ROUND_OVER);
-  assert.equal(after.matchWinner, null);
-  assert.deepEqual(after.scores, [1, 0]);
-  section("A 0–1, A wins → 1–0 (1→0 opposite)");
+  const aWins = playTile(ordinaryWinState([3, 3]), "1-2", END.RIGHT);
+  assert.equal(aWins.phase, PHASE.MATCH_OVER);
+  assert.equal(aWins.matchWinner, 0);
+  assert.deepEqual(aWins.scores, [4, 3]);
+  const bWins = playTile(ordinaryWinStateB([3, 3]), "1-2", END.RIGHT);
+  assert.equal(bWins.phase, PHASE.MATCH_OVER);
+  assert.equal(bWins.matchWinner, 1);
+  assert.deepEqual(bWins.scores, [3, 4]);
+  section("4. 3–3 then either player wins → 4–3 match over");
 }
 
 {
-  // A=0 B=2, A wins → 1–0 (explicit 2→0 opposite)
-  const after = playTile(ordinaryWinState([0, 2]), "1-2", END.RIGHT);
-  assert.equal(after.phase, PHASE.ROUND_OVER);
-  assert.equal(after.matchWinner, null);
-  assert.deepEqual(after.scores, [1, 0]);
-  section("A 0–2, A wins → 1–0 (2→0 opposite)");
+  const after = playTile(ordinaryWinState([3, 0]), "1-2", END.RIGHT);
+  assert.equal(after.phase, PHASE.MATCH_OVER);
+  assert.equal(after.matchWinner, 0);
+  assert.deepEqual(after.scores, [4, 0]);
+  section("5. 4–0 is a valid first-to-4 win");
 }
 
 {
-  // A=0 B=3, A wins → 1–0 (explicit 3→0 opposite)
-  const after = playTile(ordinaryWinState([0, 3]), "1-2", END.RIGHT);
-  assert.equal(after.phase, PHASE.ROUND_OVER);
+  const dekabes = dekabesWinState([1, 0]);
+  assert.equal(
+    isDekabes({
+      tileId: "3-5",
+      hand: ["3-5"],
+      board: dekabes.board,
+      byId: dekabes.byId,
+    }),
+    true
+  );
+  const after = playTile(dekabes, "3-5", END.LEFT);
+  assert.equal(after.roundResult.reason, ROUND_END_REASON.DEKABES);
+  assert.equal(after.roundResult.points, 1);
+  assert.equal(after.roundResult.dekabes, true);
+  assert.deepEqual(after.scores, [2, 0]);
   assert.equal(after.matchWinner, null);
-  assert.deepEqual(after.scores, [1, 0]);
-  section("A 0–3, A wins → 1–0 (3→0 opposite)");
+  section("6. Dekabès increments winner by exactly 1");
 }
 
-// --- Match win only on valid shutout (4–0 / 0–4) ---
+{
+  const after = playTile(dekabesWinStateB([2, 0]), "3-5", END.LEFT);
+  assert.equal(after.roundResult.reason, ROUND_END_REASON.DEKABES);
+  assert.equal(after.roundResult.points, 1);
+  assert.deepEqual(after.scores, [2, 1]);
+  assert.equal(after.matchWinner, null);
+  section("7. Dekabès does not reset opponent");
+}
+
+{
+  const after = playTile(dekabesWinState([3, 2]), "3-5", END.LEFT);
+  assert.equal(after.roundResult.points, 1);
+  assert.deepEqual(after.scores, [4, 2]);
+  assert.equal(after.phase, PHASE.MATCH_OVER);
+  assert.equal(after.matchWinner, 0);
+  section("8. Dekabès from 3 wins → 4 and match ends");
+}
+
+{
+  const after = playTile(ordinaryWinState([3, 1]), "1-2", END.RIGHT);
+  assert.equal(after.roundResult.reason, ROUND_END_REASON.DOMINO);
+  assert.equal(after.roundResult.points, 1);
+  assert.deepEqual(after.scores, [4, 1]);
+  assert.equal(after.phase, PHASE.MATCH_OVER);
+  assert.equal(after.matchWinner, 0);
+  section("9. non-Dekabès from 3 wins → 4 and match ends");
+}
+
 {
   assert.equal(
     isHaitianMatchWon({ scores: [4, 0], winnerIndex: 0, targetScore: 4 }),
+    true
+  );
+  assert.equal(
+    isHaitianMatchWon({ scores: [4, 1], winnerIndex: 0, targetScore: 4 }),
+    true
+  );
+  assert.equal(
+    isHaitianMatchWon({ scores: [4, 2], winnerIndex: 0, targetScore: 4 }),
+    true
+  );
+  assert.equal(
+    isHaitianMatchWon({ scores: [4, 3], winnerIndex: 0, targetScore: 4 }),
     true
   );
   assert.equal(
@@ -594,118 +641,16 @@ function dekabesWinState(scores) {
     true
   );
   assert.equal(
-    isHaitianMatchWon({ scores: [5, 0], winnerIndex: 0, targetScore: 4 }),
-    true
-  );
-  // score >= 4 alone is NOT a win when opponent ≠ 0
-  assert.equal(
-    isHaitianMatchWon({ scores: [4, 1], winnerIndex: 0, targetScore: 4 }),
+    isHaitianMatchWon({ scores: [3, 3], winnerIndex: 0, targetScore: 4 }),
     false
   );
-  assert.equal(
-    isHaitianMatchWon({ scores: [5, 2], winnerIndex: 0, targetScore: 4 }),
-    false
+  const ended = playTile(ordinaryWinState([3, 2]), "1-2", END.RIGHT);
+  assert.equal(ended.phase, PHASE.MATCH_OVER);
+  assert.throws(
+    () => startNextRound(ended),
+    /Next round only after a finished round/
   );
-  assert.equal(
-    isHaitianMatchWon({ scores: [3, 0], winnerIndex: 0, targetScore: 4 }),
-    false
-  );
-  section("isHaitianMatchWon requires score>=4 and opponent===0");
-}
-
-{
-  // A=3 B=0, A wins +1 → 4–0 match
-  const after = playTile(ordinaryWinState([3, 0]), "1-2", END.RIGHT);
-  assert.equal(after.phase, PHASE.MATCH_OVER);
-  assert.equal(after.matchWinner, 0);
-  assert.deepEqual(after.scores, [4, 0]);
-  section("A reaches valid 4–0 → A wins match");
-}
-
-{
-  // A=0 B=3, B wins +1 → 0–4 match
-  const after = playTile(ordinaryWinStateB([0, 3]), "1-2", END.RIGHT);
-  assert.equal(after.phase, PHASE.MATCH_OVER);
-  assert.equal(after.matchWinner, 1);
-  assert.deepEqual(after.scores, [0, 4]);
-  section("B reaches valid 0–4 → B wins match");
-}
-
-{
-  // Migration scores [4, 1]: engine must NOT declare match win on play that
-  // leaves both non-zero before reset — after reset A wins to [5, 0] (or [4,0]).
-  // Direct predicate: [4,1] is not a Haitian match win.
-  assert.equal(
-    resolveRuleset("haitian").policies.isMatchWon({
-      scores: [4, 1],
-      winnerIndex: 0,
-      targetScore: 4,
-    }),
-    false
-  );
-  // Engine path from both-nonzero: A=3 B=1 wins +1 → reset → [4, 0] match.
-  const after = playTile(ordinaryWinState([3, 1]), "1-2", END.RIGHT);
-  assert.deepEqual(after.scores, [4, 0]);
-  assert.equal(after.phase, PHASE.MATCH_OVER);
-  assert.equal(after.matchWinner, 0);
-  section("engine does not win Haitian on >=4 when opponent ≠ 0");
-}
-
-{
-  // A=1 B=0, B wins Dekabès: reset A, B gets +2 → 0–2
-  const state = dekabesWinState([1, 0]);
-  const flipped = {
-    ...state,
-    players: [
-      { id: "a", hand: ["0-1"] },
-      { id: "b", hand: ["3-5"] },
-    ],
-    currentPlayer: 1,
-  };
-  assert.equal(
-    isDekabes({
-      tileId: "3-5",
-      hand: ["3-5"],
-      board: flipped.board,
-      byId: flipped.byId,
-    }),
-    true
-  );
-  const after = playTile(flipped, "3-5", END.LEFT);
-  assert.equal(after.roundResult.reason, ROUND_END_REASON.DEKABES);
-  assert.equal(after.roundResult.points, 2);
-  assert.deepEqual(after.scores, [0, 2]);
-  assert.equal(after.matchWinner, null);
-  section("Dekabès +2 after reset (A 1–0 → 0–2)");
-}
-
-{
-  // A=3 B=0, B wins Dekabès: reset A from 3→0, B gets +2 → 0–2
-  const state = dekabesWinState([3, 0]);
-  const flipped = {
-    ...state,
-    players: [
-      { id: "a", hand: ["0-1"] },
-      { id: "b", hand: ["3-5"] },
-    ],
-    currentPlayer: 1,
-  };
-  const after = playTile(flipped, "3-5", END.LEFT);
-  assert.equal(after.roundResult.reason, ROUND_END_REASON.DEKABES);
-  assert.equal(after.roundResult.points, 2);
-  assert.deepEqual(after.scores, [0, 2]);
-  assert.equal(after.matchWinner, null);
-  section("Dekabès +2 after reset (A 3–0 → 0–2)");
-}
-
-{
-  // A=3 B=0 + Dekabès → 5–0 match (apply points, then check; no cap)
-  const after = playTile(dekabesWinState([3, 0]), "3-5", END.LEFT);
-  assert.equal(after.roundResult.points, 2);
-  assert.deepEqual(after.scores, [5, 0]);
-  assert.equal(after.phase, PHASE.MATCH_OVER);
-  assert.equal(after.matchWinner, 0);
-  section("Dekabès from 3–0 yields 5–0 match win (no cap)");
+  section("10. first to 4 ends the match; next round cannot start");
 }
 
 // --- Classic/legacy scoring unchanged ---
@@ -717,6 +662,8 @@ function dekabesWinState(scores) {
   assert.equal(typeof resolveRuleset("legacy").policies.afterRoundScoreUpdate, "undefined");
   assert.equal(typeof resolveRuleset("legacy").policies.isMatchWon, "undefined");
   assert.ok(classic.mustPlayTileId);
+  assert.equal(classic.mustPlayTileId, "6-6");
+  assert.equal(resolveRuleset("legacy").round1Starter, "highestDoubleElseHighest");
   // Classic still sums opponent pips (not Haitian match points / reset).
   const pipPoints = calculateRoundPoints({
     winnerIndex: 0,
@@ -737,10 +684,10 @@ function dekabesWinState(scores) {
   const withPoints = { ...state, scores: [2, 1], targetScore: 4 };
   assert.equal(isValidSavedMatch({ version: MATCH_SAVE_VERSION, state: withPoints }), true);
   assert.equal(normalizeSaveRuleset(withPoints).rulesetId, "haitian");
-  // Resume preserves stored scores (even both non-zero from older saves).
+  // Resume preserves stored scores (including both non-zero).
   assert.deepEqual(normalizeSaveRuleset(withPoints).scores, [2, 1]);
-  const shutout = { ...state, scores: [3, 0], targetScore: 4 };
-  assert.deepEqual(normalizeSaveRuleset(shutout).scores, [3, 0]);
+  const firstToFour = { ...state, scores: [3, 2], targetScore: 4 };
+  assert.deepEqual(normalizeSaveRuleset(firstToFour).scores, [3, 2]);
 
   const { rulesetId: _drop, ...without } = state;
   assert.equal(normalizeSaveRuleset(without).rulesetId, "legacy");

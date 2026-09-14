@@ -15,6 +15,18 @@ export const SERVICE_OUTAGE_NETWORK_THRESHOLD = 2;
 
 export const SERVICE_OUTAGE_RETRY_MS = Object.freeze([4000, 8000, 16000, 24000]);
 
+/**
+ * Hard bound for a single network request (Edge Function invoke, RPC).
+ * Every caller must pass this to the client library's own abort mechanism
+ * (functions.invoke's `timeout` option, postgrest-js's `.abortSignal(...)`)
+ * so a stalled/dropped connection always settles (as a catchable error)
+ * instead of hanging the underlying fetch forever. A promise that never
+ * settles cannot be told apart from one that is still legitimately in
+ * flight, which is what let one hung request permanently wedge every
+ * refresh/recovery path sharing the same in-flight guard.
+ */
+export const NETWORK_REQUEST_TIMEOUT_MS = 15000;
+
 const DOMAIN_CODES = new Set([
   "TIMEOUT_NOT_DUE",
   "STALE_VERSION",
@@ -38,6 +50,28 @@ const DOMAIN_CODES = new Set([
 
 function asText(value) {
   return value == null ? "" : String(value);
+}
+
+/**
+ * A wrapper's own `.name`/`.message` is never diagnostic (GameplayClientError
+ * always self-names "GameplayClientError"; the functions-js SDK's own
+ * FunctionsFetchError/FunctionsHttpError always self-name too). The real
+ * signal — the underlying AbortError/TypeError from a dropped connection —
+ * lives one or two levels deeper, and the SDK nests it under `.context`,
+ * not `.cause`. Check the real, deep value first; fall back to the
+ * outermost value only when nothing more specific exists.
+ */
+export function deepText(error, key) {
+  const candidates = [
+    error?.cause?.context?.[key],
+    error?.context?.[key],
+    error?.cause?.[key],
+    error?.[key],
+  ];
+  for (const value of candidates) {
+    if (value != null && value !== "") return asText(value);
+  }
+  return "";
 }
 
 export function httpStatusFromError(error) {
@@ -100,11 +134,11 @@ export function isNetworkInfrastructureFailure(error) {
   if (!error || isDomainGameplayError(error) || isImmediateInfrastructureOutage(error)) {
     return false;
   }
-  const name = asText(error?.name || error?.cause?.name);
-  const msg = `${asText(error?.message)} ${asText(error?.cause?.message)}`.toLowerCase();
+  const name = deepText(error, "name");
+  const msg = `${asText(error?.message)} ${deepText(error, "message")}`.toLowerCase();
   if (name === "AbortError" || name === "TimeoutError") return true;
   if (error?.timeout === true || error?.code === "TIMEOUT") return true;
-  if (/failed to fetch|networkerror|load failed|aborted|the user aborted|timeout/i.test(msg)) {
+  if (/failed to fetch|networkerror|load failed|abort|timed out|timeout/i.test(msg)) {
     return true;
   }
   return false;

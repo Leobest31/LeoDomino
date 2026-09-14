@@ -10,6 +10,7 @@ export {
   initMonitoring,
   reportError,
   addSafeBreadcrumb,
+  reportSafeEvent,
   setSafeTags,
   setMonitoringClient,
   isMonitoringEnabled,

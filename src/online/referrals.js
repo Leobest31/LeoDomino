@@ -5,6 +5,8 @@
 import { getSupabaseClient, isSupabaseConfigured } from "./supabaseClient.js";
 
 export const PUBLIC_APP_URL_ENV = "VITE_PUBLIC_APP_URL";
+/** Stable testers web origin for shareable Invite Friends links. */
+export const TESTERS_PUBLIC_APP_ORIGIN = "https://leodomino-testers.vercel.app";
 export const REFERRAL_PENDING_STORAGE_KEY = "leodomino.referral.pendingCode";
 export const REFERRAL_NOTICE_STORAGE_KEY = "leodomino.referral.notice";
 export const REFERRAL_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{8}$/;
@@ -46,15 +48,48 @@ function parseHttpOrigin(value) {
 }
 
 /**
- * Production share origin: configured public URL first, else the current http(s) origin.
- * Never hardcodes a Cloudflare Quick Tunnel host.
+ * Temporary Vercel Preview deployment hostnames (and similar) must never be
+ * embedded in Invite Friends share links — recipients hit 404 / SSO when the
+ * deployment expires or stays protection-gated.
+ */
+export function isEphemeralShareHost(hostname) {
+  const host = String(hostname || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\.$/, "");
+  if (!host) return false;
+  if (host === "leodomino-testers.vercel.app") return false;
+  if (host === "play.leodomino.com" || host.endsWith(".leodomino.com")) return false;
+  if (host.endsWith(".trycloudflare.com")) return true;
+  // project-hash-team.vercel.app (e.g. leodomino-testers-pgpq9kcxk-leo-domino.vercel.app)
+  if (/^[a-z0-9-]+-[a-z0-9]+-[a-z0-9-]+\.vercel\.app$/.test(host)) return true;
+  return false;
+}
+
+function originIfStable(value) {
+  const origin = parseHttpOrigin(value);
+  if (!origin) return "";
+  try {
+    if (isEphemeralShareHost(new URL(origin).hostname)) return "";
+  } catch {
+    return "";
+  }
+  return origin;
+}
+
+/**
+ * Share-link origin: configured public URL first (if stable), else the current
+ * stable http(s) origin, else the testers public alias. Never embeds ephemeral
+ * Vercel Preview hostnames or Cloudflare Quick Tunnel hosts.
  */
 export function getAppOrigin({ env, location } = {}) {
   const viteEnv = env || (typeof import.meta !== "undefined" ? import.meta.env : {});
-  const configured = parseHttpOrigin(viteEnv?.[PUBLIC_APP_URL_ENV] || readViteEnv(PUBLIC_APP_URL_ENV));
+  const configured = originIfStable(viteEnv?.[PUBLIC_APP_URL_ENV] || readViteEnv(PUBLIC_APP_URL_ENV));
   if (configured) return configured;
   const loc = location ?? (typeof globalThis !== "undefined" ? globalThis.location : undefined);
-  return parseHttpOrigin(loc?.origin || loc?.href || "");
+  const fromLocation = originIfStable(loc?.origin || loc?.href || "");
+  if (fromLocation) return fromLocation;
+  return TESTERS_PUBLIC_APP_ORIGIN;
 }
 
 export function buildReferralLink(code, options = {}) {

@@ -6,8 +6,8 @@
 import { HAND_SIZE, PIP_MAX, TILE_COUNT } from "../constants.js";
 import { MAX_PLAYER_COUNT, MIN_PLAYER_COUNT } from "../players.js";
 import { DEFAULT_TARGET_SCORE } from "../rules/constants.js";
-import { calculateRoundPoints } from "../rules/scoring.js";
 import { chooseStartingPlayer } from "../rules/start.js";
+import { calculateRoundPoints } from "../rules/scoring.js";
 
 /** Engine ruleset id — not a user-facing label. */
 export const LEGACY_RULESET_ID = "legacy";
@@ -43,9 +43,14 @@ export const legacyRuleset = Object.freeze({
   partnerships: null,
 
   // —— Opening ——
-  /** Round 1: highest double, else highest tile. */
+  /**
+   * Round 1: highest double across both hands opens (else highest tile by
+   * normal ranking). Shared by legacy/Haitian/American — no fixed tile.
+   */
   round1Starter: "highestDoubleElseHighest",
   forceOpeningTile: true,
+  /** The highest-double/highest-tile chooser always finds a starter — never redeal. */
+  redealUntilOpeningTile: false,
   laterRoundStarter: "previousWinner",
   freeOpenAfterRound1: true,
 

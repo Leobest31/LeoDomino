@@ -10,14 +10,13 @@ import BottomBar from "../components/BottomBar";
 import DragGhost from "../components/DragGhost";
 import GameBanner from "../components/GameBanner";
 import MatchOverModal from "../components/MatchOverModal";
+import LeoPipsVictoryOverlay from "../components/LeoPipsVictoryOverlay.jsx";
+import LevelUpOverlay from "../components/LevelUpOverlay.jsx";
 import AbandonMatchDialog from "../components/AbandonMatchDialog";
+import { loadLeoPipsMatchResult } from "../online/matchPipsResult.js";
+import { notifyLeoPipsWalletChanged } from "../online/leopipsWalletEvents.js";
+import { listMyPendingLevelUps, consumeMyLevelUpEvent } from "../online/levelUpEvents.js";
 import { isForfeitView, isTimeoutView } from "../online/gameAuthority.js";
-import {
-  fetchSettledMatchRpResult,
-  isOnlineMatchAborted,
-  matchRpDisplayFromResult,
-  notifyGlobalRatingRefresh,
-} from "../online/globalRp.js";
 import {
   applyGameplayLayoutVars,
   gameplayDensityClass,
@@ -41,6 +40,7 @@ import {
   destinationTileId,
   pickTargetDestination,
   resolveDestinationOutward,
+  isPlausiblePlayDrop,
   DESTINATION_TAP_SLOP_PX,
 } from "../game/destinationTarget.js";
 import { usesAmericanBoardLayout } from "../board/index.js";
@@ -60,17 +60,17 @@ import {
   handTilesFromView,
   layoutFromView,
   lockedRulesetId,
-  applyOptimisticBoardPreview,
   onlineDragGate,
   opaqueReserveIds,
-  optimisticPlayPreview,
   roundIdentityFromView,
   tableEpochFromView,
   isInteractableTurn,
   isViewerTurn,
   hasCoherentInteraction,
+  needsPrivateHydration,
 } from "../online/onlineTable.js";
 import { createOnlineMoveTrace } from "../online/onlineMoveTrace.js";
+import { dragDropDiag, DRAG_DROP_RECOVERY } from "../online/onlineActionDiag.js";
 import {
   endChoiceI18nKey,
   hasUsableDomTargets,
@@ -229,10 +229,12 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   const [drag, setDrag] = useState(null);
   const [hotEnd, setHotEnd] = useState(null);
   const [roundBanner, setRoundBanner] = useState(null);
-  const [pendingPlay, setPendingPlay] = useState(null);
   const [abandonIntent, setAbandonIntent] = useState(null);
   const [leaving, setLeaving] = useState(false);
-  const [matchRp, setMatchRp] = useState(null);
+  const [leopipsResult, setLeopipsResult] = useState(null);
+  const [pendingLevelUp, setPendingLevelUp] = useState(null);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const leaveAfterLevelUpRef = useRef(false);
   const leavingRef = useRef(false);
   const dragRef = useRef(null);
   const captureTargetRef = useRef(null);
@@ -249,59 +251,89 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   }, [matchId]);
 
   const legalMoves = useMemo(() => view?.legalMoves ?? [], [view]);
-  const isHumanTurn = !serviceOutage && isInteractableTurn(view);
+  const isHumanTurn = !serviceOutage && !needsPrivateHydration(view) && isInteractableTurn(view);
   const mustPlayTileId = forcedOpeningTileId({
     isTurn: isHumanTurn,
     mustPlayTileId: view?.mustPlayTileId,
   });
-  const awaitingInteraction = isViewerTurn(view) && !hasCoherentInteraction(view);
+  const hydratingHand = needsPrivateHydration(view);
+  const awaitingInteraction =
+    !hydratingHand && isViewerTurn(view) && !hasCoherentInteraction(view);
   const matchOver = view?.phase === PHASE.MATCH_OVER || view?.status === "match_over";
   const roundOver = view?.phase === PHASE.ROUND_OVER || view?.status === "round_over";
-  const matchAborted = isOnlineMatchAborted(view);
-  const remainingMs = useTurnCountdown(matchOver || roundOver ? null : view);
+  const remainingMs = useTurnCountdown(matchOver || roundOver || hydratingHand ? null : view);
   const timerSeconds = formatTurnSeconds(remainingMs);
   const timerTone = turnTimerTone(remainingMs);
 
   useEffect(() => {
     if (!matchOver || !matchId) {
-      setMatchRp(null);
-      return undefined;
-    }
-    if (matchAborted) {
-      setMatchRp({ kind: "none" });
+      setLeopipsResult(null);
       return undefined;
     }
     let cancelled = false;
-    const controller = typeof AbortController === "function" ? new AbortController() : null;
-    setMatchRp(null);
-    void (async () => {
-      try {
-        const result = await fetchSettledMatchRpResult(matchId, { signal: controller?.signal });
-        if (cancelled) return;
-        const display = matchRpDisplayFromResult(result);
-        setMatchRp(display);
-        if (display.kind === "rated") notifyGlobalRatingRefresh();
-      } catch {
-        if (!cancelled) setMatchRp({ kind: "none" });
-      }
-    })();
+    let attempts = 0;
+    let timer = 0;
+    setLeopipsResult(null);
+
+    const load = () => {
+      void loadLeoPipsMatchResult(matchId)
+        .then((result) => {
+          if (cancelled) return;
+          setLeopipsResult(result);
+          if (result?.kind === "staked" && result.balance != null) {
+            notifyLeoPipsWalletChanged({
+              source: "match_over",
+              matchId,
+              balance: result.balance,
+              finishReason: result.finishReason,
+            });
+          }
+          // Settlement may land slightly after match_over; retry briefly for ledger + wallet.
+          const needsRetry =
+            result?.kind === "staked" &&
+            result.payoutSource !== "ledger" &&
+            attempts < 8;
+          if (needsRetry) {
+            attempts += 1;
+            timer = window.setTimeout(load, 400);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setLeopipsResult({ kind: "unavailable" });
+        });
+    };
+    load();
     return () => {
       cancelled = true;
-      controller?.abort();
+      if (timer) window.clearTimeout(timer);
     };
-  }, [matchOver, matchId, matchAborted]);
+  }, [matchOver, matchId]);
+
+  useEffect(() => {
+    if (!matchOver) {
+      setPendingLevelUp(null);
+      setShowLevelUp(false);
+      leaveAfterLevelUpRef.current = false;
+      return undefined;
+    }
+    let cancelled = false;
+    void listMyPendingLevelUps()
+      .then((events) => {
+        if (cancelled) return;
+        if (Array.isArray(events) && events.length) setPendingLevelUp(events[0]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [matchOver, matchId]);
+
   const roundIdentity = roundIdentityFromView(view);
   const tableEpoch = tableEpochFromView(view);
-  const boardTiles = useMemo(() => {
-    const tiles = boardTilesFromView(view);
-    if (!pendingPlay || pendingPlay.roundIdentity !== roundIdentity) return tiles;
-    return applyOptimisticBoardPreview(tiles, pendingPlay);
-  }, [view, pendingPlay, roundIdentity]);
-  const humanHand = useMemo(() => {
-    const tiles = handTilesFromView(view);
-    if (!pendingPlay?.tileId || pendingPlay.roundIdentity !== roundIdentity) return tiles;
-    return tiles.filter((tile) => tile.id !== pendingPlay.tileId);
-  }, [view, pendingPlay, roundIdentity]);
+  // Authoritative board/hand only. Never paint a play onto the board before
+  // the server accepts it (physical incident 369c7279: optimistic tile + no commit).
+  const boardTiles = useMemo(() => boardTilesFromView(view), [view]);
+  const humanHand = useMemo(() => handTilesFromView(view), [view]);
   const spinnerId = view?.spinner?.id ?? null;
   const spinnerNorth = view?.spinner?.north;
   const spinnerSouth = view?.spinner?.south;
@@ -319,13 +351,9 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
 
   const destLayout = useMemo(() => layoutFromView(view), [view]);
   const hiddenIds = useMemo(() => {
-    const ids = [];
-    if (drag?.tileId) ids.push(drag.tileId);
-    if (pendingPlay?.tileId && pendingPlay.roundIdentity === roundIdentity) {
-      ids.push(pendingPlay.tileId);
-    }
-    return ids.length ? new Set(ids) : null;
-  }, [drag, pendingPlay, roundIdentity]);
+    if (!drag?.tileId) return null;
+    return new Set([drag.tileId]);
+  }, [drag]);
   const dragLegalEnds = drag ? legalEndsForTile(legalMoves, drag.tileId) : [];
   const selectedLegalEnds =
     selectedId && !drag ? legalEndsForTile(legalMoves, selectedId) : [];
@@ -346,24 +374,16 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
       }
       trace.mark("actionCreated");
       setSelectedId(null);
-      const preview = optimisticPlayPreview(chosen);
-      if (preview) {
-        setPendingPlay({
-          ...preview,
-          roundIdentity: roundIdentityFromView(snap),
-        });
-      }
-      play("place");
-      vibrate(14);
-      trace.mark("optimisticVisible");
+      // Tile stays in hand until authoritative view updates. busy blocks duplicates.
       const ok = await playTile(tileId, chosen.end);
       trace.mark("httpSettled");
       if (!ok) {
-        setPendingPlay(null);
         play("error");
         trace.finish({ outcome: "rollback" });
         return false;
       }
+      play("place");
+      vibrate(14);
       trace.finish({ outcome: "ok", tileId });
       return true;
     },
@@ -549,46 +569,80 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
       );
       skipClickRef.current = true;
       clearDragVisuals();
+
       if (end) {
         await placeTile(current.tileId, end);
         return;
       }
+
+      // Not a legal tile at all (no legal placement exists) — nothing to
+      // recover; this is not the "legal move went missing" case.
+      if (!legalEnds.length) return;
+
+      // Cancel safety: a clearly-off-the-table drop (e.g. dragged back onto
+      // the hand tray) must not be forced into a play just because a legal
+      // move happens to exist. This is a coarse, table-wide geometry check —
+      // separate from per-end hit-testing — used only to classify intent; it
+      // never decides legality and fails OPEN (recovers) whenever the table
+      // rect itself can't be measured, so DOM failure still never blocks a
+      // legal move.
+      const tableRect = document.querySelector(".game-table__felt")?.getBoundingClientRect() ?? null;
+      if (!isPlausiblePlayDrop(clientX, clientY, tableRect)) {
+        dragDropDiag("legal_tile_drop_cancelled", {
+          ruleset: snap?.rulesetId ?? null,
+          legalEndCount: legalEnds.length,
+          measuredTargetCount: targets.length,
+          recoveryAction: DRAG_DROP_RECOVERY.NONE,
+          matchId: snap?.matchId ?? null,
+        });
+        return;
+      }
+
+      // A legal tile's drop could not be resolved by DOM hit-testing (no
+      // usable target, only some of the legal ends measurable, or a genuine
+      // miss) but the drop still looks like a real attempt to play on the
+      // table. DOM availability must never decide whether the legal move
+      // still exists — fall back to the logical resolver, which only needs
+      // the ruleset-agnostic legalEnds/equivalent/autoEnd shape and never
+      // consults the DOM. This is the single shared recovery path for
+      // Classic, Haitian, and American alike.
       const equivalent = equivalentPlayEnd(moves, current.tileId, layout);
       const autoEnd = isAutoPlaceable(moves, current.tileId)
         ? resolvePlayChoice(moves, current.tileId)?.end
         : null;
-      if (!hasUsableDomTargets(targets) && legalEnds.length) {
-        const resolved = resolvePlayWithoutDomTargets({
-          legalEnds,
-          equivalent,
-          autoEnd,
+      const zeroTargets = !hasUsableDomTargets(targets);
+      const resolved = resolvePlayWithoutDomTargets({ legalEnds, equivalent, autoEnd });
+      dragDropDiag("legal_tile_drop_unresolved", {
+        ruleset: snap?.rulesetId ?? null,
+        legalEndCount: legalEnds.length,
+        measuredTargetCount: targets.length,
+        destinationTypes: targets.map((t) => t.end),
+        boardTileCount: Array.isArray(layout?.board) ? layout.board.length : null,
+        spinnerActive: Boolean(layout?.spinnerId),
+        resolvedByHitTest: false,
+        recoveryAction: zeroTargets ? DRAG_DROP_RECOVERY.ZERO_TARGET : DRAG_DROP_RECOVERY.PARTIAL_TARGET,
+        tapLike: fromTravel <= DESTINATION_TAP_SLOP_PX,
+        clientBuild: (typeof import.meta !== "undefined" && import.meta.env?.MODE) || null,
+        matchId: snap?.matchId ?? null,
+        clientKnownVersion: snap?.version ?? null,
+      });
+      if (resolved.action === "place") {
+        await placeTile(current.tileId, resolved.end);
+        return;
+      }
+      if (resolved.action === "choose") {
+        setSelectedId(current.tileId);
+        dragDropDiag("legal_tile_drop_recovery", {
+          ruleset: snap?.rulesetId ?? null,
+          legalEndCount: legalEnds.length,
+          measuredTargetCount: targets.length,
+          recoveryAction: DRAG_DROP_RECOVERY.EXPLICIT_CHOICE,
+          matchId: snap?.matchId ?? null,
         });
-        if (resolved.action === "place") {
-          await placeTile(current.tileId, resolved.end);
-          return;
-        }
-        if (resolved.action === "choose") {
-          setSelectedId(current.tileId);
-          return;
-        }
-        return;
       }
-      if (
-        equivalent &&
-        (fromTravel <= DESTINATION_TAP_SLOP_PX ||
-          pickTargetDestination(
-            clientX,
-            clientY,
-            collectDestinationTargets([equivalent], layout)
-          ))
-      ) {
-        await placeTile(current.tileId, equivalent);
-        return;
-      }
-      if (fromTravel <= DESTINATION_TAP_SLOP_PX && isAutoPlaceable(moves, current.tileId)) {
-        const move = resolvePlayChoice(moves, current.tileId);
-        if (move) await placeTile(current.tileId, move.end);
-      }
+      // action === "cancel" is unreachable here (legalEnds.length >= 1 was
+      // already required above), kept only as resolvePlayWithoutDomTargets's
+      // own safety net.
     },
     [clearDragVisuals, placeTile, viewRef]
   );
@@ -633,15 +687,42 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     advanceRound();
   };
 
+  const finishLeave = () => {
+    void leave().then((ok) => {
+      if (ok) onMainMenu?.();
+    });
+  };
+
   const requestLeave = (intent = "home") => {
     play("button");
     if (matchOver) {
-      void leave().then((ok) => {
-        if (ok) onMainMenu?.();
-      });
+      if (pendingLevelUp && !showLevelUp) {
+        leaveAfterLevelUpRef.current = true;
+        setShowLevelUp(true);
+        return;
+      }
+      finishLeave();
       return;
     }
     setAbandonIntent(intent === "new-match" ? "new-match" : "home");
+  };
+
+  const handleLevelUpContinue = () => {
+    const current = pendingLevelUp;
+    setShowLevelUp(false);
+    setPendingLevelUp(null);
+    const shouldLeave = leaveAfterLevelUpRef.current;
+    leaveAfterLevelUpRef.current = false;
+    void (async () => {
+      if (current?.level != null) {
+        try {
+          await consumeMyLevelUpEvent(current.level);
+        } catch {
+          /* ignore — durable consume may already be done */
+        }
+      }
+      if (shouldLeave) finishLeave();
+    })();
   };
 
   const handleAbandonCancel = () => {
@@ -687,7 +768,6 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     skipClickRef.current = true;
     clearDragVisuals();
     setSelectedId(null);
-    setPendingPlay(null);
   }, [clearDragVisuals, tableEpoch]);
 
   useEffect(() => {
@@ -695,19 +775,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
     skipClickRef.current = true;
     clearDragVisuals();
     setSelectedId(null);
-    setPendingPlay(null);
   }, [clearDragVisuals, matchId]);
-
-  useEffect(() => {
-    if (!pendingPlay?.tileId) return;
-    if (pendingPlay.roundIdentity !== roundIdentity) {
-      setPendingPlay(null);
-      return;
-    }
-    if ((view?.board ?? []).some((tile) => tile.id === pendingPlay.tileId)) {
-      setPendingPlay(null);
-    }
-  }, [view, pendingPlay, roundIdentity]);
 
   useEffect(() => {
     if (!roundOver || !view?.roundResult) return;
@@ -742,7 +810,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
 
   useEffect(() => {
     const reason = view?.roundResult?.reason;
-    if (reason !== "timeout_pass" && reason !== "timeout") return;
+    if (reason !== "timeout_pass" && reason !== "timeout_auto" && reason !== "timeout") return;
     const identity = `${view.matchId}:${view.version}:${reason}:${view.roundResult?.strike ?? ""}`;
     setRoundBanner((prev) => {
       if (prev?.identity === identity) return prev;
@@ -784,7 +852,12 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   const humanWonMatch = winnerSeat === viewerSeat;
   const winnerName =
     winnerSeat == null ? "" : winnerSeat === viewerSeat ? humanName : rivalName;
+  const leopipsResultReady = !matchOver || leopipsResult != null;
+  const leopipsVictory =
+    leopipsResultReady && humanWonMatch && leopipsResult?.kind === "staked";
+  const showGenericMatchOver = matchOver && leopipsResultReady && !leopipsVictory;
   const humanStatus = (() => {
+    if (hydratingHand) return t("online.reconnectingGame");
     if (matchOver) return t("rules.matchWon", { name: winnerName || t("game.rival") });
     if (roundOver) return t("dialog.roundOver");
     if (drag || needsEndChoice) return t("game.dragToEnd");
@@ -798,11 +871,19 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
   })();
   const tableStatus = (() => {
     if (serviceOutage) return t("online.serviceUnavailable");
-    if (matchOver || roundOver || timerSeconds == null) return humanStatus;
+    if (hydratingHand) return t("online.reconnectingGame");
+    if (matchOver || roundOver) return humanStatus;
+    if (timerSeconds == null) {
+      // Live session, but the server has not armed a deadline yet: the
+      // opponent has not joined the table. Distinct from "Waiting for
+      // timeout…", which means a deadline exists and is already due.
+      if (view?.phase === PHASE.PLAYING) return t("online.waitingForOpponent");
+      return humanStatus;
+    }
     if (timerTone === "pending") return t("online.timeoutPending");
     return `${humanStatus} · ${timerSeconds}`;
   })();
-  const rivalTurn = view?.currentSeat === rivalSeat && view?.phase === PHASE.PLAYING;
+  const rivalTurn = view?.currentSeat === rivalSeat && view?.phase === PHASE.PLAYING && !hydratingHand;
   const showReservePicker = isHumanTurn && actions.canDraw && !drag && !matchOver && !roundOver;
   const styleLabel = style ? t(style.nameKey) : "";
 
@@ -840,6 +921,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
       }`}
       data-online-table="true"
       data-online-outage={serviceOutage ? "true" : "false"}
+      data-private-hydration={hydratingHand ? "missing" : "ok"}
       data-online-match-id={view.matchId}
       data-online-ruleset={rulesetId}
       data-online-version={view.version}
@@ -934,7 +1016,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         >
           <OpponentPanel
             name={rivalName}
-            status={rivalTurn ? t("game.thinking") : t("game.waiting")}
+            status={hydratingHand ? t("online.reconnectingGame") : rivalTurn ? t("game.thinking") : t("game.waiting")}
             tileCount={view.handCounts?.[rivalSeat] ?? 0}
             thinking={rivalTurn}
             isTurn={rivalTurn}
@@ -986,7 +1068,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
                   <PlayerPanel
                     name={humanName}
                     status={humanStatus}
-                    tiles={humanHand}
+                    tiles={hydratingHand ? [] : humanHand}
                     selectedId={selectedId}
                     onSelectTile={isHumanTurn ? handleTileSelect : undefined}
                     onTilePointerDown={isHumanTurn ? handleTilePointerDown : undefined}
@@ -995,6 +1077,7 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
                     isTurn={isHumanTurn}
                     mustPlayTileId={mustPlayTileId}
                     legalMoves={actions.legalMoves}
+                    hydrating={hydratingHand}
                     tilesOnly
                   />
                 </BottomBar>
@@ -1055,12 +1138,26 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
         subtitle={roundBanner?.subtitle}
       />
 
+      <LeoPipsVictoryOverlay
+        open={Boolean(leopipsVictory) && !showLevelUp}
+        winnerName={winnerName}
+        payout={leopipsResult?.payout}
+        balance={leopipsResult?.balance}
+        stake={leopipsResult?.stake}
+        roundsPlayed={view.round}
+        durationSeconds={leopipsResult?.durationSeconds ?? 0}
+        finishReason={view.finishReason || leopipsResult?.finishReason}
+        matchKind={leopipsResult?.matchKind}
+        onBackHome={requestLeave}
+        onMainMenu={requestLeave}
+      />
       <MatchOverModal
-        open={matchOver}
+        open={Boolean(showGenericMatchOver) && !showLevelUp}
         humanWon={humanWonMatch}
         winnerName={winnerName}
         scores={scores}
         roundsPlayed={view.round}
+        durationSeconds={leopipsResult?.durationSeconds ?? 0}
         title={
           isTimeoutMatchOver(view)
             ? humanWonMatch
@@ -1072,10 +1169,22 @@ function OnlineGamePage({ matchOptions = {}, onMainMenu }) {
               : t("online.matchLostForfeit")
             : t("matchOver.title")
         }
-        globalRp={matchRp}
+        leopipsBalance={leopipsResult?.kind === "staked" ? leopipsResult.balance : null}
         primaryActionLabel={t("findMatch.backHome")}
         onNewMatch={requestLeave}
         onMainMenu={requestLeave}
+      />
+      <LevelUpOverlay
+        open={Boolean(showLevelUp && pendingLevelUp)}
+        level={pendingLevelUp?.level}
+        rank={pendingLevelUp?.rank}
+        maxLevel={pendingLevelUp?.level === 100}
+        title={t("progression.levelUpTitle")}
+        congratulations={t("progression.congratulations")}
+        welcome={t("progression.welcomeToLevel", { level: pendingLevelUp?.level ?? 0 })}
+        maxLabel={t("progression.maxLevelReached")}
+        continueLabel={t("progression.continue")}
+        onContinue={handleLevelUpContinue}
       />
       <AbandonMatchDialog
         open={Boolean(abandonIntent)}

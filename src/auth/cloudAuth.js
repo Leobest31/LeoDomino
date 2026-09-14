@@ -11,6 +11,11 @@ import { clearAccountLocalData, deleteMyAccount } from "../online/accountDeletio
 import { normalizeAvatarId } from "./avatars.js";
 import { normalizeCountryCode } from "./countries.js";
 import {
+  clearAuthCallbackUrl,
+  locationLooksLikeAuthCallback,
+  passwordResetRedirectTo,
+} from "./passwordRecovery.js";
+import {
   normalizeDisplayName,
   normalizeEmail,
   normalizeUsername,
@@ -98,6 +103,28 @@ function mapSupabaseError(error) {
     message.includes("invalid_grant")
   ) {
     return new AuthError(AUTH_ERROR.CREDENTIALS);
+  }
+  if (
+    message.includes("password") &&
+    (message.includes("weak") ||
+      message.includes("least") ||
+      message.includes("short") ||
+      message.includes("characters") ||
+      code.includes("weak"))
+  ) {
+    return new AuthError(AUTH_ERROR.PASSWORD_WEAK, "password");
+  }
+  if (
+    message.includes("expired") ||
+    message.includes("invalid jwt") ||
+    code === "otp_expired" ||
+    code === "flow_state_expired" ||
+    (message.includes("session") && message.includes("not found"))
+  ) {
+    return new AuthError(AUTH_ERROR.RECOVERY_INVALID);
+  }
+  if (message.includes("redirect") && message.includes("not allowed")) {
+    return new AuthError(AUTH_ERROR.GENERIC);
   }
   return new AuthError(AUTH_ERROR.GENERIC);
 }
@@ -343,6 +370,79 @@ export function createCloudAuth(getClient = getSupabaseClient) {
       return null;
     },
 
+    /**
+     * Sends a Supabase Auth password-reset email.
+     * Always resolves with a generic success shape when Auth accepts the request
+     * so UI copy cannot enumerate accounts.
+     */
+    async requestPasswordReset(emailInput, options = {}) {
+      const email = normalizeEmail(emailInput);
+      failIf(validateEmail(email), "email");
+      const redirectTo =
+        typeof options.redirectTo === "string" && options.redirectTo
+          ? options.redirectTo
+          : passwordResetRedirectTo();
+      const { error } = await client().auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) throw mapSupabaseError(error);
+      return { sent: true };
+    },
+
+    /**
+     * Consume PKCE/hash recovery callback when detectSessionInUrl is false.
+     * @returns {Promise<{ recovered: boolean, event?: string }>}
+     */
+    async consumeAuthCallback(locationLike = globalThis.location) {
+      if (!locationLooksLikeAuthCallback(locationLike)) {
+        return { recovered: false };
+      }
+      const auth = client().auth;
+      const href = String(locationLike?.href || "");
+      const search = String(locationLike?.search || "");
+      const hash = String(locationLike?.hash || "").replace(/^#/, "");
+      const searchParams = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+      const hashParams = new URLSearchParams(hash);
+      const code = searchParams.get("code");
+      const type = hashParams.get("type") || searchParams.get("type") || "";
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      try {
+        if (code) {
+          const { data, error } = await auth.exchangeCodeForSession(code);
+          if (error) throw mapSupabaseError(error);
+          clearAuthCallbackUrl(locationLike);
+          const isRecovery =
+            type === "recovery" ||
+            Boolean(data?.session?.user) ||
+            /type=recovery/i.test(href);
+          return { recovered: Boolean(data?.session), event: isRecovery ? "PASSWORD_RECOVERY" : "SIGNED_IN" };
+        }
+        if (accessToken && refreshToken && type === "recovery") {
+          const { data, error } = await auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) throw mapSupabaseError(error);
+          clearAuthCallbackUrl(locationLike);
+          return { recovered: Boolean(data?.session), event: "PASSWORD_RECOVERY" };
+        }
+      } catch (error) {
+        clearAuthCallbackUrl(locationLike);
+        throw error instanceof AuthError ? error : mapSupabaseError(error);
+      }
+      clearAuthCallbackUrl(locationLike);
+      return { recovered: false };
+    },
+
+    async updatePassword(password, confirmPassword) {
+      failIf(validatePassword(password), "password");
+      failIf(validatePasswordConfirm(password, confirmPassword), "confirmPassword");
+      const { data, error } = await client().auth.updateUser({ password });
+      if (error) throw mapSupabaseError(error);
+      if (!data?.user) fail(AUTH_ERROR.RECOVERY_INVALID);
+      return accountFromCloudUser(data.user);
+    },
+
     async deleteAccount(password) {
       await deleteMyAccount(client(), password);
       try {
@@ -356,12 +456,12 @@ export function createCloudAuth(getClient = getSupabaseClient) {
 
     onAuthStateChange(handler) {
       let generation = 0;
-      const { data } = client().auth.onAuthStateChange((_event, session) => {
+      const { data } = client().auth.onAuthStateChange((event, session) => {
         const myGeneration = ++generation;
-        handler(accountFromUser(session?.user));
+        handler(accountFromUser(session?.user), event);
         if (!session?.user) return;
         void accountFromCloudUser(session.user).then((full) => {
-          if (myGeneration === generation && full) handler(full);
+          if (myGeneration === generation && full) handler(full, event);
         });
       });
       return () => data?.subscription?.unsubscribe?.();

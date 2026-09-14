@@ -167,6 +167,10 @@
   filter: drop-shadow(0 2.5px 3.5px rgba(40, 30, 15, 0.26));
 }
 
+.player-panel--hydrating .player-panel__tray {
+  opacity: 0.78;
+}
+
 .player-panel__tile--enter {
   animation: hand-rise 200ms var(--ease-out) both;
 }

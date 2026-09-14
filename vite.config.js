@@ -107,6 +107,9 @@ export default defineConfig({
         // Keep public legal pages out of the SPA shell fallback.
         navigateFallbackDenylist: [/^\/privacy(?:\/|$)/, /^\/terms(?:\/|$)/, /^\/support(?:\/|$)/],
         cleanupOutdatedCaches: true,
+        // Testers must drop the prior broken precache (XY7) as soon as this worker installs.
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>

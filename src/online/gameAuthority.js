@@ -25,8 +25,10 @@ import {
   startMatch,
   startNextRound,
 } from "../game/rules/drawDominoes.js";
+import { END } from "../game/constants.js";
 import { PHASE } from "../game/rules/constants.js";
 import { HAITIAN_OPENING_TILE_ID } from "../game/rules/haitianStart.js";
+import { chooseStartingPlayer } from "../game/rules/start.js";
 import { resolveRuleset } from "../game/rulesets/index.js";
 import { TIMEOUT_STRIKE_LIMIT, normalizeTimeoutStrikes } from "./turnTimeout.js";
 
@@ -361,12 +363,84 @@ function applyTimeoutLoss(state, timeoutSeat) {
   };
 }
 
+const TIMEOUT_END_ORDER = Object.freeze({
+  [END.LEFT]: 0,
+  [END.RIGHT]: 1,
+  [END.NORTH]: 2,
+  [END.SOUTH]: 3,
+});
+
+/**
+ * Deterministic legal placement for timeout auto-play.
+ * Reuses getAvailableActions / engine legalMoves. Does not invent legality.
+ */
+export function pickTimeoutAutoPlayMove(state) {
+  const moves = getAvailableActions(state).legalMoves ?? [];
+  if (!moves.length) return null;
+  const forced = state.mustPlayTileId;
+  const preferred = forced ? moves.filter((move) => move.tileId === forced) : moves;
+  const pool = preferred.length ? preferred : moves;
+  return pool.slice().sort((a, b) => {
+    if (a.tileId !== b.tileId) return a.tileId < b.tileId ? -1 : 1;
+    const ea = TIMEOUT_END_ORDER[a.end] ?? 99;
+    const eb = TIMEOUT_END_ORDER[b.end] ?? 99;
+    if (ea !== eb) return ea - eb;
+    return String(a.end).localeCompare(String(b.end));
+  })[0];
+}
+
+function completeTimedOutTurn(state) {
+  let next = state;
+  let autoDraw = 0;
+  let autoPass = false;
+  let autoPlay = null;
+
+  const playIfLegal = () => {
+    const move = pickTimeoutAutoPlayMove(next);
+    if (!move) return false;
+    next = playTile(next, move.tileId, move.end);
+    autoPlay = { tileId: move.tileId, end: move.end };
+    return true;
+  };
+
+  if (playIfLegal()) {
+    return { state: next, autoDraw, autoPass, autoPlay };
+  }
+
+  for (let i = 0; i < 28; i += 1) {
+    const actions = getAvailableActions(next);
+    if (actions.canPlay) {
+      if (!playIfLegal()) {
+        throw new GameplayError("ILLEGAL_PLACEMENT", "timeout auto-play found no legal move");
+      }
+      return { state: next, autoDraw, autoPass, autoPlay };
+    }
+    if (actions.canDraw) {
+      next = drawTile(next);
+      autoDraw += 1;
+      continue;
+    }
+    if (actions.canPass) {
+      next = passTurn(next);
+      autoPass = true;
+      return { state: next, autoDraw, autoPass, autoPlay };
+    }
+    next = skipTurn(next);
+    autoPass = true;
+    return { state: next, autoDraw, autoPass, autoPlay };
+  }
+
+  next = skipTurn(next);
+  autoPass = true;
+  return { state: next, autoDraw, autoPass, autoPlay };
+}
+
 /**
  * Authoritative timeout resolution. Does not trust a client timestamp.
- * Legal-move expiry: one strike and skipTurn (clears mustPlayTileId).
- * Third strike: timeout loss.
- * No legal move: existing draw/pass path, no strike. skipTurn is last resort
- * so a locked opener cannot ping-pong; a genuinely blocked table uses passTurn.
+ * Every due timeout records one strike for the current seat.
+ * Strikes 1–2: complete the turn via engine playTile / drawTile / passTurn.
+ * Strike 3: timeout loss with no auto-play or auto-pass.
+ * skipTurn is last resort for a locked opener with no legal action set.
  */
 export function applyTimeoutResolution(state, options = {}) {
   if (!state) {
@@ -389,66 +463,16 @@ export function applyTimeoutResolution(state, options = {}) {
 
   const seat = state.currentPlayer === PLAYER_B_SEAT ? PLAYER_B_SEAT : PLAYER_A_SEAT;
   const strikes = normalizeTimeoutStrikes(options.timeoutStrikes);
-  const available = getAvailableActions(state);
-
-  if (!available.canPlay) {
-    let next = state;
-    let draws = 0;
-    let autoPass = false;
-    for (let i = 0; i < 28; i += 1) {
-      const actions = getAvailableActions(next);
-      if (actions.canPlay) break;
-      if (actions.canDraw) {
-        next = drawTile(next);
-        draws += 1;
-        continue;
-      }
-      if (actions.canPass) {
-        next = passTurn(next);
-        autoPass = true;
-        break;
-      }
-      next = skipTurn(next);
-      autoPass = true;
-      break;
-    }
-    const after = getAvailableActions(next);
-    const resetTurnDeadline =
-      next.phase === PHASE.PLAYING && (next.currentPlayer !== seat || after.canPlay);
-    return {
-      state: {
-        ...next,
-        roundResult:
-          next.phase === PHASE.PLAYING
-            ? {
-                reason: "timeout_auto",
-                timedOutSeat: seat,
-                strike: strikes[seat],
-                strikeLimit: TIMEOUT_STRIKE_LIMIT,
-                autoDraw: draws,
-                autoPass,
-              }
-            : next.roundResult,
-      },
-      actionType: ONLINE_ACTION_TIMEOUT,
-      safePayload: {
-        timedOutSeat: seat,
-        strike: 0,
-        strikes,
-        autoDraw: draws,
-        autoPass,
-        matchOver: next.phase === PHASE.MATCH_OVER,
-      },
-      finishReason: next.phase === PHASE.MATCH_OVER ? "completed" : null,
-      resetTurnDeadline,
-      timeoutStrikes: strikes,
-      idempotent: false,
-    };
+  // A seat with no legal play at all (must draw/pass/skip) did not fail to
+  // act on an available option — it must not accrue a timeout strike, and
+  // can therefore never reach the strike limit from repeated blocked turns.
+  const hadLegalPlay = getAvailableActions(state).canPlay;
+  const nextStrikes = strikes.slice();
+  if (hadLegalPlay) {
+    nextStrikes[seat] += 1;
   }
 
-  const nextStrikes = strikes.slice();
-  nextStrikes[seat] += 1;
-  if (nextStrikes[seat] >= TIMEOUT_STRIKE_LIMIT) {
+  if (hadLegalPlay && nextStrikes[seat] >= TIMEOUT_STRIKE_LIMIT) {
     const lost = applyTimeoutLoss(state, seat);
     return {
       state: lost,
@@ -458,6 +482,9 @@ export function applyTimeoutResolution(state, options = {}) {
         strike: nextStrikes[seat],
         strikes: nextStrikes,
         matchOver: true,
+        autoPlay: null,
+        autoDraw: 0,
+        autoPass: false,
       },
       finishReason: "timeout",
       resetTurnDeadline: false,
@@ -466,27 +493,44 @@ export function applyTimeoutResolution(state, options = {}) {
     };
   }
 
-  const skipped = skipTurn(state);
+  const completed = completeTimedOutTurn(state);
+  const next = completed.state;
+  // A seat with no legal play at all is always resolved automatically
+  // (auto-play a drawn/forced tile, draw, pass, or skip) and reported as
+  // "timeout_auto" — matching the historical convention where "timeout_pass"
+  // meant "had a legal move and chose not to take it," a case that no longer
+  // exists now that a legal/forced move is always auto-played.
+  const reason = !hadLegalPlay || completed.autoPlay ? "timeout_auto" : "timeout_pass";
+  const playing = next.phase === PHASE.PLAYING;
   return {
     state: {
-      ...skipped,
-      roundResult: {
-        reason: "timeout_pass",
-        timedOutSeat: seat,
-        strike: nextStrikes[seat],
-        strikeLimit: TIMEOUT_STRIKE_LIMIT,
-      },
+      ...next,
+      roundResult: playing
+        ? {
+            reason,
+            timedOutSeat: seat,
+            strike: nextStrikes[seat],
+            strikeLimit: TIMEOUT_STRIKE_LIMIT,
+            autoDraw: completed.autoDraw,
+            autoPass: completed.autoPass,
+            autoPlay: completed.autoPlay,
+          }
+        : next.roundResult,
     },
     actionType: ONLINE_ACTION_TIMEOUT,
     safePayload: {
       timedOutSeat: seat,
-      strike: nextStrikes[seat],
+      // 0 when blocked (no strike was applied by this action); otherwise the
+      // seat's new total, matching the roundResult display value above.
+      strike: hadLegalPlay ? nextStrikes[seat] : 0,
       strikes: nextStrikes,
-      autoPass: true,
-      matchOver: false,
+      autoDraw: completed.autoDraw,
+      autoPass: completed.autoPass,
+      autoPlay: completed.autoPlay,
+      matchOver: next.phase === PHASE.MATCH_OVER,
     },
-    finishReason: null,
-    resetTurnDeadline: skipped.phase === PHASE.PLAYING && skipped.currentPlayer !== seat,
+    finishReason: next.phase === PHASE.MATCH_OVER ? "completed" : null,
+    resetTurnDeadline: playing && next.currentPlayer !== seat,
     timeoutStrikes: nextStrikes,
     idempotent: false,
   };
@@ -537,12 +581,25 @@ export function isForfeitView(view) {
   );
 }
 
+/**
+ * Test/validation helper (full server engine state, not a client view — safe
+ * to see both hands here). Validates the AUTHORITATIVE mustPlayTileId against
+ * the real shared highest-double-else-highest-tile rule; does not assume a
+ * fixed 6-6 (Haitian no longer forces one — see game/rulesets/haitian.js).
+ */
 export function haitianOpeningOk(state) {
   if (state.rulesetId !== "haitian") return true;
-  const id = HAITIAN_OPENING_TILE_ID;
-  const inHands = (state.players ?? []).some((player) => player.hand?.includes(id));
-  const inReserve = state.reserve?.includes(id);
-  return inHands && !inReserve && state.mustPlayTileId === id;
+  const expected = chooseStartingPlayer(state.players, state.byId);
+  if (!expected) return false;
+  const holderIndex = (state.players ?? []).findIndex((player) =>
+    player.hand?.includes(expected.tileId)
+  );
+  const inReserve = state.reserve?.includes(expected.tileId);
+  return (
+    holderIndex === expected.playerIndex &&
+    !inReserve &&
+    state.mustPlayTileId === expected.tileId
+  );
 }
 
 export { PHASE, HAITIAN_OPENING_TILE_ID, getAvailableActions };

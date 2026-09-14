@@ -1,0 +1,396 @@
+{
+  "matchId": "029da58a-69ca-465e-971c-541d3a38919a",
+  "rulesetId": "legacy",
+  "label": "CASS509 vs Lelao Classic round4 overdue freeze (reconstructed playing)",
+  "currentSeat": 0,
+  "timeoutStrikes": [
+    1,
+    0
+  ],
+  "scores": [
+    0,
+    85
+  ],
+  "round": 4,
+  "version": 130,
+  "handCounts": [
+    6,
+    4
+  ],
+  "reserveCount": 0,
+  "engineState": {
+    "byId": {
+      "0-0": {
+        "a": 0,
+        "b": 0,
+        "id": "0-0",
+        "isDouble": true
+      },
+      "0-1": {
+        "a": 0,
+        "b": 1,
+        "id": "0-1",
+        "isDouble": false
+      },
+      "0-2": {
+        "a": 0,
+        "b": 2,
+        "id": "0-2",
+        "isDouble": false
+      },
+      "0-3": {
+        "a": 0,
+        "b": 3,
+        "id": "0-3",
+        "isDouble": false
+      },
+      "0-4": {
+        "a": 0,
+        "b": 4,
+        "id": "0-4",
+        "isDouble": false
+      },
+      "0-5": {
+        "a": 0,
+        "b": 5,
+        "id": "0-5",
+        "isDouble": false
+      },
+      "0-6": {
+        "a": 0,
+        "b": 6,
+        "id": "0-6",
+        "isDouble": false
+      },
+      "1-1": {
+        "a": 1,
+        "b": 1,
+        "id": "1-1",
+        "isDouble": true
+      },
+      "1-2": {
+        "a": 1,
+        "b": 2,
+        "id": "1-2",
+        "isDouble": false
+      },
+      "1-3": {
+        "a": 1,
+        "b": 3,
+        "id": "1-3",
+        "isDouble": false
+      },
+      "1-4": {
+        "a": 1,
+        "b": 4,
+        "id": "1-4",
+        "isDouble": false
+      },
+      "1-5": {
+        "a": 1,
+        "b": 5,
+        "id": "1-5",
+        "isDouble": false
+      },
+      "1-6": {
+        "a": 1,
+        "b": 6,
+        "id": "1-6",
+        "isDouble": false
+      },
+      "2-2": {
+        "a": 2,
+        "b": 2,
+        "id": "2-2",
+        "isDouble": true
+      },
+      "2-3": {
+        "a": 2,
+        "b": 3,
+        "id": "2-3",
+        "isDouble": false
+      },
+      "2-4": {
+        "a": 2,
+        "b": 4,
+        "id": "2-4",
+        "isDouble": false
+      },
+      "2-5": {
+        "a": 2,
+        "b": 5,
+        "id": "2-5",
+        "isDouble": false
+      },
+      "2-6": {
+        "a": 2,
+        "b": 6,
+        "id": "2-6",
+        "isDouble": false
+      },
+      "3-3": {
+        "a": 3,
+        "b": 3,
+        "id": "3-3",
+        "isDouble": true
+      },
+      "3-4": {
+        "a": 3,
+        "b": 4,
+        "id": "3-4",
+        "isDouble": false
+      },
+      "3-5": {
+        "a": 3,
+        "b": 5,
+        "id": "3-5",
+        "isDouble": false
+      },
+      "3-6": {
+        "a": 3,
+        "b": 6,
+        "id": "3-6",
+        "isDouble": false
+      },
+      "4-4": {
+        "a": 4,
+        "b": 4,
+        "id": "4-4",
+        "isDouble": true
+      },
+      "4-5": {
+        "a": 4,
+        "b": 5,
+        "id": "4-5",
+        "isDouble": false
+      },
+      "4-6": {
+        "a": 4,
+        "b": 6,
+        "id": "4-6",
+        "isDouble": false
+      },
+      "5-5": {
+        "a": 5,
+        "b": 5,
+        "id": "5-5",
+        "isDouble": true
+      },
+      "5-6": {
+        "a": 5,
+        "b": 6,
+        "id": "5-6",
+        "isDouble": false
+      },
+      "6-6": {
+        "a": 6,
+        "b": 6,
+        "id": "6-6",
+        "isDouble": true
+      }
+    },
+    "seed": 4151309323,
+    "board": [
+      {
+        "id": "4-6",
+        "left": 6,
+        "right": 4,
+        "branch": "MAIN_LEFT",
+        "destination": "MAIN_LEFT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "0-4",
+        "left": 4,
+        "right": 0,
+        "branch": "MAIN_LEFT",
+        "destination": "MAIN_LEFT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "0-0",
+        "left": 0,
+        "right": 0,
+        "branch": "MAIN_LEFT",
+        "destination": "MAIN_LEFT",
+        "orientation": "vertical"
+      },
+      {
+        "id": "0-3",
+        "left": 0,
+        "right": 3,
+        "branch": "MAIN_LEFT",
+        "destination": "MAIN_LEFT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "3-5",
+        "left": 3,
+        "right": 5,
+        "branch": "MAIN_LEFT",
+        "destination": "MAIN_LEFT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "5-6",
+        "left": 5,
+        "right": 6,
+        "branch": "MAIN_LEFT",
+        "destination": "MAIN_LEFT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "3-6",
+        "left": 6,
+        "right": 3,
+        "branch": "MAIN_LEFT",
+        "destination": "MAIN_LEFT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "3-3",
+        "left": 3,
+        "right": 3,
+        "branch": "MAIN_LEFT",
+        "destination": "MAIN_LEFT",
+        "orientation": "vertical"
+      },
+      {
+        "id": "2-3",
+        "left": 3,
+        "right": 2,
+        "branch": "MAIN_LEFT",
+        "destination": "MAIN_LEFT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "2-2",
+        "left": 2,
+        "right": 2,
+        "branch": "MAIN_RIGHT",
+        "destination": "MAIN_RIGHT",
+        "orientation": "vertical"
+      },
+      {
+        "id": "2-6",
+        "left": 2,
+        "right": 6,
+        "branch": "MAIN_RIGHT",
+        "destination": "MAIN_RIGHT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "0-6",
+        "left": 6,
+        "right": 0,
+        "branch": "MAIN_RIGHT",
+        "destination": "MAIN_RIGHT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "0-5",
+        "left": 0,
+        "right": 5,
+        "branch": "MAIN_RIGHT",
+        "destination": "MAIN_RIGHT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "5-5",
+        "left": 5,
+        "right": 5,
+        "branch": "MAIN_RIGHT",
+        "destination": "MAIN_RIGHT",
+        "orientation": "vertical"
+      },
+      {
+        "id": "1-5",
+        "left": 5,
+        "right": 1,
+        "branch": "MAIN_RIGHT",
+        "destination": "MAIN_RIGHT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "1-1",
+        "left": 1,
+        "right": 1,
+        "branch": "MAIN_RIGHT",
+        "destination": "MAIN_RIGHT",
+        "orientation": "vertical"
+      },
+      {
+        "id": "1-6",
+        "left": 1,
+        "right": 6,
+        "branch": "MAIN_RIGHT",
+        "destination": "MAIN_RIGHT",
+        "orientation": "horizontal"
+      },
+      {
+        "id": "6-6",
+        "left": 6,
+        "right": 6,
+        "branch": "MAIN_RIGHT",
+        "destination": "MAIN_RIGHT",
+        "orientation": "vertical"
+      }
+    ],
+    "phase": "playing",
+    "round": 4,
+    "scores": [
+      0,
+      85
+    ],
+    "players": [
+      {
+        "id": "246ca13a-bc4c-4434-813b-92288bbc0fcc",
+        "hand": [
+          "1-2",
+          "4-4",
+          "4-5",
+          "3-4",
+          "2-5",
+          "1-3"
+        ]
+      },
+      {
+        "id": "2379ac50-84a4-403f-a99e-71e909c4d5ef",
+        "hand": [
+          "2-4",
+          "0-1",
+          "0-2",
+          "1-4"
+        ]
+      }
+    ],
+    "reserve": [],
+    "rulesetId": "legacy",
+    "spinnerId": "2-2",
+    "statusKey": null,
+    "statusVars": null,
+    "matchWinner": null,
+    "roundResult": null,
+    "targetScore": 100,
+    "spinnerNorth": [],
+    "spinnerSouth": [],
+    "currentPlayer": 0,
+    "lastPlayPoints": 0,
+    "mustPlayTileId": null,
+    "consecutivePasses": 0,
+    "roundStarterIndex": 1,
+    "lastPlayPointsSeat": null,
+    "lastPlayScoreTerminals": [],
+    "status": "playing"
+  },
+  "expectedTimeout": {
+    "canPlay": false,
+    "canDraw": false,
+    "canPass": true,
+    "autoPass": true,
+    "autoPlayTileId": null,
+    "strike": 2,
+    "matchOver": true,
+    "nextStrike": [2, 0]
+  }
+}

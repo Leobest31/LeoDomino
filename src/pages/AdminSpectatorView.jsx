@@ -227,9 +227,6 @@ function AdminSpectatorView({ matchId, seed = null, onClose }) {
                 </div>
                 <div className="game-page__hud-id">
                   <span className="game-page__hud-name">{nameA}</span>
-                  <span className="admin-spectator__rp">
-                    {t("admin.rp")} {formatNumber(snapshot?.playerA?.rp ?? 1000)}
-                  </span>
                   <SeatScore
                     value={scores[0]}
                     name={nameA}
@@ -267,9 +264,6 @@ function AdminSpectatorView({ matchId, seed = null, onClose }) {
               <div className="game-page__hud-cluster game-page__hud-cluster--rival" data-hud-zone="rival">
                 <div className="game-page__hud-id game-page__hud-id--end">
                   <span className="game-page__hud-name">{nameB}</span>
-                  <span className="admin-spectator__rp">
-                    {t("admin.rp")} {formatNumber(snapshot?.playerB?.rp ?? 1000)}
-                  </span>
                   <SeatScore
                     value={scores[1]}
                     name={nameB}

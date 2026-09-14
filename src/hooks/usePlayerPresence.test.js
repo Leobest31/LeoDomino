@@ -12,6 +12,7 @@ const hook = readFileSync(join(root, "src/hooks/usePlayerPresence.js"), "utf8");
 const app = readFileSync(join(root, "src/App.jsx"), "utf8");
 const pages = [
   "pages/HomePage.jsx",
+  "pages/LeoPipsAuthenticatedHome.jsx",
   "pages/FriendsPage.jsx",
   "pages/ChatPage.jsx",
   "pages/ChallengePage.jsx",

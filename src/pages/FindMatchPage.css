@@ -111,6 +111,24 @@
   font-size: clamp(0.88rem, 2.6vw, 1rem);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+/* Temporary owner-only Find Match diag affordance (title tap ×5). */
+.find-match[data-find-match-diag="busy"] .find-match__diag {
+  opacity: 0.65;
+}
+.find-match[data-find-match-diag="copied"] .find-match__diag {
+  color: #9dffb0;
+}
+.find-match[data-find-match-diag="manual"] .find-match__diag {
+  color: #f3e2a4;
+}
+.find-match[data-find-match-diag="failed"] .find-match__diag {
+  color: #ff9d9d;
 }
 
 .find-match__hint,
@@ -128,6 +146,46 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 700;
+}
+
+.find-match__fair-play {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(255, 184, 0, 0.28);
+  background: rgba(255, 184, 0, 0.07);
+  color: var(--fm-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.find-match__fair-play strong {
+  display: block;
+  margin-bottom: 0.1rem;
+  color: #f3e2a4;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.find-match__fair-play-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.05rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 184, 0, 0.55);
+  color: #f3e2a4;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .find-match__panel {

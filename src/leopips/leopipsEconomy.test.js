@@ -10,6 +10,7 @@ import {
   LEOPIPS_MIN_FIND_MATCH_STAKE,
   LEOPIPS_POPULAR_STAKE,
   LEOPIPS_PREVIEW_DEFAULT_BALANCE,
+  LEOPIPS_REFERRAL_QUALIFYING_MATCHES,
   LEOPIPS_REFERRAL_REWARD,
   LEOPIPS_STAKE_TIERS,
   LEOPIPS_TIMEOUT_MS,
@@ -24,6 +25,7 @@ import {
   isLeoPipsBigWin,
   isLeoPipsTimeoutMatchLoss,
   leoPipsCumulativeTimeoutPenalty,
+  leoPipsEnabledStakes,
   leoPipsPot,
   leoPipsStakeCardModel,
   leoPipsTimeoutPenaltyForStrike,
@@ -41,6 +43,7 @@ assert.equal(LEOPIPS_TIMEOUT_STRIKE_LIMIT, 3);
 assert.equal(LEOPIPS_TIMEOUT_MS, 30_000);
 assert.equal(LEOPIPS_BIG_WIN_PAYOUT, 300);
 assert.equal(LEOPIPS_REFERRAL_REWARD, 100);
+assert.equal(LEOPIPS_REFERRAL_QUALIFYING_MATCHES, 3);
 assert.equal(LEOPIPS_TOP_REFERRAL_USD, 63);
 assert.equal(LEOPIPS_HOME_PREVIEW.level, 12);
 assert.equal(LEOPIPS_HOME_PREVIEW.xp, 2450);
@@ -77,25 +80,26 @@ assert.equal(formatLeoPipsAmount(LEOPIPS_PREVIEW_DEFAULT_BALANCE), "1,000");
 
 {
   const a20 = settleLeoPipsAbandon(20);
-  assert.equal(a20.abandonerNet, -20);
-  assert.equal(a20.opponentPayout, 30);
-  assert.equal(a20.opponentNet, 10);
+  assert.equal(a20.authoritative, true);
+  assert.equal(a20.winnerPayout, 30);
+  assert.equal(a20.loserRefund, 0);
   assert.equal(a20.houseRetention, 10);
+  assert.equal(a20.abandonerNet, -20);
+  assert.equal(a20.opponentNet, 10);
 
   const a50 = settleLeoPipsAbandon(50);
-  assert.equal(a50.abandonerNet, -50);
-  assert.equal(a50.opponentPayout, 75);
-  assert.equal(a50.opponentNet, 25);
+  assert.equal(a50.winnerPayout, 75);
+  assert.equal(a50.loserRefund, 0);
   assert.equal(a50.houseRetention, 25);
 
   const a100 = settleLeoPipsAbandon(100);
-  assert.equal(a100.opponentPayout, 150);
+  assert.equal(a100.winnerPayout, 150);
   assert.equal(a100.houseRetention, 50);
+  assert.equal(a100.opponentNet, 50);
 
   const a150 = settleLeoPipsAbandon(150);
-  assert.equal(a150.abandonerNet, -150);
-  assert.equal(a150.opponentPayout, 225);
-  assert.equal(a150.opponentNet, 75);
+  assert.equal(a150.winnerPayout, 225);
+  assert.equal(a150.loserRefund, 0);
   assert.equal(a150.houseRetention, 75);
 }
 
@@ -104,9 +108,10 @@ assert.equal(formatLeoPipsAmount(LEOPIPS_PREVIEW_DEFAULT_BALANCE), "1,000");
   assert.equal(ok.applied, true);
   assert.equal(ok.nextBalance, 495);
   const floor = settleLeoPipsTimeoutPenalty(3);
-  assert.equal(floor.applied, false);
-  assert.equal(floor.reason, "insufficient_balance_floor_unresolved");
-  assert.equal(floor.nextBalance, 3);
+  assert.equal(floor.applied, true);
+  assert.equal(floor.nextBalance, -2);
+  assert.equal(settleLeoPipsTimeoutPenalty(5).nextBalance, 0);
+  assert.equal(settleLeoPipsTimeoutPenalty(0).nextBalance, -5);
 }
 
 {
@@ -154,14 +159,25 @@ assert.equal(formatLeoPipsAmount(LEOPIPS_PREVIEW_DEFAULT_BALANCE), "1,000");
   assert.equal(canEnterLeoPipsFindMatch(20), true);
   assert.equal(canEnterLeoPipsFindMatch(75), true);
 
+  assert.deepEqual(leoPipsEnabledStakes(5), []);
+  assert.deepEqual(leoPipsEnabledStakes(20), [20]);
+  assert.deepEqual(leoPipsEnabledStakes(75), [20, 50]);
+  assert.deepEqual(leoPipsEnabledStakes(1000), [20, 50, 100, 150]);
+
   const low = LEOPIPS_STAKE_TIERS.map((stake) => leoPipsStakeCardModel(stake, 5));
   assert.deepEqual(low.map((card) => card.disabled), [true, true, true, true]);
+
+  const onlyMin = LEOPIPS_STAKE_TIERS.map((stake) => leoPipsStakeCardModel(stake, 20));
+  assert.deepEqual(onlyMin.map((card) => card.disabled), [false, true, true, true]);
 
   const mid = LEOPIPS_STAKE_TIERS.map((stake) => leoPipsStakeCardModel(stake, 75));
   assert.equal(mid[0].disabled, false);
   assert.equal(mid[1].disabled, false);
   assert.equal(mid[2].disabled, true);
   assert.equal(mid[3].disabled, true);
+
+  const rich = LEOPIPS_STAKE_TIERS.map((stake) => leoPipsStakeCardModel(stake, 1000));
+  assert.deepEqual(rich.map((card) => card.disabled), [false, false, false, false]);
 
   const card150 = leoPipsStakeCardModel(150, 200, "Classic");
   assert.equal(card150.pot, 300);

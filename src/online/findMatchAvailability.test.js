@@ -23,6 +23,7 @@ const CREATOR_ROW = {
   status: "open",
   created_at: "2026-08-23T12:00:00.000Z",
   expires_at: "2099-01-01T00:00:00.000Z",
+  waiting_heartbeat_at: "2099-01-01T00:00:00.000Z",
   match_id: null,
   acceptor_id: null,
   profiles: { display_name: "Marie", avatar_id: "amina", country_code: "HT" },

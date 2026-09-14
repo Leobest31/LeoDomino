@@ -17,6 +17,7 @@ import {
   fetchAdminLeague,
   fetchAdminReports,
   fetchAdminUserDetail,
+  fetchAdminPlayerEmail,
   formatAdminClipboardReport,
   fetchAdminClipboardReport,
   normalizeAdminChallenge,
@@ -25,6 +26,7 @@ import {
   normalizeAdminLeague,
   normalizeAdminReport,
   normalizeAdminUserDetailPayload,
+  normalizeAdminPlayerEmail,
   updateAdminChallenge,
   updateAdminReportStatus,
 } from "./adminV1.js";
@@ -37,15 +39,20 @@ assert.deepEqual([...ADMIN_V1_NAV], [
   "overview",
   "users",
   "liveMatches",
-  "globalRp",
+  "matchHistory",
+  "leopips",
+  "leopipsReferrals",
+  "matchmakingHealth",
   "reports",
   "challenge",
   "inviteWin",
+  "playerRankings",
   "league",
   "feedback",
   "audit",
 ]);
 assert.match(source, /rpc\(\s*"admin_get_user"/);
+assert.match(source, /rpc\(\s*"admin_get_player_email"/);
 assert.match(source, /rpc\(\s*"admin_list_reports"/);
 assert.match(source, /rpc\(\s*"admin_list_feedback"/);
 assert.match(source, /rpc\(\s*"admin_list_audit"/);
@@ -65,42 +72,35 @@ assert.match(page, /ADMIN_V1_NAV|liveMatches/);
       player_id: "a",
       display_name: "Ada",
       username: "ada",
-      rp: 1100,
-      wins: 2,
-      losses: 1,
-      matches_played: 3,
       in_active_match: true,
       match_last_seen_at: "2026-08-28T20:00:00.000Z",
       presence_last_seen_at: "2026-08-28T19:59:50.000Z",
       friend_count: 4,
       email: "hidden@example.com",
     },
-    recent_rated_matches: [
-      {
-        match_id: "m1",
-        rated: true,
-        result: "win",
-        settled_at: "2026-08-28T19:00:00.000Z",
-        ruleset_id: "legacy",
-        finish_reason: "completed",
-        match_kind: "public",
-        myHand: ["6-6"],
-      },
-      {
-        match_id: "m-friend",
-        rated: false,
-        result: "win",
-        settled_at: "2026-08-28T18:00:00.000Z",
-      },
-    ],
   });
   assert.equal(payload.player.friendCount, 4);
   assert.equal(payload.player.matchLastSeenAt, "2026-08-28T20:00:00.000Z");
   assert.equal(payload.player.presenceLastSeenAt, "2026-08-28T19:59:50.000Z");
   assert.equal("email" in payload.player, false);
-  assert.equal(payload.recentRatedMatches.length, 1);
-  assert.equal(payload.recentRatedMatches[0].settledAt, "2026-08-28T19:00:00.000Z");
-  assert.equal("myHand" in payload.recentRatedMatches[0], false);
+  assert.equal("rp" in payload.player, false);
+  assert.equal("wins" in payload.player, false);
+  assert.equal("recentRatedMatches" in payload, false);
+}
+
+{
+  const allowed = normalizeAdminPlayerEmail({
+    email: "  owner@example.com  ",
+    phone: "555-0100",
+    token: "secret",
+    raw_user_meta_data: { role: "nope" },
+  });
+  assert.equal(allowed.email, "owner@example.com");
+  assert.equal("phone" in allowed, false);
+  assert.equal("token" in allowed, false);
+  assert.deepEqual(normalizeAdminPlayerEmail({ email: "   " }), { email: null });
+  assert.deepEqual(normalizeAdminPlayerEmail({ email: null }), { email: null });
+  assert.deepEqual(normalizeAdminPlayerEmail(null), { email: null });
 }
 
 {
@@ -178,6 +178,7 @@ assert.match(page, /ADMIN_V1_NAV|liveMatches/);
   await assert.rejects(() => fetchAdminLeague(client), (error) => error.code === ADMIN_ERROR.AUTH);
   await assert.rejects(() => fetchAdminInviteWin(client), (error) => error.code === ADMIN_ERROR.AUTH);
   await assert.rejects(() => fetchAdminUserDetail("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", client), (error) => error.code === ADMIN_ERROR.AUTH);
+  await assert.rejects(() => fetchAdminPlayerEmail("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", client), (error) => error.code === ADMIN_ERROR.AUTH);
 }
 
 {
@@ -188,6 +189,20 @@ assert.match(page, /ADMIN_V1_NAV|liveMatches/);
   };
   await assert.rejects(() => fetchAdminReports({}, client), (error) => error.code === ADMIN_ERROR.FORBIDDEN);
   await assert.rejects(() => fetchAdminChallenge(client), (error) => error.code === ADMIN_ERROR.FORBIDDEN);
+  await assert.rejects(() => fetchAdminPlayerEmail("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", client), (error) => error.code === ADMIN_ERROR.FORBIDDEN);
+}
+
+{
+  const client = {
+    async rpc(name, payload) {
+      assert.equal(name, "admin_get_player_email");
+      assert.equal(payload.p_player_id, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+      return { data: { email: "staff-visible@example.com", phone: "555-0100" }, error: null };
+    },
+  };
+  const row = await fetchAdminPlayerEmail("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", client);
+  assert.equal(row.email, "staff-visible@example.com");
+  assert.equal("phone" in row, false);
 }
 
 {
@@ -242,10 +257,9 @@ assert.match(page, /ADMIN_V1_NAV|liveMatches/);
     users: {
       total: 1,
       offset: 0,
-      users: [{ displayName: "Ada", username: "ada", rp: 1100, wins: 2, losses: 1, inActiveMatch: false, createdAt: "2026-08-01T00:00:00.000Z" }],
+      users: [{ displayName: "Ada", username: "ada", inActiveMatch: false, createdAt: "2026-08-01T00:00:00.000Z" }],
     },
     liveMatches: { total: 0, matches: [] },
-    topRp: { total: 1, players: [{ rank: 1, displayName: "Ada", username: "ada", rp: 1100, wins: 2, losses: 1, matchesPlayed: 3 }] },
     reports: {
       total: 1,
       items: [{
@@ -270,7 +284,7 @@ assert.match(page, /ADMIN_V1_NAV|liveMatches/);
   assert.match(text, /== Overview ==/);
   assert.match(text, /== Users ==/);
   assert.match(text, /== Live Matches ==/);
-  assert.match(text, /== Top RP ==/);
+  assert.doesNotMatch(text, /== Top RP ==/);
   assert.match(text, /== Reports ==/);
   assert.match(text, /== Challenge ==/);
   assert.match(text, /== League ==/);
@@ -282,6 +296,7 @@ assert.match(page, /ADMIN_V1_NAV|liveMatches/);
   assert.match(text, /\[redacted\]/);
   assert.doesNotMatch(text, /hidden@example\.com/);
   assert.doesNotMatch(text, /game_secrets|engine_state|legalMoves|myHand|password|SERVICE_ROLE/);
+  assert.doesNotMatch(text, /\bRP\b/);
 }
 
 {
@@ -292,7 +307,6 @@ assert.match(page, /ADMIN_V1_NAV|liveMatches/);
       }
       if (name === "admin_list_users") return { data: { users: [], total: 0 }, error: null };
       if (name === "admin_list_live_matches") return { data: { matches: [], total: 0 }, error: null };
-      if (name === "admin_list_top_rp") return { data: { players: [], total: 0 }, error: null };
       if (name === "admin_list_reports") return { data: { items: [], total: 0 }, error: null };
       if (name === "admin_get_challenge") {
         return { data: { status: "coming_soon", cp_earning_enabled: true, qualification_cp: 5000 }, error: null };

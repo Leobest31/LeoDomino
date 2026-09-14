@@ -27,10 +27,14 @@ assert.match(settings, /isCloudAuth\(\)/);
 assert.doesNotMatch(settings, /onClick=\{\(\) => tap\(deleteAccount\)\}/, "first tap does not delete");
 assert.doesNotMatch(settings, /AUTH_ERROR\.MATCH_ACTIVE/);
 
-assert.match(app, /playable = Boolean\(signedIn && !session\?\.deletionPending\)/);
+assert.match(
+  app,
+  /playable = Boolean\(signedIn && !session\?\.deletionPending && !passwordRecoveryPending\)/
+);
 assert.match(app, /AccountDeletionPending/);
 assert.match(app, /session\?\.deletionPending/);
 assert.match(app, /phase === "home" && playable/);
+assert.match(app, /phase === "leopipsStake" && playable/);
 assert.match(app, /phase === "findMatch" && playable/);
 assert.match(app, /phase === "friends" && playable/);
 assert.match(app, /phase === "chat" && playable/);

@@ -118,6 +118,28 @@ export function addSafeBreadcrumb(message, data = {}) {
   });
 }
 
+/**
+ * Standalone, always-on diagnostic event — deliberately NOT gated by
+ * isExpectedError. `reportError` intentionally silences expected
+ * control-flow codes (CREATE_FAILED, ACCEPT_FAILED, ...) so they don't
+ * spam Sentry as crashes; that's correct for the exception-severity signal,
+ * but it also means an unclassified failure landing in one of those
+ * catch-all codes previously left zero trace anywhere. Use this for a
+ * generic-fallback path that must stay observable regardless of whether
+ * the *code* is expected — never for genuine gameplay/domain outcomes.
+ * @param {string} name short, stable event name (e.g. "matchmaking_unclassified_error")
+ * @param {Record<string, unknown>} [metadata] safe fields only — no tokens, hands, secrets
+ */
+export function reportSafeEvent(name, metadata = {}) {
+  if (!name || typeof name !== "string") return;
+  const safe = pickSafeMetadata(metadata);
+  sentryClient?.captureMessage?.(name.slice(0, 80), {
+    level: "warning",
+    tags: metadataToTags(safe),
+    extra: safe,
+  });
+}
+
 export function setSafeTags(metadata) {
   const tags = metadataToTags(metadata);
   for (const [key, value] of Object.entries(tags)) {

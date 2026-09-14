@@ -16,6 +16,10 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { GameplayError } from "../../../src/online/gameAuthority.js";
+import {
+  committedTransitionFromRpc,
+  gameplayErrorFromCommitRaise,
+} from "../../../src/online/commitTransitionResult.js";
 import { handleOnlineGameRequest } from "../../../src/online/gameplayHandler.js";
 
 const cors = {
@@ -83,6 +87,11 @@ function createPostgrestGameStore(supabaseUrl, { anonKey, userJwt, serviceKey })
     return headers;
   }
 
+  function isMissingRpcError(error) {
+    const text = [error?.message, error?.code, error?.details, error?.hint].filter(Boolean).join(" ");
+    return /PGRST202|could not find the function|schema cache/i.test(text);
+  }
+
   async function rest(path, { method = "GET", body, role } = {}) {
     const res = await fetch(restUrl + path, {
       method,
@@ -109,7 +118,8 @@ function createPostgrestGameStore(supabaseUrl, { anonKey, userJwt, serviceKey })
   return {
     async loadMatch(matchId) {
       const rows = await rest(
-        "/matches?select=id,ruleset_id,player_a,player_b,status&id=eq." + encodeURIComponent(matchId),
+        "/matches?select=id,ruleset_id,player_a,player_b,status,stake_pips,match_kind&id=eq." +
+          encodeURIComponent(matchId),
         { role: "user" }
       );
       return Array.isArray(rows) ? rows[0] || null : rows;
@@ -149,17 +159,46 @@ function createPostgrestGameStore(supabaseUrl, { anonKey, userJwt, serviceKey })
     },
     async installGame({ matchId, rulesetId, publicRow, engineState, seed, matchStatus }) {
       void matchStatus;
-      const data = await rest("/rpc/install_online_game", {
-        method: "POST",
-        role: "service",
-        body: {
-          p_match_id: matchId,
-          p_ruleset_id: rulesetId,
-          p_public: publicRow,
-          p_engine_state: engineState,
-          p_deal_seed: seed,
-        },
-      });
+      const body = {
+        p_match_id: matchId,
+        p_ruleset_id: rulesetId,
+        p_public: publicRow,
+        p_engine_state: engineState,
+        p_deal_seed: seed,
+      };
+      let data;
+      try {
+        data = await rest("/rpc/_leopips_install_online_game", {
+          method: "POST",
+          role: "service",
+          body,
+        });
+      } catch (error) {
+        if (!isMissingRpcError(error)) throw error;
+        // Fail closed for staked LeoPips matches: never install without debit gate.
+        let stakePips = null;
+        try {
+          const match = await rest(
+            "/matches?select=stake_pips&id=eq." + encodeURIComponent(matchId),
+            { role: "service" }
+          );
+          const row = Array.isArray(match) ? match[0] : match;
+          stakePips = row?.stake_pips ?? row?.stakePips ?? null;
+        } catch {
+          stakePips = null;
+        }
+        if (stakePips != null) {
+          const err = new Error("LeoPips install RPC required for staked match");
+          err.code = "LEOPIPS_INSTALL_REQUIRED";
+          err.cause = error;
+          throw err;
+        }
+        data = await rest("/rpc/install_online_game", {
+          method: "POST",
+          role: "service",
+          body,
+        });
+      }
       return { created: Boolean(data?.created), version: data?.version ?? 0 };
     },
     async commitTransition({
@@ -171,33 +210,37 @@ function createPostgrestGameStore(supabaseUrl, { anonKey, userJwt, serviceKey })
       matchStatus,
     }) {
       try {
-        const data = await rest("/rpc/commit_online_game_transition", {
-          method: "POST",
-          role: "service",
-          body: {
-            p_match_id: matchId,
-            p_expected_version: expectedVersion,
-            p_actor: action.actorId,
-            p_seat: action.seat,
-            p_action_type: action.actionType,
-            p_payload: action.payload ?? {},
-            p_public: publicRow,
-            p_engine_state: engineState,
-            p_match_status: matchStatus ?? null,
-          },
-        });
-        return {
-          version: data?.version,
-          turnDeadlineAt: data?.turnDeadlineAt ?? data?.turn_deadline_at ?? null,
-          timeoutStrikes: data?.timeoutStrikes ?? data?.timeout_strikes ?? null,
+        const body = {
+          p_match_id: matchId,
+          p_expected_version: expectedVersion,
+          p_actor: action.actorId,
+          p_seat: action.seat,
+          p_action_type: action.actionType,
+          p_payload: action.payload ?? {},
+          p_public: publicRow,
+          p_engine_state: engineState,
+          p_match_status: matchStatus ?? null,
         };
+        let data;
+        try {
+          data = await rest("/rpc/_leopips_commit_online_game_transition", {
+            method: "POST",
+            role: "service",
+            body,
+          });
+        } catch (error) {
+          if (!isMissingRpcError(error)) throw error;
+          data = await rest("/rpc/commit_online_game_transition", {
+            method: "POST",
+            role: "service",
+            body,
+          });
+        }
+        return committedTransitionFromRpc(data);
       } catch (error) {
-        if (/stale expected_version/i.test(error.message || "")) {
-          throw new GameplayError("STALE_VERSION", "expected_version does not match");
-        }
-        if (/timeout not due/i.test(error.message || "")) {
-          throw new GameplayError("TIMEOUT_NOT_DUE", "timeout not due");
-        }
+        if (error instanceof GameplayError) throw error;
+        const mapped = gameplayErrorFromCommitRaise(error);
+        if (mapped) throw mapped;
         throw error;
       }
     },

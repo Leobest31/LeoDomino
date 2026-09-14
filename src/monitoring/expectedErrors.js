@@ -33,6 +33,10 @@ export const EXPECTED_ERROR_CODES = Object.freeze([
   "CREATE_FAILED",
   "ACCEPT_FAILED",
   "CANCEL_FAILED",
+  // Mirrors serviceHealth.js's SERVICE_UNAVAILABLE_CODE — a classified
+  // transient-infrastructure outcome, not a crash. Previously unlisted here
+  // (neither expected nor reportable), which was an unintentional gap.
+  "SERVICE_UNAVAILABLE",
 ]);
 
 export const REPORTABLE_ERROR_CODES = Object.freeze([

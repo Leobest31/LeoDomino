@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   PUBLIC_APP_URL_ENV,
   ReferralError,
+  TESTERS_PUBLIC_APP_ORIGIN,
   applyPendingReferralAttribution,
   buildReferralLink,
   capturePendingReferralFromWindow,
@@ -15,6 +16,7 @@ import {
   copyText,
   ensureMyReferralCode,
   getAppOrigin,
+  isEphemeralShareHost,
   normalizeReferralCode,
   parseReferralCodeFromHref,
   readPendingReferralCode,
@@ -28,16 +30,22 @@ const source = readFileSync(join(root, "src/online/referrals.js"), "utf8");
 const main = readFileSync(join(root, "src/main.jsx"), "utf8");
 const provider = readFileSync(join(root, "src/auth/AuthProvider.jsx"), "utf8");
 const example = readFileSync(join(root, ".env.example"), "utf8");
+const vercel = readFileSync(join(root, "vercel.json"), "utf8");
 
 assert.equal(PUBLIC_APP_URL_ENV, "VITE_PUBLIC_APP_URL");
+assert.equal(TESTERS_PUBLIC_APP_ORIGIN, "https://leodomino-testers.vercel.app");
 assert.match(example, /^VITE_PUBLIC_APP_URL=$/m);
-assert.doesNotMatch(source, /trycloudflare/i);
+assert.match(source, /trycloudflare\.com/);
+assert.doesNotMatch(source, /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
 assert.doesNotMatch(source, /SERVICE_ROLE|service_role/i);
 assert.match(main, /capturePendingReferralFromWindow/);
 assert.match(provider, /applyPendingReferralAttribution/);
 assert.match(source, /ensure_my_referral_code/);
 assert.match(source, /apply_referral_code/);
 assert.doesNotMatch(source, /status:\s*'validated'|pending -> validated/i);
+assert.match(vercel, /destination": "\/index\.html"/);
+assert.match(vercel, /privacy/);
+assert.match(vercel, /\/invite|index\.html/);
 
 assert.equal(normalizeReferralCode("abcd2345"), "ABCD2345");
 assert.equal(normalizeReferralCode("ABCD2345"), "ABCD2345");
@@ -48,6 +56,18 @@ assert.equal(parseReferralCodeFromHref("https://play.leodomino.com/invite?ref=ab
 assert.equal(parseReferralCodeFromHref("https://play.leodomino.com/invite/ABCD2345"), "ABCD2345");
 assert.equal(parseReferralCodeFromHref("https://play.leodomino.com/#ref=ABCD2345"), "ABCD2345");
 assert.equal(parseReferralCodeFromHref("https://play.leodomino.com/"), "");
+assert.equal(
+  parseReferralCodeFromHref("https://leodomino-testers.vercel.app/invite?ref=ABCD2345"),
+  "ABCD2345"
+);
+
+assert.equal(isEphemeralShareHost("leodomino-testers.vercel.app"), false);
+assert.equal(isEphemeralShareHost("play.leodomino.com"), false);
+assert.equal(
+  isEphemeralShareHost("leodomino-testers-pgpq9kcxk-leo-domino.vercel.app"),
+  true
+);
+assert.equal(isEphemeralShareHost("leodomino-testers-xxxx-leo-domino.vercel.app"), true);
 
 {
   const origin = getAppOrigin({
@@ -72,11 +92,62 @@ assert.equal(parseReferralCodeFromHref("https://play.leodomino.com/"), "");
 }
 
 {
+  // Capacitor / non-http origin cannot be shared; fall back to stable testers alias.
   const origin = getAppOrigin({
     env: { VITE_PUBLIC_APP_URL: "" },
     location: { origin: "capacitor://localhost" },
   });
-  assert.equal(origin, "");
+  assert.equal(origin, TESTERS_PUBLIC_APP_ORIGIN);
+}
+
+{
+  const ephemeral = "https://leodomino-testers-pgpq9kcxk-leo-domino.vercel.app";
+  assert.equal(
+    getAppOrigin({
+      env: { VITE_PUBLIC_APP_URL: "" },
+      location: { origin: ephemeral },
+    }),
+    TESTERS_PUBLIC_APP_ORIGIN,
+    "ephemeral Preview hosts must not be shared"
+  );
+  assert.equal(
+    buildReferralLink("ABCD2345", {
+      env: { VITE_PUBLIC_APP_URL: "" },
+      location: { origin: ephemeral },
+    }),
+    "https://leodomino-testers.vercel.app/invite?ref=ABCD2345"
+  );
+  assert.equal(
+    getAppOrigin({
+      env: { VITE_PUBLIC_APP_URL: ephemeral },
+      location: { origin: ephemeral },
+    }),
+    TESTERS_PUBLIC_APP_ORIGIN,
+    "misconfigured ephemeral VITE_PUBLIC_APP_URL is rejected"
+  );
+  assert.doesNotMatch(
+    buildReferralLink("ABCD2345", {
+      env: { VITE_PUBLIC_APP_URL: "" },
+      location: { origin: ephemeral },
+    }),
+    /leodomino-testers-[a-z0-9]+-leo-domino\.vercel\.app/i
+  );
+}
+
+{
+  assert.equal(
+    getAppOrigin({
+      env: { VITE_PUBLIC_APP_URL: "" },
+      location: { origin: "https://leodomino-testers.vercel.app" },
+    }),
+    "https://leodomino-testers.vercel.app"
+  );
+  assert.equal(
+    buildReferralLink("WXYZ6789", {
+      env: { VITE_PUBLIC_APP_URL: "https://leodomino-testers.vercel.app" },
+    }),
+    "https://leodomino-testers.vercel.app/invite?ref=WXYZ6789"
+  );
 }
 
 {

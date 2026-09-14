@@ -196,6 +196,27 @@ export const authService = {
     }
     return current.deleteAccount(password);
   },
+  async requestPasswordReset(email, options) {
+    const current = adapter();
+    if (typeof current.requestPasswordReset !== "function") {
+      throw new AuthError(AUTH_ERROR.RESET_UNAVAILABLE);
+    }
+    return current.requestPasswordReset(email, options);
+  },
+  async consumeAuthCallback(locationLike) {
+    const current = adapter();
+    if (typeof current.consumeAuthCallback !== "function") {
+      return { recovered: false };
+    }
+    return current.consumeAuthCallback(locationLike);
+  },
+  async updatePassword(password, confirmPassword) {
+    const current = adapter();
+    if (typeof current.updatePassword !== "function") {
+      throw new AuthError(AUTH_ERROR.RESET_UNAVAILABLE);
+    }
+    return current.updatePassword(password, confirmPassword);
+  },
   onAuthStateChange(handler) {
     return adapter().onAuthStateChange(handler);
   },
