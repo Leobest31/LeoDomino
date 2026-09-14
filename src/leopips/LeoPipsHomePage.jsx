@@ -40,6 +40,7 @@ import { progressionWinProgress } from "./leopipsProgress.js";
 import { leoPipsHomeLevelSubText } from "./leoPipsHomeLevelSubText.js";
 import "../pages/HomePage.css";
 import "./LeoPipsHomePage.css";
+import PremiumHomePresentation from "./PremiumHomePresentation.jsx";
 
 function walletLabel(isolated, walletStatus, balance) {
   if (isolated) return formatLeoPipsAmount(clampLeoPipsBalance(balance));
@@ -61,6 +62,7 @@ function LeoPipsHomePage({
   qualifyingWins = null,
   progressionRank = null,
   avatarSrc,
+  displayName = "LeoDomino Player",
   inboxBadge,
   chatBadge,
   canResume = false,
@@ -79,6 +81,8 @@ function LeoPipsHomePage({
   onResume,
   onOpenStore,
   statusNotice = "",
+  comingSoonNotice = "",
+  presentation = "approved-premium",
 }) {
   const availableLabel = walletLabel(isolated, walletStatus, balance);
   const [notice, setNotice] = useState("");
@@ -116,7 +120,9 @@ function LeoPipsHomePage({
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const fallbackNotice = isolated ? LEOPIPS_COPY.previewNotice : LEOPIPS_COPY.comingSoonNotice;
+  const fallbackNotice = isolated
+    ? LEOPIPS_COPY.previewNotice
+    : comingSoonNotice || LEOPIPS_COPY.comingSoonNotice;
   const previewOnly = () => setNotice(fallbackNotice);
   const run = (fn) => {
     if (typeof fn === "function") fn();
@@ -149,6 +155,51 @@ function LeoPipsHomePage({
   const seasonText = isolated ? LEOPIPS_COPY.seasonN : LEOPIPS_COPY.progressComingSoon;
   const leagueFill = isolated ? LEOPIPS_HOME_PREVIEW.leagueFill : 0;
   const leaguePct = isolated ? `${LEOPIPS_HOME_PREVIEW.leagueFill}%` : LEOPIPS_COPY.progressPending;
+
+  if (presentation !== "legacy") {
+    const levelSubText = leoPipsHomeLevelSubText({
+      maxed: liveProgress.maxed,
+      rank: liveRank,
+      winsInLevel: liveProgress.winsInLevel,
+      nextLevel: liveProgress.nextLevel,
+      copy: LEOPIPS_COPY,
+    });
+    return (
+      <PremiumHomePresentation
+        homeRef={homeRef}
+        isolated={isolated}
+        walletStatus={walletStatus}
+        availableLabel={availableLabel}
+        avatar={avatar}
+        displayName={displayName}
+        liveLevel={liveLevel}
+        liveXp={liveXp}
+        liveRank={liveRank}
+        liveProgress={liveProgress}
+        winFill={winFill}
+        levelSubText={levelSubText}
+        bellBadge={bellBadge}
+        chatBadge={chatCount}
+        showResume={showResume}
+        resumeLabel={resumeLabel}
+        findMatchLabel={findMatchLabel}
+        notice={notice}
+        onPlayOnline={onPlayOnline}
+        onPlayVsLeoBest={onPlayVsLeoBest}
+        onFriends={onFriends}
+        onChat={onChat}
+        onNotifications={onNotifications}
+        onProfile={onProfile}
+        onSettings={onSettings}
+        onChallenge={onChallenge}
+        onInviteFriends={onInviteFriends}
+        onResume={onResume}
+        onNavPlay={onNavPlay}
+        previewOnly={previewOnly}
+        run={run}
+      />
+    );
+  }
 
   return (
     <main

@@ -206,7 +206,9 @@ function LeoPipsAuthenticatedHome({
         lifetimeXp={progression?.lifetimeXp ?? 0}
         qualifyingWins={progression?.qualifyingWins ?? 0}
         progressionRank={progression?.rank ?? null}
+        displayName={session?.displayName || session?.username || t("game.player")}
         statusNotice={walletNotice}
+        comingSoonNotice={t("home.comingSoonNotice")}
         avatarSrc={session ? resolvePlayerAvatar(session.avatarId).src : undefined}
         inboxBadge={formatInboxBadge(inboxCount)}
         chatBadge={formatInboxBadge(chat.unreadTotal)}
@@ -228,6 +230,7 @@ function LeoPipsAuthenticatedHome({
         onChallenge={() => tap(() => onOpenChallenge?.())}
         onInviteFriends={() => tap(() => void referral.inviteFriends())}
         onResume={() => tap(() => onResume?.())}
+        onNavPlay={() => tap(() => onPlayVsLeoBest?.())}
       />
       <LevelUpOverlay
         open={Boolean(levelUpEvent)}

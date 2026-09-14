@@ -1,7 +1,11 @@
 /**
- * Isolated LeoPips Home preview UI contract (pre-premium redesign).
- * Live wiring: wallet + LVL/XP/rank in the status strip. Visual: approved League/status Home.
+ * LeoPips Home integration contract — permanent V1 Home contract.
+ * Live wiring: identity, wallet, LVL/XP/rank. Visual: approved premium Home.
  * Run: node src/leopips/leopipsHome.ui.test.js
+ *
+ * Includes chatBadge/bellBadge forwarding and render-contract coverage
+ * (mail dot only on a real unread count; bell badge unchanged) alongside
+ * the premium-v1 structure assertions.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -20,6 +24,8 @@ const read = (rel) => readFileSync(join(root, rel), "utf8");
 
 const home = read("src/leopips/LeoPipsHomePage.jsx");
 const css = read("src/leopips/LeoPipsHomePage.css");
+const premium = read("src/leopips/PremiumHomePresentation.jsx");
+const premiumCss = read("src/leopips/PremiumHomePresentation.css");
 const preview = read("src/leopips/preview.jsx");
 const realHome = read("src/pages/HomePage.jsx");
 const app = read("src/App.jsx");
@@ -111,7 +117,75 @@ assert.match(authHome, /isolated=\{false\}/);
 assert.match(authHome, /readMyProgression/);
 assert.match(authHome, /LevelUpOverlay/);
 assert.doesNotMatch(authHome, /LEOPIPS_HOME_PREVIEW|GOLD II|LVL 12/);
-assert.doesNotMatch(authHome, /displayName=|countryLabel=|rateAvailable=|onRate=/);
+assert.match(authHome, /displayName=\{session\?\.displayName \|\| session\?\.username/);
+assert.match(authHome, /comingSoonNotice=\{t\("home\.comingSoonNotice"\)\}/);
+assert.match(authHome, /onNavPlay=\{\(\) => tap\(\(\) => onPlayVsLeoBest/);
+assert.match(authHome, /onChat=\{\(\) => tap\(\(\) => onChat/);
+assert.match(authHome, /onFriends=\{\(\) => tap\(\(\) => onFriends/);
+assert.match(authHome, /onChallenge=\{\(\) => tap\(\(\) => onOpenChallenge/);
+assert.match(authHome, /onInviteFriends=\{\(\) => tap\(\(\) => void referral\.inviteFriends\(\)\)\}/);
+assert.doesNotMatch(authHome, /onOpenStore/);
+assert.doesNotMatch(preview, /onFriends=|onChat=|onInviteFriends=|onPlayVsLeoBest=|onChallenge=|onOpenStore=/);
+assert.match(home, /PremiumHomePresentation/);
+
+// --- chatBadge/bellBadge forwarding and render contract ---
+// PremiumHomePresentation.jsx conditionally renders both badges; these
+// assertions prove the forwarding path from LeoPipsHomePage.jsx is intact.
+assert.match(home, /bellBadge=\{bellBadge\}/, "bell badge must be forwarded from LeoPipsHomePage to PremiumHomePresentation");
+assert.match(home, /chatBadge=\{chatCount\}/, "chat badge must be forwarded from LeoPipsHomePage to PremiumHomePresentation");
+assert.match(home, /const chatCount = isolated \? "" : chatBadge/, "isolated preview must suppress the live chat badge instead of showing real unread data");
+assert.match(authHome, /chatBadge=\{formatInboxBadge\(chat\.unreadTotal\)\}/, "authenticated Home must source chatBadge from the real unread total via formatInboxBadge");
+
+assert.match(premium, /data-home-structure="premium-v1"/);
+assert.match(premium, /PLAY\. WIN\. CONNECT\./);
+assert.match(premium, /JWE\. GENYEN\. KONEKTE\./);
+assert.match(premium, /community-approved\.jpeg/);
+assert.match(premium, /data-progression-level/);
+assert.match(premium, /data-progression-rank/);
+assert.match(premium, /data-progression-xp/);
+assert.match(premium, /PRIVATE TABLE/);
+assert.match(premium, /LEOPIPS STORE/);
+assert.match(premium, /data-home-cta="liveChat"/);
+assert.match(premium, /data-home-cta="messages"/);
+assert.match(premium, /data-home-cta="notifications"/);
+
+// --- Badge render contract (proves zero-unread => no dot, positive-unread
+// => dot, since both are gated by the same `? <i/> : null` conditional and
+// chatBadge/bellBadge are only ever "" or a non-empty string — see the
+// formatInboxBadge contract asserted above and in chat.ui.test.js). ---
+assert.match(premium, /<Icon name="mail" \/>\{chatBadge \? <i \/> : null\}/, "messages button must render the dot iff chatBadge is a non-empty (truthy) string");
+assert.match(premium, /<Icon name="bell" \/>\{bellBadge \? <i \/> : null\}/, "notifications button badge render must remain unchanged (regression guard)");
+
+assert.match(premium, /data-home-cta="account"/);
+assert.match(premium, /data-home-cta="inviteFriends"/);
+assert.match(premium, /data-home-card="challenge"/);
+assert.match(premium, /data-home-card="private"/);
+assert.match(premium, /data-home-card="store"/);
+assert.match(premium, /data-home-nav-item="play"/);
+assert.match(premium, /data-home-nav-item="league"/);
+assert.match(premium, /data-home-nav-item="store"/);
+assert.match(premium, /data-home-nav-item="menu"/);
+assert.match(premium, /data-leopips-plus="visual-only"/);
+assert.match(premium, /onClick=\{\(\) => run\(onChat\)\}/);
+assert.match(premium, /onClick=\{\(\) => run\(onFriends\)\}/);
+assert.match(premium, /onClick=\{\(\) => run\(onPlayOnline\)\}/);
+assert.match(premium, /onClick=\{\(\) => run\(onPlayVsLeoBest\)\}/);
+assert.match(premium, /onClick=\{\(\) => run\(onInviteFriends\)\}/);
+assert.match(premium, /onClick=\{\(\) => run\(onChallenge\)\}/);
+assert.match(premium, /onClick=\{\(\) => run\(onNavPlay \|\| onPlayVsLeoBest\)\}/);
+{
+  const privateAt = premium.indexOf('data-home-card="private"');
+  const storeAt = premium.indexOf('data-home-card="store"');
+  const plusAt = premium.indexOf('data-leopips-plus="visual-only"');
+  const leagueNav = premium.indexOf('data-home-nav-item="league"');
+  const storeNav = premium.indexOf('data-home-nav-item="store"');
+  assert.match(premium.slice(privateAt, privateAt + 180), /onClick=\{previewOnly\}/);
+  assert.match(premium.slice(storeAt, storeAt + 160), /onClick=\{previewOnly\}/);
+  assert.match(premium.slice(plusAt, plusAt + 120), /onClick=\{previewOnly\}/);
+  assert.match(premium.slice(leagueNav, leagueNav + 120), /onClick=\{previewOnly\}/);
+  assert.match(premium.slice(storeNav, storeNav + 120), /onClick=\{previewOnly\}/);
+}
+assert.match(premiumCss, /object-fit:cover/);
 
 assert.match(realHome, /HOME_PREVIEW\.leoPoints/);
 assert.doesNotMatch(realHome, /LeoPipsHomePage|from ["'].*leopips/);
@@ -134,4 +208,4 @@ const inviteAt = home.indexOf('data-home-cta="inviteFriends"');
 assert.ok(referralAt > 0 && cashAt > referralAt, "Referral Reward appears before Top Referral");
 assert.ok(inviteAt > cashAt, "Invite Friends follows the referral rewards");
 
-console.log("  ✓ LeoPips Home preview UI contract (pre-premium)");
+console.log("  ✓ LeoPips Home premium integration contract");
